@@ -1,0 +1,33 @@
+{
+  "name": "@discourse/mcp",
+  "version": "0.1.0",
+  "description": "Discourse MCP CLI server (stdio) exposing Discourse tools via MCP",
+  "private": false,
+  "type": "module",
+  "bin": {
+    "discourse-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "node --enable-source-maps dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "sync:fixtures": "node scripts/sync-fixtures.mjs",
+    "test": "node --test dist/test/**/*.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.4"
+  },
+  "packageManager": "pnpm@10.14.0"
+}
+
