@@ -15,7 +15,8 @@ export const registerGetUser: RegisterFn = (server, ctx) => {
     },
     async ({ username }, _extra: any) => {
       try {
-        const data = (await ctx.client.get(`/u/${encodeURIComponent(username)}.json`)) as any;
+        const { base, client } = ctx.siteState.ensureSelectedSite();
+        const data = (await client.get(`/u/${encodeURIComponent(username)}.json`)) as any;
         const user = data?.user || data?.user_badges || data;
         const name = user?.name || username;
         const trust = user?.trust_level;
@@ -27,7 +28,7 @@ export const registerGetUser: RegisterFn = (server, ctx) => {
           created ? `Joined: ${created}` : undefined,
           bio ? "" : undefined,
           bio ? bio.slice(0, 1000) : undefined,
-          `Profile: ${ctx.siteBase}/u/${encodeURIComponent(username)}`,
+          `Profile: ${base}/u/${encodeURIComponent(username)}`,
         ].filter(Boolean) as string[];
         return { content: [{ type: "text", text: lines.join("\n") }] };
       } catch (e: any) {

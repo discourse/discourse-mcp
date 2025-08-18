@@ -28,13 +28,14 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
       lastPostAt = Date.now();
 
       try {
-        const data = (await ctx.client.post(`/posts.json`, { topic_id, raw })) as any;
+        const { base, client } = ctx.siteState.ensureSelectedSite();
+        const data = (await client.post(`/posts.json`, { topic_id, raw })) as any;
         const postId = data?.id || data?.post?.id;
         const topicId = data?.topic_id || topic_id;
         const postNumber = data?.post_number || data?.post?.post_number;
         const link = postId && topicId && postNumber
-          ? `${ctx.siteBase}/t/${topicId}/${postNumber}`
-          : `${ctx.siteBase}/t/${topicId}`;
+          ? `${base}/t/${topicId}/${postNumber}`
+          : `${base}/t/${topicId}`;
         return { content: [{ type: "text", text: `Created post: ${link}` }] };
       } catch (e: any) {
         return { content: [{ type: "text", text: `Failed to create post: ${e?.message || String(e)}` }], isError: true };

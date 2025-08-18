@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { RegisterFn } from "../types.js";
 
 export const registerSearch: RegisterFn = (server, ctx) => {
@@ -18,11 +17,12 @@ export const registerSearch: RegisterFn = (server, ctx) => {
     },
     async (args, _extra: any) => {
       const { query, with_private = false, max_results = 10 } = args;
+      const { base, client } = ctx.siteState.ensureSelectedSite();
       const q = new URLSearchParams();
       q.set("expanded", "true");
       q.set("q", query);
       try {
-        const data = (await ctx.client.get(`/search.json?${q.toString()}`)) as any;
+        const data = (await client.get(`/search.json?${q.toString()}`)) as any;
         const topics: any[] = data?.topics || [];
         const posts: any[] = data?.posts || [];
 
@@ -37,13 +37,13 @@ export const registerSearch: RegisterFn = (server, ctx) => {
         lines.push(`Top results for "${query}":`);
         let idx = 1;
         for (const it of items) {
-          const url = `${ctx.siteBase}/t/${it.slug}/${it.id}`;
+          const url = `${base}/t/${it.slug}/${it.id}`;
           lines.push(`${idx}. ${it.title} – ${url}`);
           idx++;
         }
 
         const jsonFooter = {
-          results: items.map((it) => ({ id: it.id, url: `${ctx.siteBase}/t/${it.slug}/${it.id}`, title: it.title })),
+          results: items.map((it) => ({ id: it.id, url: `${base}/t/${it.slug}/${it.id}`, title: it.title })),
         };
         const text = lines.join("\n") + "\n\n```json\n" + JSON.stringify(jsonFooter) + "\n```\n";
         return { content: [{ type: "text", text }] };

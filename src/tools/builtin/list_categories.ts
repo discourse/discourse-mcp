@@ -12,7 +12,8 @@ export const registerListCategories: RegisterFn = (server, ctx) => {
     },
     async (_args, _extra: any) => {
       try {
-        const data = (await ctx.client.getCached(`/site.json`, 30000)) as any;
+        const { client } = ctx.siteState.ensureSelectedSite();
+        const data = (await client.getCached(`/site.json`, 30000)) as any;
         const cats: any[] = data?.categories || [];
         const lines = cats.map((c) => `- ${c.name} (${c.topic_count ?? 0} topics)`);
         const text = lines.length ? lines.join("\n") : "No categories found.";

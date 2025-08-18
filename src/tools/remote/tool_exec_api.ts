@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { HttpClient } from "../../http/client.js";
 import type { Logger } from "../../util/logger.js";
+import type { SiteState } from "../../site/state.js";
 
 type RemoteTool = {
   name: string;
@@ -11,11 +11,11 @@ type RemoteTool = {
 
 export async function tryRegisterRemoteTools(
   server: McpServer,
-  client: HttpClient,
-  logger: Logger,
-  siteBase: string
+  siteState: SiteState,
+  logger: Logger
 ) {
   try {
+    const { client } = siteState.ensureSelectedSite();
     const tools = (await client.get(`/ai/tools`)) as RemoteTool[] | { tools: RemoteTool[] };
     const list = Array.isArray(tools) ? tools : tools?.tools || [];
     if (!Array.isArray(list) || list.length === 0) return;
@@ -57,6 +57,7 @@ export async function tryRegisterRemoteTools(
         },
         async (args: any, _extra: any) => {
           try {
+            const { client } = siteState.ensureSelectedSite();
             const res = (await client.post(`/ai/tools/${encodeURIComponent(t.name)}/call`, {
               arguments: args,
               context: {},

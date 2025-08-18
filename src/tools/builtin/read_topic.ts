@@ -16,7 +16,8 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
     },
     async ({ topic_id, post_limit = 5 }, _extra: any) => {
       try {
-        const data = (await ctx.client.getCached(`/t/${topic_id}.json`, 30000)) as any;
+        const { base, client } = ctx.siteState.ensureSelectedSite();
+        const data = (await client.get(`/t/${topic_id}.json`)) as any;
         const title = data?.title || `Topic ${topic_id}`;
         const category = data?.category_id ? `Category ID ${data.category_id}` : "";
         const tags: string[] = data?.tags || [];
@@ -39,7 +40,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
           lines.push(`  ${p.excerpt}`);
         }
         lines.push("");
-        lines.push(`Link: ${ctx.siteBase}/t/${data?.slug || topic_id}/${topic_id}`);
+        lines.push(`Link: ${base}/t/${data?.slug || topic_id}/${topic_id}`);
         return { content: [{ type: "text", text: lines.join("\n") }] };
       } catch (e: any) {
         return { content: [{ type: "text", text: `Failed to read topic ${topic_id}: ${e?.message || String(e)}` }], isError: true };

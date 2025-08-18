@@ -12,7 +12,8 @@ export const registerListTags: RegisterFn = (server, ctx) => {
     },
     async (_args, _extra: any) => {
       try {
-        const data = (await ctx.client.get(`/tags.json`)) as any;
+        const { client } = ctx.siteState.ensureSelectedSite();
+        const data = (await client.get(`/tags.json`)) as any;
         const tags: any[] = data?.tags || [];
         const lines = tags.map((t) => `- ${t.id} (${t.count ?? 0})`);
         const text = lines.length ? lines.join("\n") : "No tags found or tags disabled.";

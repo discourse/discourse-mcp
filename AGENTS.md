@@ -6,17 +6,18 @@
 - **SDK**: `@modelcontextprotocol/sdk`. Node ≥ 18.
 
 ### How it works
-- On start, the server validates CLI flags via Zod, constructs an HTTP client, and registers tools on an MCP server named `@discourse/mcp`.
-- HTTP requests target the configured Discourse site; responses are summarized for agent consumption.
+- On start, the server validates CLI flags via Zod, constructs a dynamic site state, and registers tools on an MCP server named `@discourse/mcp`.
+- Use the `discourse_select_site` tool to validate and choose a target Discourse site (via `/about.json`). Subsequent tools use the selected site and appropriate auth.
 - Outputs are text-oriented; some tools embed compact JSON in fenced code blocks for structured extraction.
 
 ### Authentication & permissions
 - Supported auth:
   - **None** (read-only public data)
-  - **Api-Key** with optional `Api-Username`
-  - **User-Api-Key**
+  - **Api-Key** with optional `Api-Username` (global default)
+  - **User-Api-Key** (global default)
+  - Optional per-site overrides via `--auth_pairs`, e.g. `[{"site":"https://example.com","api_key":"...","api_username":"system"}]`.
 - **Writes are disabled by default**. `discourse.create_post` is only registered when all are true:
-  - `--allow_writes` AND not `--read_only` AND one of `--api_key` or `--user_api_key` is provided.
+  - `--allow_writes` AND not `--read_only` AND some auth is configured (either default or matching `auth_pairs`).
 - Secrets are never logged; config is redacted before logging.
 
 ### Tools exposed (built-in)
@@ -39,12 +40,15 @@
   - **Input**: `{ username: string }`
   - **Output**: Display name, trust level, joined date, short bio, and profile link.
 - **discourse_create_post** (conditionally available; see permissions)
+ - **discourse_select_site**
+   - **Input**: `{ site: string }`
+   - **Output**: Confirms selection; validates via `/about.json`. Triggers remote tool discovery when enabled.
   - **Input**: `{ topic_id: number; raw: string (≤ 30k chars) }`
   - **Output**: Link to created post/topic. Includes a simple 1 req/sec rate limit.
 
 ### Remote Tool Execution API (optional)
 - If the target Discourse site exposes an MCP-compatible Tool Execution API:
-  - GET `/ai/tools` is discovered on startup when `tools_mode` is `auto` (default) or `tool_exec_api`.
+  - GET `/ai/tools` is discovered after selecting a site when `tools_mode` is `auto` (default) or `tool_exec_api`.
   - Each remote tool is registered dynamically using its JSON Schema input.
   - Calls POST `/ai/tools/{name}/call` with `{ arguments, context: {} }`.
   - Results may include `details.artifacts[]`; links are surfaced at the end of the tool output.

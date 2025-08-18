@@ -1,12 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { HttpClient } from "../http/client.js";
 import type { Logger } from "../util/logger.js";
+import type { SiteState } from "../site/state.js";
 
 export interface ToolContext {
-  client: HttpClient;
+  siteState: SiteState;
   logger: Logger;
-  siteBase: string;
 }
 
-export type RegisterFn = (server: McpServer, ctx: ToolContext, opts: { allowWrites: boolean }) => void | Promise<void>;
+export type RegisterFn = (server: McpServer, ctx: ToolContext, opts: { allowWrites: boolean; toolsMode?: string }) => void | Promise<void>;
 

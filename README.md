@@ -16,8 +16,9 @@ pnpm build
 
 - **Run locally (read‑only, recommended to start):**
 ```bash
-node dist/index.js --site https://try.discourse.org
+node dist/index.js
 ```
+Then, in your MCP client, call the `discourse_select_site` tool with `{ "site": "https://try.discourse.org" }` to choose a site.
 
 - **Enable writes (opt‑in, safe‑guarded):**
 ```bash
@@ -33,7 +34,7 @@ node dist/index.js \
   "mcpServers": {
     "discourse": {
       "command": "node",
-      "args": ["/absolute/path/to/dist/index.js", "--site", "https://try.discourse.org"],
+      "args": ["/absolute/path/to/dist/index.js"],
       "env": {}
     }
   }
@@ -46,7 +47,7 @@ node dist/index.js \
   "mcpServers": {
     "discourse": {
       "command": "discourse-mcp",
-      "args": ["--site", "https://try.discourse.org"]
+      "args": []
     }
   }
 }
@@ -54,21 +55,19 @@ node dist/index.js \
 
 ## Configuration
 
-The server connects to your Discourse site and registers tools under the MCP server name `@discourse/mcp`.
-
-- **Required**
-  - **`--site <https://your.discourse.site>`**: Base URL of the Discourse instance.
+The server registers tools under the MCP server name `@discourse/mcp`. You select the target Discourse site at runtime using the `discourse_select_site` tool, which validates the site via `/about.json`.
 
 - **Auth modes**
   - **None** (default): read‑only public data.
-  - **`--api_key <key>`** (+ optional `--api_username <name>`): Admin/mod API key.
-  - **`--user_api_key <key>`**: User API key.
+  - **`--api_key <key>`** (+ optional `--api_username <name>`): Default API key used when no per‑site override matches.
+  - **`--user_api_key <key>`**: Default User API key used when no per‑site override matches.
+  - **`--auth_pairs '[{"site":"https://example.com","api_key":"...","api_username":"system"}]'`**: Optional per‑site auth overrides; matched by origin. You can include multiple entries. When present for a selected site, overrides the default auth.
   - Provide only one of `--api_key` or `--user_api_key` (mutually exclusive).
 
 - **Write safety**
   - Writes are disabled by default.
   - The tool `discourse.create_post` is only registered when all are true:
-    - `--allow_writes` AND not `--read_only` AND one of `--api_key` or `--user_api_key` is present.
+    - `--allow_writes` AND not `--read_only` AND some auth is configured (either default flags or a matching `auth_pairs` entry).
   - A ~1 req/sec rate limit is enforced for `create_post`.
 
 - **Flags & defaults**
@@ -84,8 +83,10 @@ The server connects to your Discourse site and registers tools under the MCP ser
 - **Profile file** (keep secrets off the command line)
 ```json
 {
-  "site": "https://try.discourse.org",
   "user_api_key": "<redacted>",
+  "auth_pairs": [
+    { "site": "https://try.discourse.org", "user_api_key": "<redacted>" }
+  ],
   "read_only": false,
   "allow_writes": true,
   "log_level": "info",
@@ -99,7 +100,7 @@ node dist/index.js --profile /absolute/path/to/profile.json
 Flags still override values from the profile.
 
 - **Remote Tool Execution API (optional)**
-  - With `tools_mode=auto` (default) or `tool_exec_api`, the server discovers remote tools via GET `/ai/tools` and registers them dynamically. Set `--tools_mode=discourse_api_only` to disable remote tool discovery.
+  - With `tools_mode=auto` (default) or `tool_exec_api`, the server discovers remote tools via GET `/ai/tools` after you select a site and registers them dynamically. Set `--tools_mode=discourse_api_only` to disable remote tool discovery.
 
 - **Networking & resilience**
   - Retries on 429/5xx with backoff (3 attempts).
@@ -175,15 +176,13 @@ See `AGENTS.md` for additional guidance on using this server from agent framewor
 
 - Read‑only session against `try.discourse.org`:
 ```bash
-node dist/index.js --site https://try.discourse.org --log_level debug
+node dist/index.js --log_level debug
+# In client: call discourse_select_site with {"site":"https://try.discourse.org"}
 ```
 
 - Create a post (writes enabled):
 ```bash
-node dist/index.js \
-  --site https://try.discourse.org \
-  --allow_writes --read_only=false \
-  --api_key "$DISCOURSE_API_KEY" --api_username "system"
+node dist/index.js --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 ```
 
 ## FAQ
