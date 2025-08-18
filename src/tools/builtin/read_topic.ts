@@ -4,7 +4,8 @@ import type { RegisterFn } from "../types.js";
 export const registerReadTopic: RegisterFn = (server, ctx) => {
   const schema = z.object({
     topic_id: z.number().int().positive(),
-    post_limit: z.number().int().min(1).max(20).optional(),
+    post_limit: z.number().int().min(1).max(100).optional(),
+    start_post_number: z.number().int().min(1).optional().describe("Start from this post number (1-based)")
   });
 
   server.registerTool(
@@ -14,33 +15,56 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
       description: "Read a topic metadata and first N posts.",
       inputSchema: schema.shape,
     },
-    async ({ topic_id, post_limit = 5 }, _extra: any) => {
+    async ({ topic_id, post_limit = 5, start_post_number }, _extra: any) => {
       try {
         const { base, client } = ctx.siteState.ensureSelectedSite();
-        const data = (await client.get(`/t/${topic_id}.json`)) as any;
-        const title = data?.title || `Topic ${topic_id}`;
-        const category = data?.category_id ? `Category ID ${data.category_id}` : "";
-        const tags: string[] = data?.tags || [];
+        const start = start_post_number ?? 1;
 
-        const stream: any[] = data?.post_stream?.posts || [];
-        const posts = stream.slice(0, post_limit).map((p) => ({
-          number: p.post_number,
-          username: p.username,
-          created_at: p.created_at,
-          excerpt: (p.excerpt || p.cooked || p.raw || "").toString().slice(0, 400),
-        }));
+        // First request to load metadata/title and initial chunk
+        let current = start;
+        let fetchedPosts: Array<{ number: number; username: string; created_at: string; excerpt: string }> = [];
+        let slug = "";
+        let title = `Topic ${topic_id}`;
+        let category = "";
+        let tags: string[] = [];
+
+        const maxBatches = 10; // safety guard
+        for (let i = 0; i < maxBatches && fetchedPosts.length < post_limit; i++) {
+          const url = current > 1 ? `/t/${topic_id}.json?near=${current}` : `/t/${topic_id}.json`;
+          const data = (await client.get(url)) as any;
+          if (i === 0) {
+            title = data?.title || title;
+            category = data?.category_id ? `Category ID ${data.category_id}` : "";
+            tags = Array.isArray(data?.tags) ? data.tags : [];
+            slug = data?.slug || String(topic_id);
+          }
+          const stream: any[] = Array.isArray(data?.post_stream?.posts) ? data.post_stream.posts : [];
+          const sorted = stream.slice().sort((a, b) => (a.post_number || 0) - (b.post_number || 0));
+          const filtered = sorted.filter((p) => (p.post_number || 0) >= current);
+          for (const p of filtered) {
+            if (fetchedPosts.length >= post_limit) break;
+            fetchedPosts.push({
+              number: p.post_number,
+              username: p.username,
+              created_at: p.created_at,
+              excerpt: (p.excerpt || p.cooked || p.raw || "").toString().slice(0, 400),
+            });
+          }
+          if (filtered.length === 0) break; // no progress
+          current = (filtered[filtered.length - 1]?.post_number || current) + 1;
+        }
 
         const lines: string[] = [];
         lines.push(`# ${title}`);
         if (category) lines.push(category);
         if (tags.length) lines.push(`Tags: ${tags.join(", ")}`);
         lines.push("");
-        for (const p of posts) {
+        for (const p of fetchedPosts) {
           lines.push(`- Post #${p.number} by @${p.username} (${p.created_at})`);
           lines.push(`  ${p.excerpt}`);
         }
         lines.push("");
-        lines.push(`Link: ${base}/t/${data?.slug || topic_id}/${topic_id}`);
+        lines.push(`Link: ${base}/t/${slug}/${topic_id}`);
         return { content: [{ type: "text", text: lines.join("\n") }] };
       } catch (e: any) {
         return { content: [{ type: "text", text: `Failed to read topic ${topic_id}: ${e?.message || String(e)}` }], isError: true };
