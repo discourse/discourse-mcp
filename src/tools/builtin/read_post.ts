@@ -7,7 +7,7 @@ export const registerReadPost: RegisterFn = (server, ctx) => {
   });
 
   server.registerTool(
-    "discourse.read_post",
+    "discourse_read_post",
     {
       title: "Read Post",
       description: "Read a specific post.",

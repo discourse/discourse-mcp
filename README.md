@@ -112,23 +112,23 @@ Flags still override values from the profile.
 
 Built‑in tools (always present unless noted):
 
-- `discourse.search`
+- `discourse_search`
   - Input: `{ query: string; with_private?: boolean; max_results?: number (1–50, default 10) }`
   - Output: text summary plus a compact footer like:
     ```json
     { "results": [{ "id": 123, "url": "https://…", "title": "…" }] }
     ```
-- `discourse.read_topic`
+- `discourse_read_topic`
   - Input: `{ topic_id: number; post_limit?: number (1–20, default 5) }`
-- `discourse.read_post`
+- `discourse_read_post`
   - Input: `{ post_id: number }`
-- `discourse.list_categories`
+- `discourse_list_categories`
   - Input: `{}`
-- `discourse.list_tags`
+- `discourse_list_tags`
   - Input: `{}`
-- `discourse.get_user`
+- `discourse_get_user`
   - Input: `{ username: string }`
-- `discourse.create_post` (only when writes enabled; see Write safety)
+- `discourse_create_post` (only when writes enabled; see Write safety)
   - Input: `{ topic_id: number; raw: string (≤ 30k chars) }`
 
 Notes:

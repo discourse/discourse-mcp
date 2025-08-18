@@ -20,25 +20,25 @@
 - Secrets are never logged; config is redacted before logging.
 
 ### Tools exposed (built-in)
-- **discourse.search**
+- **discourse_search**
   - **Input**: `{ query: string; with_private?: boolean; max_results?: number (1–50, default 10) }`
   - **Output**: Top topics with titles and URLs; appends a JSON footer of `{ results: [{ id, url, title }] }` inside a fenced block.
-- **discourse.read_topic**
+- **discourse_read_topic**
   - **Input**: `{ topic_id: number; post_limit?: number (1–20, default 5) }`
   - **Output**: Title, category, tags, and the first N posts as brief bullet summaries; includes canonical topic link.
-- **discourse.read_post**
+- **discourse_read_post**
   - **Input**: `{ post_id: number }`
   - **Output**: Author, timestamp, excerpt (up to ~1200 chars), and direct link.
-- **discourse.list_categories**
+- **discourse_list_categories**
   - **Input**: `{}`
   - **Output**: Category names with topic counts.
-- **discourse.list_tags**
+- **discourse_list_tags**
   - **Input**: `{}`
   - **Output**: Tags with usage counts (or notice if tags are disabled).
-- **discourse.get_user**
+- **discourse_get_user**
   - **Input**: `{ username: string }`
   - **Output**: Display name, trust level, joined date, short bio, and profile link.
-- **discourse.create_post** (conditionally available; see permissions)
+- **discourse_create_post** (conditionally available; see permissions)
   - **Input**: `{ topic_id: number; raw: string (≤ 30k chars) }`
   - **Output**: Link to created post/topic. Includes a simple 1 req/sec rate limit.
 

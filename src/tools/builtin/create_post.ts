@@ -12,7 +12,7 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
   });
 
   server.registerTool(
-    "discourse.create_post",
+    "discourse_create_post",
     {
       title: "Create Post",
       description: "Create a post in a topic.",

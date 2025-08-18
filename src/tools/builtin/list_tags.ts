@@ -4,7 +4,7 @@ import { z } from "zod";
 export const registerListTags: RegisterFn = (server, ctx) => {
   const schema = z.object({}).strict();
   server.registerTool(
-    "discourse.list_tags",
+    "discourse_list_tags",
     {
       title: "List Tags",
       description: "List tags (if enabled).",

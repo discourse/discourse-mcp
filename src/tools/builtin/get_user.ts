@@ -7,7 +7,7 @@ export const registerGetUser: RegisterFn = (server, ctx) => {
   });
 
   server.registerTool(
-    "discourse.get_user",
+    "discourse_get_user",
     {
       title: "Get User",
       description: "Get basic user info.",

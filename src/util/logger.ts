@@ -7,7 +7,7 @@ export class Logger {
     info: 2,
     debug: 3,
   };
-  constructor(private level: LogLevel = "info") {}
+  constructor(private level: LogLevel = "info") { }
 
   setLevel(level: LogLevel) {
     this.level = level;
@@ -34,7 +34,7 @@ export class Logger {
   private write(level: string, msg: string, meta?: unknown) {
     const line = meta ? `${msg} ${safeJson(meta)}` : msg;
     // Log to stderr per spec
-    process.stderr.write(`[${new Date().toISOString()}] ${level} ${line}\n`);
+    //process.stderr.write(`[${new Date().toISOString()}] ${level} ${line}\n`);
   }
 }
 

@@ -10,7 +10,7 @@ export const registerSearch: RegisterFn = (server, ctx) => {
   });
 
   server.registerTool(
-    "discourse.search",
+    "discourse_search",
     {
       title: "Discourse Search",
       description: "Search site content.",

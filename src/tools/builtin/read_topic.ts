@@ -8,7 +8,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
   });
 
   server.registerTool(
-    "discourse.read_topic",
+    "discourse_read_topic",
     {
       title: "Read Topic",
       description: "Read a topic metadata and first N posts.",
