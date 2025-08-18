@@ -5,7 +5,6 @@ export type AuthOverride = {
   site: string; // base URL or origin to match
   api_key?: string;
   api_username?: string;
-  user_api_key?: string;
 };
 
 function normalizeBase(url: string): string {
@@ -68,7 +67,6 @@ export class SiteState {
     const overrides = this.opts.authOverrides || [];
     const match = overrides.find((o) => normalizeBase(o.site) === base || this.sameOrigin(o.site, base));
     if (match) {
-      if (match.user_api_key) return { type: "user_api_key", key: match.user_api_key };
       if (match.api_key) return { type: "api_key", key: match.api_key, username: match.api_username };
     }
     return this.opts.defaultAuth;

@@ -22,10 +22,7 @@ Then, in your MCP client, call the `discourse_select_site` tool with `{ "site": 
 
 - **Enable writes (opt‑in, safe‑guarded):**
 ```bash
-node dist/index.js \
-  --site https://try.discourse.org \
-  --allow_writes --read_only=false \
-  --user_api_key $DISCOURSE_USER_API_KEY
+node dist/index.js --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 ```
 
 - **Use in an MCP client (example: Claude Desktop) — local build:**
@@ -57,12 +54,9 @@ node dist/index.js \
 
 The server registers tools under the MCP server name `@discourse/mcp`. You select the target Discourse site at runtime using the `discourse_select_site` tool, which validates the site via `/about.json`.
 
-- **Auth modes**
-  - **None** (default): read‑only public data.
-  - **`--api_key <key>`** (+ optional `--api_username <name>`): Default API key used when no per‑site override matches.
-  - **`--user_api_key <key>`**: Default User API key used when no per‑site override matches.
-  - **`--auth_pairs '[{"site":"https://example.com","api_key":"...","api_username":"system"}]'`**: Optional per‑site auth overrides; matched by origin. You can include multiple entries. When present for a selected site, overrides the default auth.
-  - Provide only one of `--api_key` or `--user_api_key` (mutually exclusive).
+- **Auth**
+  - **None** by default.
+  - **`--auth_pairs '[{"site":"https://example.com","api_key":"...","api_username":"system"}]'`**: Per‑site API key overrides. You can include multiple entries; the matching entry is used for the selected site.
 
 - **Write safety**
   - Writes are disabled by default.
@@ -83,9 +77,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. You selec
 - **Profile file** (keep secrets off the command line)
 ```json
 {
-  "user_api_key": "<redacted>",
   "auth_pairs": [
-    { "site": "https://try.discourse.org", "user_api_key": "<redacted>" }
+    { "site": "https://try.discourse.org", "api_key": "<redacted>", "api_username": "system" }
   ],
   "read_only": false,
   "allow_writes": true,

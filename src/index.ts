@@ -25,9 +25,6 @@ const DEFAULT_TIMEOUT_MS = 15000;
 // CLI config schema
 const ProfileSchema = z
   .object({
-    api_key: z.string().optional(),
-    user_api_key: z.string().optional(),
-    api_username: z.string().optional(),
     auth_pairs: z
       .array(
         z
@@ -35,7 +32,6 @@ const ProfileSchema = z
             site: z.string().url(),
             api_key: z.string().optional(),
             api_username: z.string().optional(),
-            user_api_key: z.string().optional(),
           })
           .strict()
       )
@@ -95,9 +91,6 @@ async function loadProfile(path?: string): Promise<Partial<Profile>> {
 
 function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>): Profile {
   const merged = {
-    api_key: (flags.api_key as string) ?? profile.api_key,
-    user_api_key: (flags.user_api_key as string) ?? profile.user_api_key,
-    api_username: (flags.api_username as string) ?? profile.api_username,
     auth_pairs: (flags.auth_pairs as any) ?? profile.auth_pairs,
     read_only: (flags.read_only as boolean | undefined) ?? profile.read_only ?? true,
     allow_writes: (flags.allow_writes as boolean | undefined) ?? profile.allow_writes ?? false,
@@ -112,12 +105,8 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
   return result.data;
 }
 
-function buildAuth(config: Profile): AuthMode {
-  if (config.api_key && config.user_api_key) {
-    throw new Error("Provide only one of --api_key or --user_api_key, not both");
-  }
-  if (config.user_api_key) return { type: "user_api_key", key: config.user_api_key };
-  if (config.api_key) return { type: "api_key", key: config.api_key, username: config.api_username };
+function buildAuth(_config: Profile): AuthMode {
+  // Global default is no auth; use per-site overrides via auth_pairs when provided
   return { type: "none" };
 }
 
@@ -168,7 +157,7 @@ async function main() {
     }
   );
 
-  const allowWrites = Boolean(config.allow_writes && !config.read_only && (config.api_key || config.user_api_key || (config.auth_pairs && config.auth_pairs.length > 0)));
+  const allowWrites = Boolean(config.allow_writes && !config.read_only && (config.auth_pairs && config.auth_pairs.length > 0));
   await registerAllTools(server as any, siteState, logger, {
     allowWrites,
     toolsMode: config.tools_mode,

@@ -2,8 +2,7 @@ import { Logger } from "../util/logger.js";
 
 export type AuthMode =
   | { type: "none" }
-  | { type: "api_key"; key: string; username?: string }
-  | { type: "user_api_key"; key: string };
+  | { type: "api_key"; key: string; username?: string };
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -36,8 +35,6 @@ export class HttpClient {
     if (this.opts.auth.type === "api_key") {
       h["Api-Key"] = this.opts.auth.key;
       if (this.opts.auth.username) h["Api-Username"] = this.opts.auth.username;
-    } else if (this.opts.auth.type === "user_api_key") {
-      h["User-Api-Key"] = this.opts.auth.key;
     }
     return h;
   }

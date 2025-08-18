@@ -13,11 +13,9 @@
 ### Authentication & permissions
 - Supported auth:
   - **None** (read-only public data)
-  - **Api-Key** with optional `Api-Username` (global default)
-  - **User-Api-Key** (global default)
-  - Optional per-site overrides via `--auth_pairs`, e.g. `[{"site":"https://example.com","api_key":"...","api_username":"system"}]`.
+  - Per-site overrides via `--auth_pairs`, e.g. `[{"site":"https://example.com","api_key":"...","api_username":"system"}]`.
 - **Writes are disabled by default**. `discourse.create_post` is only registered when all are true:
-  - `--allow_writes` AND not `--read_only` AND some auth is configured (either default or matching `auth_pairs`).
+  - `--allow_writes` AND not `--read_only` AND a matching `auth_pairs` entry exists for the selected site.
 - Secrets are never logged; config is redacted before logging.
 
 ### Tools exposed (built-in)
@@ -55,10 +53,8 @@
 - Set `--tools_mode=discourse_api_only` to disable remote tool discovery.
 
 ### CLI configuration
-- **Required**: `--site <https://your.discourse.site>`
 - **Optional flags**:
-  - `--api_key <key>` and optionally `--api_username <name>`
-  - `--user_api_key <key>` (mutually exclusive with `--api_key`)
+  - `--auth_pairs` (JSON)
   - `--read_only` (default true), `--allow_writes` (default false)
   - `--timeout_ms <number>` (default 15000)
   - `--concurrency <number>` (default 4)
@@ -86,5 +82,5 @@
 
 ### Quick start (for human operators)
 - Build: `pnpm build`
-- Run: `node dist/index.js --site https://try.discourse.org`
-- With writes (example): `node dist/index.js --site https://try.discourse.org --user_api_key $KEY --allow_writes --read_only=false`
+- Run: `node dist/index.js`
+- Select site with `discourse_select_site` in your client
