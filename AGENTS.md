@@ -37,6 +37,10 @@
 - **discourse_get_user**
   - **Input**: `{ username: string }`
   - **Output**: Display name, trust level, joined date, short bio, and profile link.
+- **discourse_filter_topics**
+  - **Input**: `{ filter: string; page?: number; per_page?: number (1–50) }`
+  - **Output**: Paginated topic list with titles and URLs; appends a JSON footer `{ page, per_page, results: [{ id, url, title }], next_url? }`.
+  - Query language: key:value tokens separated by spaces; category/categories (comma = OR, `=category` = without subcats, `-` exclude); tag/tags (comma = OR, `+` = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public); personal `in:` (bookmarked|watching|tracking|muted|pinned); dates created/activity/latest-post-(before|after) as `YYYY-MM-DD` or `N` days; numeric likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); `order:` with optional `-asc`; free text terms allowed.
 - **discourse_create_post** (conditionally available; see permissions)
  - **discourse_select_site**
    - **Input**: `{ site: string }`

@@ -9,6 +9,7 @@ import { registerListTags } from "./builtin/list_tags.js";
 import { registerGetUser } from "./builtin/get_user.js";
 import { registerCreatePost } from "./builtin/create_post.js";
 import { registerSelectSite } from "./builtin/select_site.js";
+import { registerFilterTopics } from "./builtin/filter_topics.js";
 
 export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
@@ -33,6 +34,6 @@ export async function registerAllTools(
   registerListCategories(server, ctx, { allowWrites: false });
   registerListTags(server, ctx, { allowWrites: false });
   registerGetUser(server, ctx, { allowWrites: false });
+  registerFilterTopics(server, ctx, { allowWrites: false });
   registerCreatePost(server, ctx, { allowWrites: opts.allowWrites });
 }
-
