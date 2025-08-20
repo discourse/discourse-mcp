@@ -20,7 +20,8 @@ export const registerSearch: RegisterFn = (server, ctx) => {
       const { base, client } = ctx.siteState.ensureSelectedSite();
       const q = new URLSearchParams();
       q.set("expanded", "true");
-      q.set("q", query);
+      const fullQuery = ctx.defaultSearchPrefix ? `${ctx.defaultSearchPrefix} ${query}` : query;
+      q.set("q", fullQuery);
       try {
         const data = (await client.get(`/search.json?${q.toString()}`)) as any;
         const topics: any[] = data?.topics || [];

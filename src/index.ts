@@ -46,6 +46,7 @@ const ProfileSchema = z
     log_level: z.enum(["silent", "error", "info", "debug"]).optional().default("info"),
     tools_mode: z.enum(["auto", "discourse_api_only", "tool_exec_api"]).optional().default("auto"),
     site: z.string().url().optional().describe("Tether MCP to a single Discourse site; hides select_site and preselects this site"),
+    default_search: z.string().optional().describe("Optional search prefix added to every search query (set via --default-search)"),
   })
   .strict();
 
@@ -103,6 +104,7 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     log_level: ((flags.log_level as LogLevel | undefined) ?? (profile.log_level as LogLevel | undefined) ?? "info") as LogLevel,
     tools_mode: ((flags.tools_mode as ToolsMode | undefined) ?? (profile.tools_mode as ToolsMode | undefined) ?? "auto") as ToolsMode,
     site: (flags.site as string | undefined) ?? profile.site,
+    default_search: ((flags["default-search"] as string | undefined) ?? profile.default_search) as string | undefined,
   } satisfies Profile;
   const result = ProfileSchema.safeParse(merged);
   if (!result.success) throw new Error(`Invalid configuration: ${result.error.message}`);
@@ -183,6 +185,7 @@ async function main() {
     allowWrites,
     toolsMode: config.tools_mode,
     hideSelectSite,
+    defaultSearchPrefix: config.default_search,
   });
 
   // If tethered and remote tool discovery is enabled, discover now

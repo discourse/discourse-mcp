@@ -138,3 +138,47 @@ test('tethered mode hides select_site and allows search without selection', asyn
     globalThis.fetch = originalFetch as any;
   }
 });
+
+test('default-search prefix is applied to queries', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+
+  const tools: Record<string, { handler: Function }> = {};
+  const fakeServer: any = {
+    registerTool(name: string, _meta: any, handler: Function) {
+      tools[name] = { handler };
+    },
+  };
+
+  // Mock fetch to capture the search URL
+  let lastUrl: string | undefined;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: any, _init?: any) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    lastUrl = url;
+    if (url.endsWith('/about.json')) {
+      return new Response(JSON.stringify({ about: { title: 'Example Discourse' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (url.includes('/search.json')) {
+      return new Response(JSON.stringify({ topics: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response('not found', { status: 404 });
+  }) as any;
+
+  try {
+    const { base, client } = siteState.buildClientForSite('https://example.com');
+    await client.get('/about.json');
+    siteState.selectSite(base);
+
+    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest-post' } as any);
+
+    await tools['discourse_search'].handler({ query: 'hello world' }, {});
+    assert.ok(lastUrl && lastUrl.includes('/search.json?'));
+    const qs = lastUrl!.split('?')[1] || '';
+    const params = new URLSearchParams(qs);
+    assert.equal(params.get('expanded'), 'true');
+    assert.equal(params.get('q'), 'tag:ai order:latest-post hello world');
+  } finally {
+    globalThis.fetch = originalFetch as any;
+  }
+});

@@ -68,6 +68,8 @@
   - `--log_level <silent|error|info|debug>` (default info)
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default auto)
   - `--profile <path.json>`: load partial config from JSON (flags override)
+  - `--site <url>`: tether to a single site (hides `discourse_select_site`)
+  - `--default-search <prefix>`: unconditionally prefix every search query (e.g., `category:support tag:ai`)
 
 ### Networking & resilience
 - User-Agent: `Discourse-MCP/0.x (+https://github.com/discourse-mcp)`.

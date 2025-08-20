@@ -18,6 +18,8 @@ export interface RegistryOptions {
   toolsMode: ToolsMode;
   // When true, do not register the discourse_select_site tool
   hideSelectSite?: boolean;
+  // Optional default search prefix to add to all searches
+  defaultSearchPrefix?: string;
 }
 
 export async function registerAllTools(
@@ -26,7 +28,7 @@ export async function registerAllTools(
   logger: Logger,
   opts: RegistryOptions
 ) {
-  const ctx = { siteState, logger } as const;
+  const ctx = { siteState, logger, defaultSearchPrefix: opts.defaultSearchPrefix } as const;
 
   // Built-in tools
   if (!opts.hideSelectSite) {

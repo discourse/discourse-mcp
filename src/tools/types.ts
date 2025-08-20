@@ -5,6 +5,7 @@ import type { SiteState } from "../site/state.js";
 export interface ToolContext {
   siteState: SiteState;
   logger: Logger;
+  defaultSearchPrefix?: string;
 }
 
 export type RegisterFn = (server: McpServer, ctx: ToolContext, opts: { allowWrites: boolean; toolsMode?: string }) => void | Promise<void>;

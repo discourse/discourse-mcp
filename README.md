@@ -67,6 +67,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - `--log_level <silent|error|info|debug>` (default: info)
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
+  - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest-post`).
   - `--cache_dir <path>` (reserved)
   - `--profile <path.json>` (see below)
 
@@ -81,6 +82,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   "log_level": "info",
   "tools_mode": "auto",
   "site": "https://try.discourse.org"
+  ,
+  "default_search": "tag:ai order:latest-post"
 }
 ```
 Run with:
