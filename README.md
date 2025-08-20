@@ -6,49 +6,40 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 - **SDK**: `@modelcontextprotocol/sdk`
 - **Node**: >= 18
 
-### TL;DR: Configure and run
+### Quick start (release)
 
-- **Install and build**
+- **Run (read‑only, recommended to start)**
 ```bash
-pnpm install
-pnpm build
-```
-
-- **Run locally (read‑only, recommended to start):**
-```bash
-node dist/index.js
+npx -y @discourse/mcp@latest
 ```
 Then, in your MCP client, call the `discourse_select_site` tool with `{ "site": "https://try.discourse.org" }` to choose a site.
 
-- **Enable writes (opt‑in, safe‑guarded):**
+- **Enable writes (opt‑in, safe‑guarded)**
 ```bash
-node dist/index.js --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
+npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 ```
 
-- **Use in an MCP client (example: Claude Desktop) — local build:**
+- **Use in an MCP client (example: Claude Desktop) — via npx**
 ```json
 {
   "mcpServers": {
     "discourse": {
-      "command": "node",
-      "args": ["/absolute/path/to/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@discourse/mcp@latest"],
       "env": {}
     }
   }
 }
 ```
 
-- **Use in an MCP client — if installed globally** (after publishing or `npm -g`):
-```json
-{
-  "mcpServers": {
-    "discourse": {
-      "command": "discourse-mcp",
-      "args": []
-    }
-  }
-}
-```
+> Alternative: if you prefer a global binary after install, the package exposes `discourse-mcp`.
+> ```json
+> {
+>   "mcpServers": {
+>     "discourse": { "command": "discourse-mcp", "args": [] }
+>   }
+> }
+> ```
 
 ## Configuration
 
@@ -160,7 +151,7 @@ pnpm build && pnpm dev
   - Tests run with Node’s test runner against compiled artifacts (`dist/test/**/*.js`). Ensure `pnpm build` before `pnpm test` if invoking scripts individually.
 
 - **Publishing (optional)**
-  - The package exposes a `bin` named `discourse-mcp`. After publishing or global install, MCP clients can invoke the binary directly without `node dist/index.js`.
+  - The package is published as `@discourse/mcp` and exposes a `bin` named `discourse-mcp`. Prefer `npx @discourse/mcp@latest` for frictionless usage.
 
 - **Conventions**
   - Focus on text‑oriented outputs; keep embedded JSON concise.
@@ -172,13 +163,13 @@ See `AGENTS.md` for additional guidance on using this server from agent framewor
 
 - Read‑only session against `try.discourse.org`:
 ```bash
-node dist/index.js --log_level debug
+npx -y @discourse/mcp@latest --log_level debug
 # In client: call discourse_select_site with {"site":"https://try.discourse.org"}
 ```
 
 - Create a post (writes enabled):
 ```bash
-node dist/index.js --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
+npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 ```
 
 ## FAQ
