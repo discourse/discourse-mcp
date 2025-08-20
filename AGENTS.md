@@ -25,11 +25,11 @@
   - **Input**: `{ query: string; with_private?: boolean; max_results?: number (1–50, default 10) }`
   - **Output**: Top topics with titles and URLs; appends a JSON footer of `{ results: [{ id, url, title }] }` inside a fenced block.
 - **discourse_read_topic**
-  - **Input**: `{ topic_id: number; post_limit?: number (1–20, default 5) }`
-  - **Output**: Title, category, tags, and the first N posts as brief bullet summaries; includes canonical topic link.
+  - **Input**: `{ topic_id: number; post_limit?: number (1–20, default 5); start_post_number?: number }`
+  - **Output**: Title, category, tags, and the first N posts (raw preferred when available) up to the configured max read length per post; includes canonical topic link.
 - **discourse_read_post**
   - **Input**: `{ post_id: number }`
-  - **Output**: Author, timestamp, excerpt (up to ~1200 chars), and direct link.
+  - **Output**: Author, timestamp, content (raw preferred) truncated to the configured max read length, and a direct link.
 - **discourse_list_categories**
   - **Input**: `{}`
   - **Output**: Category names with topic counts.
@@ -70,6 +70,7 @@
   - `--profile <path.json>`: load partial config from JSON (flags override)
   - `--site <url>`: tether to a single site (hides `discourse_select_site`)
   - `--default-search <prefix>`: unconditionally prefix every search query (e.g., `category:support tag:ai`)
+  - `--max-read-length <number>` (default 50000): maximum number of characters returned for post content in `discourse_read_post` and per-post content in `discourse_read_topic`. Tools prefer `raw` content via Discourse API (`include_raw=true`) when available.
 
 ### Networking & resilience
 - User-Agent: `Discourse-MCP/0.x (+https://github.com/discourse-mcp)`.

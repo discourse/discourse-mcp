@@ -22,15 +22,17 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
 
         // First request to load metadata/title and initial chunk
         let current = start;
-        let fetchedPosts: Array<{ number: number; username: string; created_at: string; excerpt: string }> = [];
+        let fetchedPosts: Array<{ number: number; username: string; created_at: string; content: string }> = [];
         let slug = "";
         let title = `Topic ${topic_id}`;
         let category = "";
         let tags: string[] = [];
 
         const maxBatches = 10; // safety guard
+        const limit = Number.isFinite(ctx.maxReadLength) ? ctx.maxReadLength : 50000;
         for (let i = 0; i < maxBatches && fetchedPosts.length < post_limit; i++) {
-          const url = current > 1 ? `/t/${topic_id}.json?near=${current}` : `/t/${topic_id}.json`;
+          // Ask for raw content when possible
+          const url = current > 1 ? `/t/${topic_id}.json?near=${current}&include_raw=true` : `/t/${topic_id}.json?include_raw=true`;
           const data = (await client.get(url)) as any;
           if (i === 0) {
             title = data?.title || title;
@@ -47,7 +49,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
               number: p.post_number,
               username: p.username,
               created_at: p.created_at,
-              excerpt: (p.excerpt || p.cooked || p.raw || "").toString().slice(0, 400),
+              content: (p.raw || p.cooked || p.excerpt || "").toString().slice(0, limit),
             });
           }
           if (filtered.length === 0) break; // no progress
@@ -61,7 +63,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
         lines.push("");
         for (const p of fetchedPosts) {
           lines.push(`- Post #${p.number} by @${p.username} (${p.created_at})`);
-          lines.push(`  ${p.excerpt}`);
+          lines.push(`  ${p.content}`);
         }
         lines.push("");
         lines.push(`Link: ${base}/t/${slug}/${topic_id}`);

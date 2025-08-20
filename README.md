@@ -68,6 +68,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest-post`).
+  - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic`. The tools prefer `raw` content by requesting `include_raw=true`.
   - `--cache_dir <path>` (reserved)
   - `--profile <path.json>` (see below)
 
@@ -84,6 +85,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   "site": "https://try.discourse.org"
   ,
   "default_search": "tag:ai order:latest-post"
+  ,
+  "max_read_length": 50000
 }
 ```
 Run with:

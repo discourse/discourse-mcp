@@ -26,9 +26,9 @@ export async function registerAllTools(
   server: McpServer,
   siteState: SiteState,
   logger: Logger,
-  opts: RegistryOptions
+  opts: RegistryOptions & { maxReadLength?: number }
 ) {
-  const ctx = { siteState, logger, defaultSearchPrefix: opts.defaultSearchPrefix } as const;
+  const ctx = { siteState, logger, defaultSearchPrefix: opts.defaultSearchPrefix, maxReadLength: opts.maxReadLength ?? 50000 } as const;
 
   // Built-in tools
   if (!opts.hideSelectSite) {

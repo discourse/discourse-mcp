@@ -47,6 +47,13 @@ const ProfileSchema = z
     tools_mode: z.enum(["auto", "discourse_api_only", "tool_exec_api"]).optional().default("auto"),
     site: z.string().url().optional().describe("Tether MCP to a single Discourse site; hides select_site and preselects this site"),
     default_search: z.string().optional().describe("Optional search prefix added to every search query (set via --default-search)"),
+    max_read_length: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .default(50000)
+      .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
   })
   .strict();
 
@@ -105,6 +112,7 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     tools_mode: ((flags.tools_mode as ToolsMode | undefined) ?? (profile.tools_mode as ToolsMode | undefined) ?? "auto") as ToolsMode,
     site: (flags.site as string | undefined) ?? profile.site,
     default_search: ((flags["default-search"] as string | undefined) ?? profile.default_search) as string | undefined,
+    max_read_length: ((flags["max-read-length"] as number | undefined) ?? profile.max_read_length ?? 50000) as number,
   } satisfies Profile;
   const result = ProfileSchema.safeParse(merged);
   if (!result.success) throw new Error(`Invalid configuration: ${result.error.message}`);
@@ -186,6 +194,7 @@ async function main() {
     toolsMode: config.tools_mode,
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
+    maxReadLength: config.max_read_length,
   });
 
   // If tethered and remote tool discovery is enabled, discover now
