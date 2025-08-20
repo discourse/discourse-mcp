@@ -90,3 +90,51 @@ test('select-site then search flow works with mocked HTTP', async () => {
     globalThis.fetch = originalFetch as any;
   }
 });
+
+// Tethered mode: preselect site via --site and hide select_site
+test('tethered mode hides select_site and allows search without selection', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+
+  // Minimal fake server to capture tool handlers
+  const tools: Record<string, { handler: Function }> = {};
+  const fakeServer: any = {
+    registerTool(name: string, _meta: any, handler: Function) {
+      tools[name] = { handler };
+    },
+  };
+
+  // Mock fetch
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: any, _init?: any) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    if (url.endsWith('/about.json')) {
+      return new Response(JSON.stringify({ about: { title: 'Example Discourse' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (url.includes('/search.json')) {
+      return new Response(JSON.stringify({ topics: [{ id: 123, title: 'Hello World', slug: 'hello-world' }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response('not found', { status: 404 });
+  }) as any;
+
+  try {
+    // Emulate --site tethering: validate via /about.json and preselect site
+    const { base, client } = siteState.buildClientForSite('https://example.com');
+    await client.get('/about.json');
+    siteState.selectSite(base);
+
+    // Register tools with select_site hidden
+    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
+
+    // Ensure select tool is not exposed
+    assert.ok(!('discourse_select_site' in tools));
+
+    // Search should work without calling select first
+    const searchRes = await tools['discourse_search'].handler({ query: 'hello' }, {});
+    const text = String(searchRes?.content?.[0]?.text || '');
+    assert.match(text, /Top results/);
+    assert.match(text, /hello-world/);
+  } finally {
+    globalThis.fetch = originalFetch as any;
+  }
+});

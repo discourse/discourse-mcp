@@ -19,6 +19,7 @@ import { Logger, type LogLevel } from "./util/logger.js";
 import { redactObject } from "./util/redact.js";
 import { type AuthMode } from "./http/client.js";
 import { registerAllTools, type ToolsMode } from "./tools/registry.js";
+import { tryRegisterRemoteTools } from "./tools/remote/tool_exec_api.js";
 import { SiteState, type AuthOverride } from "./site/state.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -44,6 +45,7 @@ const ProfileSchema = z
     cache_dir: z.string().optional(),
     log_level: z.enum(["silent", "error", "info", "debug"]).optional().default("info"),
     tools_mode: z.enum(["auto", "discourse_api_only", "tool_exec_api"]).optional().default("auto"),
+    site: z.string().url().optional().describe("Tether MCP to a single Discourse site; hides select_site and preselects this site"),
   })
   .strict();
 
@@ -100,6 +102,7 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     cache_dir: (flags.cache_dir as string | undefined) ?? profile.cache_dir,
     log_level: ((flags.log_level as LogLevel | undefined) ?? (profile.log_level as LogLevel | undefined) ?? "info") as LogLevel,
     tools_mode: ((flags.tools_mode as ToolsMode | undefined) ?? (profile.tools_mode as ToolsMode | undefined) ?? "auto") as ToolsMode,
+    site: (flags.site as string | undefined) ?? profile.site,
   } satisfies Profile;
   const result = ProfileSchema.safeParse(merged);
   if (!result.success) throw new Error(`Invalid configuration: ${result.error.message}`);
@@ -159,10 +162,33 @@ async function main() {
   );
 
   const allowWrites = Boolean(config.allow_writes && !config.read_only && (config.auth_pairs && config.auth_pairs.length > 0));
+
+  // If tethered to a site, validate and preselect it before registering tools,
+  // and trigger remote tool discovery when enabled.
+  let hideSelectSite = false;
+  if (config.site) {
+    try {
+      const { base, client } = siteState.buildClientForSite(config.site);
+      const about = (await client.get(`/about.json`)) as any;
+      const title = about?.about?.title || about?.title || base;
+      siteState.selectSite(base);
+      hideSelectSite = true;
+      logger.info(`Tethered to site: ${base} (${title})`);
+    } catch (e: any) {
+      throw new Error(`Failed to validate --site ${config.site}: ${e?.message || String(e)}`);
+    }
+  }
+
   await registerAllTools(server as any, siteState, logger, {
     allowWrites,
     toolsMode: config.tools_mode,
+    hideSelectSite,
   });
+
+  // If tethered and remote tool discovery is enabled, discover now
+  if (config.site && config.tools_mode !== "discourse_api_only") {
+    await tryRegisterRemoteTools(server as any, siteState, logger);
+  }
 
   const transport = new StdioServerTransport();
 

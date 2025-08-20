@@ -16,6 +16,8 @@ export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 export interface RegistryOptions {
   allowWrites: boolean;
   toolsMode: ToolsMode;
+  // When true, do not register the discourse_select_site tool
+  hideSelectSite?: boolean;
 }
 
 export async function registerAllTools(
@@ -27,7 +29,9 @@ export async function registerAllTools(
   const ctx = { siteState, logger } as const;
 
   // Built-in tools
-  registerSelectSite(server, ctx, { allowWrites: false, toolsMode: opts.toolsMode });
+  if (!opts.hideSelectSite) {
+    registerSelectSite(server, ctx, { allowWrites: false, toolsMode: opts.toolsMode });
+  }
   registerSearch(server, ctx, { allowWrites: false });
   registerReadTopic(server, ctx, { allowWrites: false });
   registerReadPost(server, ctx, { allowWrites: false });

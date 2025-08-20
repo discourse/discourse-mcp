@@ -7,7 +7,9 @@
 
 ### How it works
 - On start, the server validates CLI flags via Zod, constructs a dynamic site state, and registers tools on an MCP server named `@discourse/mcp`.
-- Use the `discourse_select_site` tool to validate and choose a target Discourse site (via `/about.json`). Subsequent tools use the selected site and appropriate auth.
+- Choose a target Discourse site by either:
+  - Calling the `discourse_select_site` tool (validates via `/about.json`), or
+  - Starting with `--site <url>` to tether to a single site (validates via `/about.json` and hides `discourse_select_site`).
 - Outputs are text-oriented; some tools embed compact JSON in fenced code blocks for structured extraction.
 
 ### Authentication & permissions
@@ -42,7 +44,7 @@
   - **Output**: Paginated topic list with titles and URLs; appends a JSON footer `{ page, per_page, results: [{ id, url, title }], next_url? }`.
   - Query language: key:value tokens separated by spaces; category/categories (comma = OR, `=category` = without subcats, `-` exclude); tag/tags (comma = OR, `+` = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public); personal `in:` (bookmarked|watching|tracking|muted|pinned); dates created/activity/latest-post-(before|after) as `YYYY-MM-DD` or `N` days; numeric likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); `order:` with optional `-asc`; free text terms allowed.
 - **discourse_create_post** (conditionally available; see permissions)
- - **discourse_select_site**
+ - **discourse_select_site** (hidden when `--site` is provided)
    - **Input**: `{ site: string }`
    - **Output**: Confirms selection; validates via `/about.json`. Triggers remote tool discovery when enabled.
   - **Input**: `{ topic_id: number; raw: string (≤ 30k chars) }`
@@ -50,7 +52,7 @@
 
 ### Remote Tool Execution API (optional)
 - If the target Discourse site exposes an MCP-compatible Tool Execution API:
-  - GET `/ai/tools` is discovered after selecting a site when `tools_mode` is `auto` (default) or `tool_exec_api`.
+  - GET `/ai/tools` is discovered after selecting a site when `tools_mode` is `auto` (default) or `tool_exec_api` (or immediately at startup if `--site` is provided).
   - Each remote tool is registered dynamically using its JSON Schema input.
   - Calls POST `/ai/tools/{name}/call` with `{ arguments, context: {} }`.
   - Results may include `details.artifacts[]`; links are surfaced at the end of the tool output.

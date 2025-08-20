@@ -12,7 +12,9 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 ```bash
 npx -y @discourse/mcp@latest
 ```
-Then, in your MCP client, call the `discourse_select_site` tool with `{ "site": "https://try.discourse.org" }` to choose a site.
+Then, in your MCP client, either:
+- Call the `discourse_select_site` tool with `{ "site": "https://try.discourse.org" }` to choose a site, or
+- Start the server tethered to a site using `--site https://try.discourse.org` (in which case `discourse_select_site` is hidden).
 
 - **Enable writes (opt‑in, safe‑guarded)**
 ```bash
@@ -43,7 +45,9 @@ npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"s
 
 ## Configuration
 
-The server registers tools under the MCP server name `@discourse/mcp`. You select the target Discourse site at runtime using the `discourse_select_site` tool, which validates the site via `/about.json`.
+The server registers tools under the MCP server name `@discourse/mcp`. Choose a target Discourse site either by:
+- Using the `discourse_select_site` tool at runtime (validates via `/about.json`), or
+- Supplying `--site <url>` to tether the server to a single site at startup (validates via `/about.json` and hides `discourse_select_site`).
 
 - **Auth**
   - **None** by default.
@@ -62,6 +66,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. You selec
   - `--concurrency <number>` (default: 4)
   - `--log_level <silent|error|info|debug>` (default: info)
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
+  - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--cache_dir <path>` (reserved)
   - `--profile <path.json>` (see below)
 
@@ -74,7 +79,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. You selec
   "read_only": false,
   "allow_writes": true,
   "log_level": "info",
-  "tools_mode": "auto"
+  "tools_mode": "auto",
+  "site": "https://try.discourse.org"
 }
 ```
 Run with:
@@ -84,7 +90,7 @@ node dist/index.js --profile /absolute/path/to/profile.json
 Flags still override values from the profile.
 
 - **Remote Tool Execution API (optional)**
-  - With `tools_mode=auto` (default) or `tool_exec_api`, the server discovers remote tools via GET `/ai/tools` after you select a site and registers them dynamically. Set `--tools_mode=discourse_api_only` to disable remote tool discovery.
+  - With `tools_mode=auto` (default) or `tool_exec_api`, the server discovers remote tools via GET `/ai/tools` after you select a site (or immediately at startup if `--site` is provided) and registers them dynamically. Set `--tools_mode=discourse_api_only` to disable remote tool discovery.
 
 - **Networking & resilience**
   - Retries on 429/5xx with backoff (3 attempts).
@@ -167,6 +173,11 @@ npx -y @discourse/mcp@latest --log_level debug
 # In client: call discourse_select_site with {"site":"https://try.discourse.org"}
 ```
 
+- Tether to a single site:
+```bash
+npx -y @discourse/mcp@latest --site https://try.discourse.org
+```
+
 - Create a post (writes enabled):
 ```bash
 npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
@@ -176,4 +187,5 @@ npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"s
 
 - **Why is `create_post` missing?** You’re in read‑only mode. Enable writes as described above.
 - **Can I disable remote tool discovery?** Yes, run with `--tools_mode=discourse_api_only`.
+- **Can I avoid exposing `discourse_select_site`?** Yes, start with `--site <url>` to tether to a single site.
 - **Time outs or rate limits?** Increase `--timeout_ms`, and note built‑in retry/backoff on 429/5xx.
