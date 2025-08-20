@@ -11,11 +11,20 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "pnpm run build",
     "dev": "node --enable-source-maps dist/index.js",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "sync:fixtures": "node scripts/sync-fixtures.mjs",
     "test": "node --test dist/test/**/*.js"
+  },
+  "files": [
+    "dist/**",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=18"
