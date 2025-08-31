@@ -11,6 +11,7 @@ import { registerCreatePost } from "./builtin/create_post.js";
 import { registerCreateCategory } from "./builtin/create_category.js";
 import { registerSelectSite } from "./builtin/select_site.js";
 import { registerFilterTopics } from "./builtin/filter_topics.js";
+import { registerCreateUser } from "./builtin/create_user.js";
 
 export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
@@ -43,5 +44,6 @@ export async function registerAllTools(
   registerGetUser(server, ctx, { allowWrites: false });
   registerFilterTopics(server, ctx, { allowWrites: false });
   registerCreatePost(server, ctx, { allowWrites: opts.allowWrites });
+  registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });
 }

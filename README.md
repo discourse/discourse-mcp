@@ -130,8 +130,13 @@ Built‑in tools (always present unless noted):
   - Query language (succinct): key:value tokens separated by spaces; category/categories (comma = OR, `=category` = without subcats, `-` prefix = exclude); tag/tags (comma = OR, `+` = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public); personal `in:` (bookmarked|watching|tracking|muted|pinned); dates: created/activity/latest-post-(before|after) with `YYYY-MM-DD` or relative days `N`; numeric: likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); order: activity|created|latest-post|likes|likes-op|posters|title|views|category with optional `-asc`; free text terms are matched.
 - `discourse_create_post` (only when writes enabled; see Write safety)
   - Input: `{ topic_id: number; raw: string (≤ 30k chars) }`
-- `discourse_create_category` (only when writes enabled; see Write safety)
-  - Input: `{ name: string; color?: hex; text_color?: hex; parent_category_id?: number; description?: string }`
+
+ - `discourse_create_user` (only when writes enabled; see Write safety)
+ - Input: `{ username: string (1-20 chars); email: string; name: string; password: string; active?: boolean; approved?: boolean }`
+
+ - `discourse_create_category` (only when writes enabled; see Write safety)
+ - Input: `{ name: string; color?: hex; text_color?: hex; parent_category_id?: number; description?: string }`
+
 
 Notes:
 - Outputs are human‑readable first. Where applicable, a compact JSON is embedded in fenced code blocks to ease structured extraction by agents.
