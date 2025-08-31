@@ -18,6 +18,25 @@ function createFakeTransport() {
 test('registers built-in tools', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+
+test('registers write-enabled tools when allowWrites=true', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+
+  // Minimal fake server to capture tool registrations
+  const tools: Record<string, { handler: Function }> = {};
+  const fakeServer: any = {
+    registerTool(name: string, _meta: any, handler: Function) {
+      tools[name] = { handler };
+    },
+  };
+
+  await registerAllTools(fakeServer, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } as any);
+
+  // When writes are enabled, both create tools should be registered
+  assert.ok('discourse_create_post' in tools);
+  assert.ok('discourse_create_category' in tools);
+});
   const server = new McpServer({ name: 'test', version: '0.0.0' }, { capabilities: { tools: { listChanged: false } } });
 
   await registerAllTools(server as any, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' });
