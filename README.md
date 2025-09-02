@@ -55,9 +55,9 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
 
 - **Write safety**
   - Writes are disabled by default.
-  - The tools `discourse.create_post` and `discourse.create_category` are only registered when all are true:
+  - The tools `discourse_create_post`, `discourse_create_topic`, `discourse_create_category`, and `discourse_create_user` are only registered when all are true:
     - `--allow_writes` AND not `--read_only` AND some auth is configured (either default flags or a matching `auth_pairs` entry).
-  - A ~1 req/sec rate limit is enforced for `create_post` and `create_category`.
+  - A ~1 req/sec rate limit is enforced for write actions.
 
 - **Flags & defaults**
   - `--read_only` (default: true)
@@ -131,6 +131,9 @@ Built‑in tools (always present unless noted):
 - `discourse_create_post` (only when writes enabled; see Write safety)
   - Input: `{ topic_id: number; raw: string (≤ 30k chars) }`
 
+- `discourse_create_topic` (only when writes enabled; see Write safety)
+  - Input: `{ title: string; raw: string (≤ 30k chars); category_id?: number; tags?: string[] }`
+
  - `discourse_create_user` (only when writes enabled; see Write safety)
  - Input: `{ username: string (1-20 chars); email: string; name: string; password: string; active?: boolean; approved?: boolean }`
 
@@ -201,6 +204,13 @@ npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"s
 npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 # In your MCP client, call discourse_create_category with for example:
 # { "name": "AI Research", "color": "0088CC", "text_color": "FFFFFF", "description": "Discussions about AI research" }
+```
+
+- Create a topic (writes enabled):
+```bash
+npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
+# In your MCP client, call discourse_create_topic, for example:
+# { "title": "Agentic workflows", "raw": "Let’s discuss agent workflows.", "category_id": 1, "tags": ["ai","agents"] }
 ```
 
 ## FAQ

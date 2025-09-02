@@ -16,7 +16,7 @@
 - Supported auth:
   - **None** (read-only public data)
   - Per-site overrides via `--auth_pairs`, e.g. `[{"site":"https://example.com","api_key":"...","api_username":"system"}]`.
-- **Writes are disabled by default**. `discourse.create_post` and `discourse.create_category` are only registered when all are true:
+- **Writes are disabled by default**. Write tools (`discourse_create_post`, `discourse_create_topic`, `discourse_create_category`, `discourse_create_user`) are only registered when all are true:
   - `--allow_writes` AND not `--read_only` AND a matching `auth_pairs` entry exists for the selected site.
 - Secrets are never logged; config is redacted before logging.
 
@@ -46,6 +46,9 @@
 - **discourse_create_post** (conditionally available; see permissions)
   - **Input**: `{ topic_id: number; raw: string (≤ 30k chars) }`
   - **Output**: Link to created post/topic. Includes a simple 1 req/sec rate limit.
+- **discourse_create_topic** (conditionally available; see permissions)
+  - **Input**: `{ title: string; raw: string (≤ 30k chars); category_id?: number; tags?: string[] }`
+  - **Output**: Link to created topic. Includes a simple 1 req/sec rate limit.
 - **discourse_create_category** (conditionally available; see permissions)
   - **Input**: `{ name: string; color?: hex; text_color?: hex; parent_category_id?: number; description?: string }`
   - **Output**: Link to created category. Includes a simple 1 req/sec rate limit.
