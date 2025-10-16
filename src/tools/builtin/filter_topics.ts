@@ -8,14 +8,14 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
         .string()
         .min(1)
         .describe(
-          "Filter query, e.g. 'category:support status:open created-after:30 order:activity'"
+          "Filter query, e.g. 'category:support status:open created-after:30 order:activity'",
         ),
       page: z
         .number()
         .int()
-        .min(1)
+        .min(0)
         .optional()
-        .describe("Page number (1-based)"),
+        .describe("Page number (0-based, default: 0)"),
       per_page: z
         .number()
         .int()
@@ -42,7 +42,7 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
       description,
       inputSchema: schema.shape,
     },
-    async ({ filter, page = 1, per_page }, _extra: any) => {
+    async ({ filter, page = 0, per_page }, _extra: any) => {
       try {
         const { base, client } = ctx.siteState.ensureSelectedSite();
         const params = new URLSearchParams();
@@ -50,11 +50,14 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
         params.set("page", String(page));
         if (per_page) params.set("per_page", String(per_page));
 
-        const data = (await client.get(`/filter.json?${params.toString()}`)) as any;
+        const data = (await client.get(
+          `/filter.json?${params.toString()}`,
+        )) as any;
         const list = data?.topic_list ?? data;
         const topics: any[] = Array.isArray(list?.topics) ? list.topics : [];
         const perPage = per_page ?? list?.per_page ?? undefined;
-        const moreUrl: string | undefined = list?.more_topics_url || list?.more_url || undefined;
+        const moreUrl: string | undefined =
+          list?.more_topics_url || list?.more_url || undefined;
 
         const items = topics.map((t) => ({
           id: t.id,
@@ -79,22 +82,36 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
         const jsonFooter: any = {
           page,
           per_page: perPage,
-          results: items.map((it) => ({ id: it.id, title: it.title, url: `${base}/t/${it.slug}/${it.id}` })),
+          results: items.map((it) => ({
+            id: it.id,
+            title: it.title,
+            url: `${base}/t/${it.slug}/${it.id}`,
+          })),
         };
         if (moreUrl) {
-          const abs = moreUrl.startsWith("http") ? moreUrl : `${base}${moreUrl.startsWith("/") ? "" : "/"}${moreUrl}`;
+          const abs = moreUrl.startsWith("http")
+            ? moreUrl
+            : `${base}${moreUrl.startsWith("/") ? "" : "/"}${moreUrl}`;
           jsonFooter.next_url = abs;
         }
 
-        const text = lines.join("\n") + "\n\n```json\n" + JSON.stringify(jsonFooter) + "\n```\n";
+        const text =
+          lines.join("\n") +
+          "\n\n```json\n" +
+          JSON.stringify(jsonFooter) +
+          "\n```\n";
         return { content: [{ type: "text", text }] };
       } catch (e: any) {
         return {
-          content: [{ type: "text", text: `Failed to filter topics: ${e?.message || String(e)}` }],
+          content: [
+            {
+              type: "text",
+              text: `Failed to filter topics: ${e?.message || String(e)}`,
+            },
+          ],
           isError: true,
         };
       }
-    }
+    },
   );
 };
-

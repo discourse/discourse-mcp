@@ -19,7 +19,7 @@ async function main() {
   if (selectRes?.isError) throw new Error('select_site failed');
 
   const filter = 'created-after:7 order:likes';
-  const res = await tools['discourse_filter_topics'].handler({ filter, page: 1, per_page: 5 }, {});
+  const res = await tools['discourse_filter_topics'].handler({ filter, page: 0, per_page: 5 }, {});
   const text = String(res?.content?.[0]?.text || '');
   console.log(text);
 }
