@@ -26,10 +26,21 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: lint
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
-      - name: Publish package
-        uses: JS-DevTools/npm-publish@v3
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
         with:
-          token: ${{ secrets.NPM_TOKEN }}
+          node-version: 22
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+      - run: pnpm install
+      - run: pnpm typecheck
+      - run: pnpm build
+      - run: pnpm test
+      - run: pnpm release
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
