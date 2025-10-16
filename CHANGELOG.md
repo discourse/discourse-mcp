@@ -1,4 +1,10 @@
 Changelog
+### [0.1.6](https://github.com/SamSaffron/discourse-mcp/compare/v0.1.5...v0.1.6) (2025-10-16)
+
+#### Bug Fixes
+
+* fix broken 0.1.5 release
+
 ### [0.1.5](https://github.com/SamSaffron/discourse-mcp/compare/v0.1.4...v0.1.5) (2025-10-16)
 
 #### Bug Fixes
