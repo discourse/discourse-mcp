@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 
 // Read package version at runtime to avoid import-attributes incompatibility
@@ -54,6 +56,8 @@ const ProfileSchema = z
       .optional()
       .default(50000)
       .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
+    transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
+    port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
   })
   .strict();
 
@@ -113,6 +117,8 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     site: (flags.site as string | undefined) ?? profile.site,
     default_search: ((flags["default-search"] as string | undefined) ?? profile.default_search) as string | undefined,
     max_read_length: ((flags["max-read-length"] as number | undefined) ?? profile.max_read_length ?? 50000) as number,
+    transport: ((flags.transport as "stdio" | "http" | undefined) ?? profile.transport ?? "stdio") as "stdio" | "http",
+    port: ((flags.port as number | undefined) ?? profile.port ?? 3000) as number,
   } satisfies Profile;
   const result = ProfileSchema.safeParse(merged);
   if (!result.success) throw new Error(`Invalid configuration: ${result.error.message}`);
@@ -202,15 +208,79 @@ async function main() {
     await tryRegisterRemoteTools(server as any, siteState, logger);
   }
 
-  const transport = new StdioServerTransport();
+  // Create transport based on configuration
+  if (config.transport === "http") {
+    // HTTP transport using Streamable HTTP (stateless mode)
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined, // Stateless mode
+      enableJsonResponse: true,
+    });
 
-  // Exit cleanly on stdin close or SIGTERM
-  const onExit = () => process.exit(0);
-  process.on("SIGTERM", onExit);
-  process.on("SIGINT", onExit);
-  process.stdin.on("close", onExit);
+    await server.connect(transport);
 
-  await server.connect(transport);
+    const httpServer = createServer(async (req, res) => {
+      // Health check endpoint
+      if (req.method === "GET" && req.url === "/health") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok" }));
+        return;
+      }
+
+      // MCP endpoint - handle via StreamableHTTPServerTransport
+      if (req.url === "/mcp" || req.url === "/") {
+        let body = "";
+        req.on("data", (chunk) => {
+          body += chunk;
+        });
+        req.on("end", async () => {
+          try {
+            const parsedBody = body ? JSON.parse(body) : undefined;
+            await transport.handleRequest(req, res, parsedBody);
+          } catch (error) {
+            logger.error(`Request handling error: ${error}`);
+            if (!res.headersSent) {
+              res.writeHead(500, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Internal server error" }));
+            }
+          }
+        });
+        return;
+      }
+
+      // Unknown endpoint
+      res.writeHead(404, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Not found" }));
+    });
+
+    httpServer.listen(config.port, () => {
+      logger.info(`HTTP transport listening on port ${config.port}`);
+      logger.info(`Health check available at http://localhost:${config.port}/health`);
+      logger.info(`MCP endpoint available at http://localhost:${config.port}/mcp`);
+    });
+
+    // Exit cleanly on SIGTERM/SIGINT
+    const onExit = () => {
+      httpServer.close(() => {
+        transport.close().then(() => {
+          logger.info("HTTP server closed");
+          process.exit(0);
+        });
+      });
+    };
+    process.on("SIGTERM", onExit);
+    process.on("SIGINT", onExit);
+  } else {
+    // Default stdio transport
+    const transport = new StdioServerTransport();
+
+    // Exit cleanly on stdin close or SIGTERM
+    const onExit = () => process.exit(0);
+    process.on("SIGTERM", onExit);
+    process.on("SIGINT", onExit);
+    process.stdin.on("close", onExit);
+
+    await server.connect(transport);
+  }
 }
 
 main().catch((err) => {

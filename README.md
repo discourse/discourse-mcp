@@ -69,6 +69,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest-post`).
   - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic`. The tools prefer `raw` content by requesting `include_raw=true`.
+  - `--transport <stdio|http>` (default: stdio): Transport type. Use `stdio` for standard input/output (default), or `http` for Streamable HTTP transport (stateless mode with JSON responses).
+  - `--port <number>` (default: 3000): Port to listen on when using HTTP transport.
   - `--cache_dir <path>` (reserved)
   - `--profile <path.json>` (see below)
 
@@ -82,11 +84,11 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   "allow_writes": true,
   "log_level": "info",
   "tools_mode": "auto",
-  "site": "https://try.discourse.org"
-  ,
-  "default_search": "tag:ai order:latest-post"
-  ,
-  "max_read_length": 50000
+  "site": "https://try.discourse.org",
+  "default_search": "tag:ai order:latest-post",
+  "max_read_length": 50000,
+  "transport": "stdio",
+  "port": 3000
 }
 ```
 Run with:
@@ -210,7 +212,15 @@ npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"s
 ```bash
 npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 # In your MCP client, call discourse_create_topic, for example:
-# { "title": "Agentic workflows", "raw": "Let’s discuss agent workflows.", "category_id": 1, "tags": ["ai","agents"] }
+# { "title": "Agentic workflows", "raw": "Let's discuss agent workflows.", "category_id": 1, "tags": ["ai","agents"] }
+```
+
+- Run with HTTP transport (on port 3000):
+```bash
+npx -y @discourse/mcp@latest --transport http --port 3000 --site https://try.discourse.org
+# Server will start on http://localhost:3000
+# Health check: http://localhost:3000/health
+# MCP endpoint: http://localhost:3000/mcp
 ```
 
 ## FAQ
