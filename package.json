@@ -1,6 +1,6 @@
 {
   "name": "@discourse/mcp",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Discourse MCP CLI server (stdio) exposing Discourse tools via MCP",
   "private": false,
   "type": "module",
