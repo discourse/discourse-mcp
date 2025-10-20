@@ -1,4 +1,12 @@
 Changelog
+### [0.1.9](https://github.com/SamSaffron/discourse-mcp/compare/v0.1.8...v0.1.9) (2025-10-20)
+
+#### Features
+
+* add discourse_list_user_posts tool to fetch user posts and replies
+* support pagination with page parameter (30 posts per page)
+* include formatted output with topic titles, dates, excerpts, and URLs
+
 ### [0.1.8](https://github.com/SamSaffron/discourse-mcp/compare/v0.1.7...v0.1.8) (2025-10-20)
 
 #### Features
