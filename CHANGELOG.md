@@ -1,4 +1,19 @@
 Changelog
+### [0.1.8](https://github.com/SamSaffron/discourse-mcp/compare/v0.1.7...v0.1.8) (2025-10-20)
+
+#### Features
+
+* add User API Key support and generator
+* implement User-Api-Key and User-Api-Client-Id headers for non-admin authentication
+* add generate-user-api-key command with RSA keypair generation and interactive setup
+* add enhanced HTTP error logging with detailed diagnostics for troubleshooting
+
+#### Bug Fixes
+
+* enable logger output to stderr (uncommented process.stderr.write())
+* support kebab-case CLI arguments in mergeConfig (--allow-writes, --read-only, etc.)
+* ensure CLI flags override profile settings regardless of case style (kebab-case or snake_case)
+
 ### [0.1.7](https://github.com/SamSaffron/discourse-mcp/compare/v0.1.6...v0.1.7) (2025-10-17)
 
 #### Features
