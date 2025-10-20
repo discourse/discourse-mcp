@@ -5,6 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
+import { generateUserApiKey } from "./user-api-key-generator.js";
 
 // Read package version at runtime to avoid import-attributes incompatibility
 async function getPackageVersion(): Promise<string> {
@@ -36,6 +37,8 @@ const ProfileSchema = z
             site: z.string().url(),
             api_key: z.string().optional(),
             api_username: z.string().optional(),
+            user_api_key: z.string().optional(),
+            user_api_client_id: z.string().optional(),
           })
           .strict()
       )
@@ -131,6 +134,29 @@ function buildAuth(_config: Profile): AuthMode {
 }
 
 async function main() {
+  // Check if user wants to generate a User API Key
+  const args = process.argv.slice(2);
+  if (args[0] === "generate-user-api-key") {
+    const options: any = { site: "" };
+    for (let i = 1; i < args.length; i++) {
+      const arg = args[i];
+      const next = args[i + 1];
+      if (arg === "--site") { options.site = next; i++; }
+      else if (arg === "--scopes") { options.scopes = next; i++; }
+      else if (arg === "--application-name") { options.applicationName = next; i++; }
+      else if (arg === "--client-id") { options.clientId = next; i++; }
+      else if (arg === "--nonce") { options.nonce = next; i++; }
+      else if (arg === "--payload") { options.payload = next; i++; }
+      else if (arg === "--save-to") { options.saveTo = next; i++; }
+      else if (arg === "--help" || arg === "-h") {
+        await generateUserApiKey({ site: "" }); // Will show help and exit
+        return;
+      }
+    }
+    await generateUserApiKey(options);
+    return;
+  }
+
   const argv = parseArgs(process.argv.slice(2));
   const profilePath = (argv.profile as string | undefined) ?? undefined;
   const profile = await loadProfile(profilePath).catch((e) => {
