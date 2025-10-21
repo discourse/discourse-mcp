@@ -1,5 +1,5 @@
 Changelog
-### [0.1.9](https://github.com/SamSaffron/discourse-mcp/compare/v0.1.8...v0.1.9) (2025-10-20)
+### [0.1.9](https://github.com/discourse/discourse-mcp/compare/v0.1.8...v0.1.9) (2025-10-20)
 
 #### Features
 
