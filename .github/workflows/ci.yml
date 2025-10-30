@@ -13,9 +13,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: "24"
           cache: pnpm
       - run: pnpm install
       - run: pnpm typecheck
@@ -30,14 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: "24"
           cache: pnpm
       - run: pnpm install
       - run: pnpm typecheck
       - run: pnpm build
       - name: Publish package
-        uses: JS-DevTools/npm-publish@v3
-        with:
-          token: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish -r
