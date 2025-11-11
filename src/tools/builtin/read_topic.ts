@@ -32,7 +32,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
         const limit = Number.isFinite(ctx.maxReadLength) ? ctx.maxReadLength : 50000;
         for (let i = 0; i < maxBatches && fetchedPosts.length < post_limit; i++) {
           // Ask for raw content when possible
-          const url = current > 1 ? `/t/${topic_id}.json?near=${current}&include_raw=true` : `/t/${topic_id}.json?include_raw=true`;
+          const url = current > 1 ? `/t/${topic_id}.json?post_number=${current}&include_raw=true` : `/t/${topic_id}.json?include_raw=true`;
           const data = (await client.get(url)) as any;
           if (i === 0) {
             title = data?.title || title;
