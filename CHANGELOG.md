@@ -1,4 +1,11 @@
 Changelog
+### [0.1.10](https://github.com/discourse/discourse-mcp/compare/v0.1.9...v0.1.10) (2025-11-11)
+
+#### Bug Fixes
+
+* fix start_post_number parameter in discourse_read_topic - use valid post_number API parameter instead of invalid near parameter
+* fixes bug where start_post_number > 20 would return zero posts due to invalid API parameter being ignored by Discourse
+
 ### [0.1.9](https://github.com/discourse/discourse-mcp/compare/v0.1.8...v0.1.9) (2025-10-20)
 
 #### Features
