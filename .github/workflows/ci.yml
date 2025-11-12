@@ -37,5 +37,6 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
+      - run: pnpm install
       - name: Publish package
         run: pnpm publish -r
