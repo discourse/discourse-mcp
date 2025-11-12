@@ -11,7 +11,7 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "prepublishOnly": "pnpm run build",
+    "prepublishOnly": "pnpm build",
     "dev": "node --enable-source-maps dist/index.js",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
