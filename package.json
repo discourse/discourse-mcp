@@ -2,6 +2,17 @@
   "name": "@discourse/mcp",
   "version": "0.1.10",
   "description": "Discourse MCP CLI server (stdio) exposing Discourse tools via MCP",
+  "author": "Discourse",
+  "license": "MIT",
+  "keywords": [
+    "discourse",
+    "mcp"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/discourse/discourse-mcp.git"
+  },
+  "homepage": "https://github.com/discourse/discourse-mcp#readme",
   "private": false,
   "type": "module",
   "bin": {
