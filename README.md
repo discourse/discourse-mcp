@@ -73,7 +73,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
     - `silent`: No logging output
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
-  - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest-post`).
+  - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest`).
   - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic`. The tools prefer `raw` content by requesting `include_raw=true`.
   - `--transport <stdio|http>` (default: stdio): Transport type. Use `stdio` for standard input/output (default), or `http` for Streamable HTTP transport (stateless mode with JSON responses).
   - `--port <number>` (default: 3000): Port to listen on when using HTTP transport.
@@ -92,7 +92,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   "log_level": "info",
   "tools_mode": "auto",
   "site": "https://try.discourse.org",
-  "default_search": "tag:ai order:latest-post",
+  "default_search": "tag:ai order:latest",
   "max_read_length": 50000,
   "transport": "stdio",
   "port": 3000
