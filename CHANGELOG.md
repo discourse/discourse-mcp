@@ -1,4 +1,12 @@
 Changelog
+### [0.1.11](https://github.com/discourse/discourse-mcp/compare/v0.1.10...v0.1.11) (2025-12-02)
+
+#### Breaking Changes
+
+* update minimum Node.js requirement from 18 to 24
+* required due to RSA_PKCS1_PADDING deprecation in generate-user-api-key functionality
+* users must upgrade to Node.js 24+ to use the User API Key generator
+
 ### [0.1.10](https://github.com/discourse/discourse-mcp/compare/v0.1.9...v0.1.10) (2025-11-11)
 
 #### Bug Fixes
