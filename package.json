@@ -1,6 +1,6 @@
 {
   "name": "@discourse/mcp",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Discourse MCP CLI server (stdio) exposing Discourse tools via MCP",
   "author": "Discourse",
   "license": "MIT",
@@ -42,7 +42,7 @@
     "access": "public"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=24"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
