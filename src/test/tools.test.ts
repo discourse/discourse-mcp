@@ -201,3 +201,40 @@ test('default-search prefix is applied to queries', async () => {
     globalThis.fetch = originalFetch as any;
   }
 });
+
+test('search tool also returns post ids', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const tools: Record<string, { handler: Function }> = {};
+  const fakeServer: any = {
+    registerTool(name: string, _meta: any, handler: Function) {
+      tools[name] = { handler };
+    },
+  };
+
+  // Mock fetch to capture the search URL
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: any, _init?: any) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    if (url.endsWith('/about.json')) {
+      return new Response(JSON.stringify({ about: { title: 'Example Discourse' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (url.includes('/search.json')) {
+      return new Response(JSON.stringify({ topics: [{ id: 123, title: 'Hello World', slug: 'hello-world' }], posts: [{ id: 456, topic_id: 123 }, { id: 789, topic_id: 123 }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response('not found', { status: 404 });
+  }) as any;
+
+  try {
+    const { base, client } = siteState.buildClientForSite('https://example.com');
+    await client.get('/about.json');
+    siteState.selectSite(base);
+    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest-post' } as any);
+    const searchRes = await tools['discourse_search'].handler({ query: 'hello world' }, {});
+    const text = String(searchRes?.content?.[0]?.text || '');
+    assert.match(text, /456/);
+    assert.match(text, /789/);
+  } finally {
+    globalThis.fetch = originalFetch as any;
+  }
+});
