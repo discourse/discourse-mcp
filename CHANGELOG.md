@@ -1,4 +1,14 @@
 Changelog
+### [0.1.12](https://github.com/discourse/discourse-mcp/compare/v0.1.11...v0.1.12) (2025-12-03)
+
+#### Features
+
+* add discourse_list_chat_channels tool to list all public chat channels with filtering and pagination
+* add discourse_list_user_chat_channels tool to list user's chat channels with unread tracking
+* add discourse_get_chat_messages tool with flexible pagination and date-based filtering
+* support directional pagination (past/future) and querying around specific dates or messages
+* include smart pagination hints that guide users on how to navigate message history
+
 ### [0.1.11](https://github.com/discourse/discourse-mcp/compare/v0.1.10...v0.1.11) (2025-12-02)
 
 #### Breaking Changes
