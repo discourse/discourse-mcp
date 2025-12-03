@@ -137,6 +137,15 @@ Built‑in tools (always present unless noted):
 - `discourse_filter_topics`
   - Input: `{ filter: string; page?: number (default 1); per_page?: number (1–50) }`
   - Query language (succinct): key:value tokens separated by spaces; category/categories (comma = OR, `=category` = without subcats, `-` prefix = exclude); tag/tags (comma = OR, `+` = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public); personal `in:` (bookmarked|watching|tracking|muted|pinned); dates: created/activity/latest-post-(before|after) with `YYYY-MM-DD` or relative days `N`; numeric: likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); order: activity|created|latest-post|likes|likes-op|posters|title|views|category with optional `-asc`; free text terms are matched.
+- `discourse_list_chat_channels`
+  - Input: `{ filter?: string; limit?: number (1–100, default 25); offset?: number (default 0); status?: string }`
+  - List all public chat channels visible to the current user. Returns channel information including title, description, and member counts.
+- `discourse_list_user_chat_channels`
+  - Input: `{}`
+  - List all chat channels for the currently authenticated user, including both public channels they're a member of and direct message channels. Includes unread tracking information.
+- `discourse_get_chat_messages`
+  - Input: `{ channel_id: number; page_size?: number (1–500, default 50); target_message_id?: number; direction?: "past" | "future"; target_date?: string (ISO 8601); fetch_from_last_read?: boolean; include_target_message_id?: boolean }`
+  - Get messages from a chat channel with flexible pagination and date-based filtering. Supports: (1) paginating with direction='past'/'future' from a target_message_id, (2) querying messages around a specific target_date, (3) getting messages around a target_message_id, or (4) fetching from last read position.
 - `discourse_create_post` (only when writes enabled; see Write safety)
   - Input: `{ topic_id: number; raw: string (≤ 30k chars) }`
 

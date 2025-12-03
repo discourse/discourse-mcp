@@ -14,6 +14,9 @@ import { registerSelectSite } from "./builtin/select_site.js";
 import { registerFilterTopics } from "./builtin/filter_topics.js";
 import { registerCreateUser } from "./builtin/create_user.js";
 import { registerListUserPosts } from "./builtin/list_user_posts.js";
+import { registerListChatChannels } from "./builtin/list_chat_channels.js";
+import { registerListUserChatChannels } from "./builtin/list_user_chat_channels.js";
+import { registerGetChatMessages } from "./builtin/get_chat_messages.js";
 
 export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
@@ -46,6 +49,9 @@ export async function registerAllTools(
   registerGetUser(server, ctx, { allowWrites: false });
   registerListUserPosts(server, ctx, { allowWrites: false });
   registerFilterTopics(server, ctx, { allowWrites: false });
+  registerListChatChannels(server, ctx, { allowWrites: false });
+  registerListUserChatChannels(server, ctx, { allowWrites: false });
+  registerGetChatMessages(server, ctx, { allowWrites: false });
   registerCreatePost(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });
