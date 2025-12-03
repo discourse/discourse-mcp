@@ -146,6 +146,18 @@ Built‑in tools (always present unless noted):
 - `discourse_get_chat_messages`
   - Input: `{ channel_id: number; page_size?: number (1–500, default 50); target_message_id?: number; direction?: "past" | "future"; target_date?: string (ISO 8601); fetch_from_last_read?: boolean; include_target_message_id?: boolean }`
   - Get messages from a chat channel with flexible pagination and date-based filtering. Supports: (1) paginating with direction='past'/'future' from a target_message_id, (2) querying messages around a specific target_date, (3) getting messages around a target_message_id, or (4) fetching from last read position.
+- `discourse_list_drafts`
+  - Input: `{ offset?: number }`
+  - List all drafts for the current user. Returns draft keys, sequences, and preview content.
+- `discourse_get_draft`
+  - Input: `{ draft_key: string; sequence?: number }`
+  - Retrieve a specific draft by its key. Common keys: `"new_topic"` for new topic drafts, `"topic_<id>"` for reply drafts.
+- `discourse_save_draft` (only when writes enabled; see Write safety)
+  - Input: `{ draft_key: string; reply: string; title?: string; category_id?: number; tags?: string[]; sequence?: number (default 0); action?: "createTopic" | "reply" | "edit" | "privateMessage" }`
+  - Create a draft topic, create a draft reply, or update an existing draft. Use `draft_key="new_topic"` for new topics, `"topic_<id>"` for replies. Returns the new sequence number for subsequent updates.
+- `discourse_delete_draft` (only when writes enabled; see Write safety)
+  - Input: `{ draft_key: string; sequence: number }`
+  - Delete a draft by its key. Requires the current sequence number from list/get operations.
 - `discourse_create_post` (only when writes enabled; see Write safety)
   - Input: `{ topic_id: number; raw: string (≤ 30k chars) }`
 

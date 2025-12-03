@@ -61,6 +61,10 @@ export class HttpClient {
     return this.request("POST", path, body, { signal });
   }
 
+  async delete(path: string, body?: unknown, { signal }: { signal?: AbortSignal } = {}) {
+    return this.request("DELETE", path, body, { signal });
+  }
+
   private async request(method: string, path: string, body?: unknown, { signal }: { signal?: AbortSignal } = {}) {
     const url = new URL(path, this.base).toString();
     const headers = this.headers();

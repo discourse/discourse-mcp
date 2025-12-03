@@ -17,6 +17,12 @@ import { registerListUserPosts } from "./builtin/list_user_posts.js";
 import { registerListChatChannels } from "./builtin/list_chat_channels.js";
 import { registerListUserChatChannels } from "./builtin/list_user_chat_channels.js";
 import { registerGetChatMessages } from "./builtin/get_chat_messages.js";
+import {
+  registerListDrafts,
+  registerGetDraft,
+  registerSaveDraft,
+  registerDeleteDraft,
+} from "./builtin/drafts.js";
 
 export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
@@ -56,4 +62,10 @@ export async function registerAllTools(
   registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateTopic(server, ctx, { allowWrites: opts.allowWrites });
+
+  // Draft tools - read operations always available, write operations conditional
+  registerListDrafts(server, ctx, { allowWrites: false });
+  registerGetDraft(server, ctx, { allowWrites: false });
+  registerSaveDraft(server, ctx, { allowWrites: opts.allowWrites });
+  registerDeleteDraft(server, ctx, { allowWrites: opts.allowWrites });
 }
