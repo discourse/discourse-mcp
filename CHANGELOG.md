@@ -1,4 +1,15 @@
 Changelog
+### [0.1.13](https://github.com/discourse/discourse-mcp/compare/v0.1.12...v0.1.13) (2025-12-03)
+
+#### Features
+
+* add discourse_list_drafts tool to list all drafts for the current user
+* add discourse_get_draft tool to retrieve a specific draft by key
+* add discourse_save_draft tool to create or update drafts (requires writes enabled)
+* add discourse_delete_draft tool to delete drafts (requires writes enabled)
+* draft tools support new_topic, topic reply, and private message draft types
+* include sequence number tracking for optimistic locking on draft updates
+
 ### [0.1.12](https://github.com/discourse/discourse-mcp/compare/v0.1.11...v0.1.12) (2025-12-03)
 
 #### Features
