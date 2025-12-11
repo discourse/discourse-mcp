@@ -1,6 +1,14 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
 
+type Topic = {
+  type: "topic";
+  id: number;
+  title: string;
+  slug: string,
+  posts: Array<{ type: "post", id: number }>
+}
+
 export const registerSearch: RegisterFn = (server, ctx) => {
   const schema = z.object({
     query: z.string().min(1).describe("Search query"),
@@ -15,7 +23,7 @@ export const registerSearch: RegisterFn = (server, ctx) => {
       description: "Search site content.",
       inputSchema: schema.shape,
     },
-    async (args, _extra: any) => {
+    async (args: any, _extra: any) => {
       const { query, with_private = false, max_results = 10 } = args;
       const { base, client } = ctx.siteState.ensureSelectedSite();
       const q = new URLSearchParams();
@@ -32,7 +40,11 @@ export const registerSearch: RegisterFn = (server, ctx) => {
           id: t.id,
           title: t.title,
           slug: t.slug,
-        })) as Array<{ type: "topic"; id: number; title: string; slug: string }>).slice(0, max_results);
+          posts: posts.filter((post) => post.topic_id == t.id).map((post) => ({
+            type: "post" as const,
+            id: post.id,
+          }))
+        })) as Array<Topic>).slice(0, max_results);
 
         const lines: string[] = [];
         lines.push(`Top results for "${query}":`);
@@ -44,7 +56,12 @@ export const registerSearch: RegisterFn = (server, ctx) => {
         }
 
         const jsonFooter = {
-          results: items.map((it) => ({ id: it.id, url: `${base}/t/${it.slug}/${it.id}`, title: it.title })),
+          results: items.map((it) => ({
+              id: it.id,
+              url: `${base}/t/${it.slug}/${it.id}`,
+              title: it.title,
+              posts: it.posts.map(({id}) => ({ id }))
+          })),
         };
         const text = lines.join("\n") + "\n\n```json\n" + JSON.stringify(jsonFooter) + "\n```\n";
         return { content: [{ type: "text", text }] };
