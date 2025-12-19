@@ -1,11 +1,13 @@
 ## Discourse MCP — Agent Guide
 
 ### What this is
+
 - **Purpose**: An MCP (Model Context Protocol) stdio server that exposes Discourse forum capabilities as tools for AI agents.
 - **Entry point**: `src/index.ts` → compiled to `dist/index.js` (binary name: `discourse-mcp`).
 - **SDK**: `@modelcontextprotocol/sdk`. Node ≥ 18.
 
 ### How it works
+
 - On start, the server validates CLI flags via Zod, constructs a dynamic site state, and registers tools on an MCP server named `@discourse/mcp`.
 - Choose a target Discourse site by either:
   - Calling the `discourse_select_site` tool (validates via `/about.json`), or
@@ -13,6 +15,7 @@
 - Outputs are text-oriented; some tools embed compact JSON in fenced code blocks for structured extraction.
 
 ### Authentication & permissions
+
 - Supported auth:
   - **None** (read-only public data)
   - Per-site overrides via `--auth_pairs`, e.g. `[{"site":"https://example.com","api_key":"...","api_username":"system"}]`.
@@ -21,6 +24,7 @@
 - Secrets are never logged; config is redacted before logging.
 
 ### Tools exposed (built-in)
+
 - **discourse_search**
   - **Input**: `{ query: string; with_private?: boolean; max_results?: number (1–50, default 10) }`
   - **Output**: Top topics with titles and URLs; appends a JSON footer of `{ results: [{ id, url, title }] }` inside a fenced block.
@@ -57,6 +61,7 @@
   - **Output**: Confirms selection; validates via `/about.json`. Triggers remote tool discovery when enabled.
 
 ### Remote Tool Execution API (optional)
+
 - If the target Discourse site exposes an MCP-compatible Tool Execution API:
   - GET `/ai/tools` is discovered after selecting a site when `tools_mode` is `auto` (default) or `tool_exec_api` (or immediately at startup if `--site` is provided).
   - Each remote tool is registered dynamically using its JSON Schema input.
@@ -65,6 +70,7 @@
 - Set `--tools_mode=discourse_api_only` to disable remote tool discovery.
 
 ### CLI configuration
+
 - **Optional flags**:
   - `--auth_pairs` (JSON)
   - `--read_only` (default true), `--allow_writes` (default false)
@@ -79,15 +85,18 @@
   - `--max-read-length <number>` (default 50000): maximum number of characters returned for post content in `discourse_read_post` and per-post content in `discourse_read_topic`. Tools prefer `raw` content via Discourse API (`include_raw=true`) when available.
 
 ### Networking & resilience
-- User-Agent: `Discourse-MCP/0.x (+https://github.com/discourse-mcp)`.
+
+- User-Agent: `Discourse-MCP/0.x (+https://github.com/discourse/discourse-mcp)`.
 - Retries on 429/5xx with backoff (3 attempts).
 - Lightweight in-memory GET cache for selected endpoints (e.g., topics, site metadata).
 
 ### Errors & rate limits
+
 - Tool failures return `isError: true` with human-readable messages.
 - `discourse.create_post` and `discourse.create_category` enforce ~1 request/second to avoid flooding.
 
 ### Source map
+
 - MCP server and CLI: `src/index.ts`
 - HTTP client: `src/http/client.ts`
 - Tool registry: `src/tools/registry.ts`
@@ -96,6 +105,7 @@
 - Logging/redaction: `src/util/logger.ts`, `src/util/redact.ts`
 
 ### Quick start (for human operators)
+
 - Build: `pnpm build`
 - Run: `node dist/index.js`
 - Select site with `discourse_select_site` in your client
