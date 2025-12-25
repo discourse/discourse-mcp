@@ -1,4 +1,18 @@
 Changelog
+### [0.1.15](https://github.com/discourse/discourse-mcp/compare/v0.1.14...v0.1.15) (2025-12-26)
+
+#### Features
+
+* add support for `emoji` and `icon` params in discourse_create_category tool
+* add support for `author_username` and `author_user_id` params in discourse_create_post tool
+* add support for `author_username` and `author_user_id` params in discourse_create_topic tool
+
+### [0.1.14](https://github.com/discourse/discourse-mcp/compare/v0.1.13...v0.1.14) (2025-12-19)
+
+#### Features
+
+* change github link in the User Agent string 
+
 ### [0.1.13](https://github.com/discourse/discourse-mcp/compare/v0.1.12...v0.1.13) (2025-12-03)
 
 #### Features
