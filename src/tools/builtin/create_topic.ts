@@ -11,6 +11,8 @@ export const registerCreateTopic: RegisterFn = (server, ctx, opts) => {
     raw: z.string().min(1).max(30000),
     category_id: z.number().int().positive().optional(),
     tags: z.array(z.string().min(1).max(100)).max(10).optional(),
+    author_username: z.string().optional(),
+    author_user_id: z.number().optional(),
   });
 
   server.registerTool(
@@ -21,7 +23,7 @@ export const registerCreateTopic: RegisterFn = (server, ctx, opts) => {
       inputSchema: schema.shape,
     },
     async (input: any, _extra: any) => {
-      const { title, raw, category_id, tags } = schema.parse(input);
+      const { title, raw, category_id, tags, author_username, author_user_id } = schema.parse(input);
 
       // Simple 1 req/sec rate limit
       const now = Date.now();
@@ -37,6 +39,8 @@ export const registerCreateTopic: RegisterFn = (server, ctx, opts) => {
         const payload: any = { title, raw };
         if (typeof category_id === "number") payload.category = category_id;
         if (Array.isArray(tags) && tags.length > 0) payload.tags = tags;
+        if (author_username && author_username.length > 0) payload.author_username = author_username;
+        if (typeof author_user_id === "number") payload.author_user_id = author_user_id;
 
         const data: any = await client.post(`/posts.json`, payload);
 
