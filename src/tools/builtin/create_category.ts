@@ -10,6 +10,8 @@ export const registerCreateCategory: RegisterFn = (server, ctx, opts) => {
     name: z.string().min(1).max(100),
     color: z.string().regex(/^[0-9a-fA-F]{6}$/).optional(),
     text_color: z.string().regex(/^[0-9a-fA-F]{6}$/).optional(),
+    emoji: z.string().optional(),
+    icon: z.string().optional(),
     parent_category_id: z.number().int().positive().optional(),
     description: z.string().min(1).max(10000).optional(),
   });
@@ -22,7 +24,7 @@ export const registerCreateCategory: RegisterFn = (server, ctx, opts) => {
       inputSchema: schema.shape,
     },
     async (input: any, _extra: any) => {
-      const { name, color, text_color, parent_category_id, description } = schema.parse(input);
+      const { name, color, text_color, emoji, icon, parent_category_id, description } = schema.parse(input);
 
       // Simple 1 req/sec rate limit
       const now = Date.now();
@@ -40,6 +42,13 @@ export const registerCreateCategory: RegisterFn = (server, ctx, opts) => {
         if (text_color) payload.text_color = text_color;
         if (parent_category_id) payload.parent_category_id = parent_category_id;
         if (description) payload.description = description;
+        if (emoji) payload.emoji = emoji;
+        if (icon) payload.icon = icon;
+        if (emoji) {
+          payload.style_type = 2;
+        } else if (icon) {
+          payload.style_type = 1;
+        }
 
         const data: any = await client.post(`/categories.json`, payload);
         const category = data?.category || data;
