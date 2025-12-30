@@ -43,8 +43,8 @@ export class HttpClient {
     return h;
   }
 
-  async get(path: string, { signal }: { signal?: AbortSignal } = {}) {
-    return this.request("GET", path, undefined, { signal });
+  async get(path: string, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
+    return this.request("GET", path, undefined, { signal, extraHeaders: headers });
   }
 
   async getCached(path: string, ttlMs: number, { signal }: { signal?: AbortSignal } = {}) {
@@ -57,19 +57,22 @@ export class HttpClient {
     return value;
   }
 
-  async post(path: string, body: unknown, { signal }: { signal?: AbortSignal } = {}) {
-    return this.request("POST", path, body, { signal });
+  async post(path: string, body: unknown, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
+    return this.request("POST", path, body, { signal, extraHeaders: headers});
   }
 
-  async delete(path: string, body?: unknown, { signal }: { signal?: AbortSignal } = {}) {
-    return this.request("DELETE", path, body, { signal });
+  async delete(path: string, body?: unknown, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
+    return this.request("DELETE", path, body, { signal, extraHeaders: headers });
   }
 
-  private async request(method: string, path: string, body?: unknown, { signal }: { signal?: AbortSignal } = {}) {
+  private async request(method: string, path: string, body?: unknown, { signal, extraHeaders }: { signal?: AbortSignal, extraHeaders?: Record<string, string>} = {}) {
     const url = new URL(path, this.base).toString();
     const headers = this.headers();
     if (body !== undefined) {
       headers["Content-Type"] = "application/json";
+    }
+    if (extraHeaders) {
+      Object.assign(headers, extraHeaders);
     }
 
     this.opts.logger.debug(`HTTP ${method} ${url}`);
