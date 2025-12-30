@@ -1,4 +1,15 @@
 Changelog
+### [0.1.16](https://github.com/discourse/discourse-mcp/compare/v0.1.15...v0.1.16) (2025-12-30)
+
+#### Features
+
+* ability to create post as another user by overriding Api-Username header
+
+#### Breaking Changes
+
+* remove `author_user_id` param from discourse_create_post tool
+* remove `author_user_id` param from discourse_create_topic tool
+
 ### [0.1.15](https://github.com/discourse/discourse-mcp/compare/v0.1.14...v0.1.15) (2025-12-26)
 
 #### Features
