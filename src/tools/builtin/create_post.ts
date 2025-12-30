@@ -10,7 +10,6 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
     topic_id: z.number().int().positive(),
     raw: z.string().min(1).max(30000),
     author_username: z.string().optional(),
-    author_user_id: z.number().optional(),
   });
 
   server.registerTool(
@@ -21,7 +20,7 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
       inputSchema: schema.shape,
     },
     async (input: any, _extra: any) => {
-      const { topic_id, raw, author_username, author_user_id } = schema.parse(input);
+      const { topic_id, raw, author_username } = schema.parse(input);
 
       // Simple 1 req/sec rate limit
       const now = Date.now();
@@ -34,11 +33,11 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
       try {
         const { base, client } = ctx.siteState.ensureSelectedSite();
         const payload: any = { topic_id, raw };
+        const headers: Record<string, string> = {};
 
-        if (author_username && author_username.length > 0) payload.author_username = author_username;
-        if (typeof author_user_id === "number") payload.author_user_id = author_user_id;
+        if (author_username && author_username.length > 0) headers["Api-Username"] = author_username;
 
-        const data = (await client.post(`/posts.json`, payload)) as any;
+        const data = (await client.post(`/posts.json`, payload, { headers })) as any;
         const postId = data?.id || data?.post?.id;
         const topicId = data?.topic_id || topic_id;
         const postNumber = data?.post_number || data?.post?.post_number;
