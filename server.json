@@ -1,0 +1,20 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.discourse/discourse-mcp",
+  "description": "Discourse MCP CLI server (stdio) exposing Discourse tools via MCP",
+  "repository": {
+    "url": "https://github.com/discourse/discourse-mcp",
+    "source": "github"
+  },
+  "version": "0.1.17",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@discourse/mcp",
+      "version": "0.1.17",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

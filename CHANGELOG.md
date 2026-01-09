@@ -1,4 +1,9 @@
-Changelog
+# Changelog
+
+### [0.1.17](https://github.com/discourse/discourse-mcp/compare/v0.1.16...v0.1.17) (2026-01-12)
+
+* Publish server to MCP registry
+
 ### [0.1.16](https://github.com/discourse/discourse-mcp/compare/v0.1.15...v0.1.16) (2025-12-30)
 
 #### Features
