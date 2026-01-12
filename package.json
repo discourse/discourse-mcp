@@ -1,6 +1,7 @@
 {
   "name": "@discourse/mcp",
-  "version": "0.1.16",
+  "mcpName": "io.github.discourse/mcp",
+  "version": "0.1.17",
   "description": "Discourse MCP CLI server (stdio) exposing Discourse tools via MCP",
   "author": "Discourse",
   "license": "MIT",
