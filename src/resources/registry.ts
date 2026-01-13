@@ -56,8 +56,27 @@ function registerCategoriesResource(server: McpServer, ctx: ResourceContext): vo
     { description: "List all categories with hierarchy (pid), permissions (perms), and counts. Use for migration workflows." },
     async (uri) => {
       const { client } = ctx.siteState.ensureSelectedSite();
-      const data = (await client.getCached("/site.json", 30000)) as any;
-      const rawCategories: any[] = data?.categories || [];
+      
+      const siteData = (await client.getCached("/site.json", 30000)) as any;
+      const siteCategories: any[] = siteData?.categories || [];
+      const categoryIds = siteCategories.map((c: any) => c.id);
+      
+      // Try to get detailed permissions via /categories/find.json?include_permissions=true
+      let rawCategories = siteCategories;
+      if (categoryIds.length > 0) {
+        try {
+          const idsParams = categoryIds.map((id: number) => `ids[]=${id}`).join("&");
+          const findData = (await client.getCached(
+            `/categories/find.json?include_permissions=true&${idsParams}`,
+            30000
+          )) as any;
+          if (Array.isArray(findData?.categories) && findData.categories.length > 0) {
+            rawCategories = findData.categories;
+          }
+        } catch {
+          // Fall back to site.json data if find endpoint fails
+        }
+      }
 
       const categories: LeanCategory[] = rawCategories.map(transformCategory);
 
@@ -134,7 +153,7 @@ function registerGroupsResource(server: McpServer, ctx: ResourceContext): void {
   server.resource(
     "site_groups",
     "discourse://site/groups",
-    { description: "List all groups with id, name, automatic flag, and user_count. Use to resolve gid values from category permissions." },
+    { description: "List all groups with visibility, interaction levels, and access settings. Levels: 0=public, 1=logged_on_users, 2=members, 3=staff, 4=owners." },
     async (uri) => {
       const { client } = ctx.siteState.ensureSelectedSite();
 

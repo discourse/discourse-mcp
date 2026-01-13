@@ -33,6 +33,7 @@ Resources provide static/semi-static data via URI addressing. Use these instead 
   - **Output**: JSON with `categories` array and `meta.total`
   - **Category fields**: `id`, `name`, `slug`, `pid` (parent_id), `read_restricted`, `topic_count`, `post_count`, `perms` (array of `{gid, perm}`)
   - **Permission types**: 1=full, 2=create_post, 3=readonly
+  - **Note**: `perms` is only populated with admin/moderator auth. Without admin auth, only `read_restricted` boolean is available.
 
 - **discourse://site/tags**
 
@@ -40,8 +41,10 @@ Resources provide static/semi-static data via URI addressing. Use these instead 
 
 - **discourse://site/groups**
 
-  - **Output**: JSON with `groups` array (`id`, `name`, `automatic`, `user_count`) and `meta.total`
-  - **Use case**: Resolve `gid` values from category permissions to group names
+  - **Output**: JSON with `groups` array and `meta.total`
+  - **Group fields**: `id`, `name`, `automatic`, `user_count`, `vis`, `members_vis`, `mention`, `msg`, `public_admission`, `public_exit`, `allow_membership_requests`
+  - **Levels** (0-4): 0=public, 1=logged_on_users, 2=members, 3=staff, 4=owners
+  - **Use case**: Resolve `gid` values from category permissions to group names, replicate group settings during migrations
 
 - **discourse://chat/channels**
 

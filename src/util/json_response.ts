@@ -94,27 +94,22 @@ export interface LeanCategory {
   read_restricted: boolean;
   topic_count: number;
   post_count: number;
-  perms: Array<{ gid: number; perm: number }>;
+  perms?: Array<{ gid: number; perm: number }>; // Only populated with admin auth
 }
 
 export function transformCategory(raw: any): LeanCategory {
-  // Extract permissions from group_permissions if available, otherwise use permission field
-  let perms: Array<{ gid: number; perm: number }> = [];
+  let perms: Array<{ gid: number; perm: number }> | undefined = undefined;
   
-  if (Array.isArray(raw.group_permissions)) {
+  if (Array.isArray(raw.group_permissions) && raw.group_permissions.length > 0) {
     perms = raw.group_permissions.map((gp: any) => ({
       gid: gp.group_id ?? gp.gid ?? 0,
       perm: gp.permission_type ?? gp.perm ?? 1,
     }));
-  } else if (raw.permission !== undefined) {
-    // Fallback: use permission field with everyone group (id=0)
-    perms = [{ gid: 0, perm: raw.permission }];
-  } else if (!raw.read_restricted) {
-    // Default: public category with full access for everyone
-    perms = [{ gid: 0, perm: 1 }];
   }
+  // Note: Without admin auth, group_permissions is not included in /site.json
+  // We intentionally omit perms rather than return misleading gid:0 data
 
-  return {
+  const result: LeanCategory = {
     id: raw.id,
     name: raw.name,
     slug: raw.slug,
@@ -122,18 +117,33 @@ export function transformCategory(raw: any): LeanCategory {
     read_restricted: raw.read_restricted ?? false,
     topic_count: raw.topic_count ?? 0,
     post_count: raw.post_count ?? 0,
-    perms,
   };
+  
+  if (perms) {
+    result.perms = perms;
+  }
+  
+  return result;
 }
 
 /**
  * Transforms raw Discourse group data to lean format.
+ * 
+ * Visibility/access levels (0-4):
+ *   0 = public, 1 = logged_on_users, 2 = members, 3 = staff, 4 = owners
  */
 export interface LeanGroup {
   id: number;
   name: string;
   automatic: boolean;
   user_count: number | null;
+  vis: number;
+  members_vis: number;
+  mention: number;
+  msg: number;
+  public_admission: boolean;
+  public_exit: boolean;
+  allow_membership_requests: boolean;
 }
 
 export function transformGroup(raw: any): LeanGroup {
@@ -142,6 +152,13 @@ export function transformGroup(raw: any): LeanGroup {
     name: raw.name,
     automatic: raw.automatic ?? false,
     user_count: raw.user_count ?? null,
+    vis: raw.visibility_level ?? 0,
+    members_vis: raw.members_visibility_level ?? 0,
+    mention: raw.mentionable_level ?? 0,
+    msg: raw.messageable_level ?? 0,
+    public_admission: raw.public_admission ?? false,
+    public_exit: raw.public_exit ?? false,
+    allow_membership_requests: raw.allow_membership_requests ?? false,
   };
 }
 

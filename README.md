@@ -148,6 +148,7 @@ Resources provide static/semi-static read-only data via URI addressing. Use thes
   - List all categories with hierarchy and permissions
   - Output: `{ categories: [{id, name, slug, pid, read_restricted, topic_count, post_count, perms}], meta: {total} }`
   - `perms` is array of `{gid, perm}` where perm: 1=full, 2=create_post, 3=readonly
+  - **Note**: `perms` is only populated with admin/moderator auth. Without admin auth, only `read_restricted` boolean is available.
 
 - **discourse://site/tags**
 
@@ -156,8 +157,10 @@ Resources provide static/semi-static read-only data via URI addressing. Use thes
 
 - **discourse://site/groups**
 
-  - List all groups (use to resolve `gid` values from category permissions)
-  - Output: `{ groups: [{id, name, automatic, user_count}], meta: {total} }`
+  - List all groups with visibility, interaction levels, and access settings
+  - Output: `{ groups: [{id, name, automatic, user_count, vis, members_vis, mention, msg, public_admission, public_exit, allow_membership_requests}], meta: {total} }`
+  - **Levels** (0-4): 0=public, 1=logged_on_users, 2=members, 3=staff, 4=owners
+  - **Use case**: Resolve `gid` values from category permissions to group names, replicate group settings during migrations
 
 - **discourse://chat/channels**
 
