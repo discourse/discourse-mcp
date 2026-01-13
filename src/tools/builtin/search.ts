@@ -13,7 +13,7 @@ export const registerSearch: RegisterFn = (server, ctx) => {
     "discourse_search",
     {
       title: "Discourse Search",
-      description: "Search site content. Returns JSON array of matching topics with id, slug, and title.",
+      description: "Search site content. Returns JSON object with results array of matching topics (id, slug, title) and meta (total, has_more).",
       inputSchema: schema.shape,
     },
     async (args, _extra: any) => {
