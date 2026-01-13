@@ -1,10 +1,9 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-
-let lastCategoryAt = 0;
+import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
 
 export const registerCreateCategory: RegisterFn = (server, ctx, opts) => {
-  if (!opts.allowWrites) return; // disabled by default
+  if (!opts.allowWrites) return;
 
   const schema = z.object({
     name: z.string().min(1).max(100),
@@ -20,22 +19,16 @@ export const registerCreateCategory: RegisterFn = (server, ctx, opts) => {
     "discourse_create_category",
     {
       title: "Create Category",
-      description: "Create a new category.",
+      description: "Create a new category. Returns JSON with id, slug, and name.",
       inputSchema: schema.shape,
     },
     async (input: any, _extra: any) => {
       const { name, color, text_color, emoji, icon, parent_category_id, description } = schema.parse(input);
 
-      // Simple 1 req/sec rate limit
-      const now = Date.now();
-      if (now - lastCategoryAt < 1000) {
-        const wait = 1000 - (now - lastCategoryAt);
-        await new Promise((r) => setTimeout(r, wait));
-      }
-      lastCategoryAt = Date.now();
+      await rateLimit("category");
 
       try {
-        const { base, client } = ctx.siteState.ensureSelectedSite();
+        const { client } = ctx.siteState.ensureSelectedSite();
 
         const payload: any = { name };
         if (color) payload.color = color;
@@ -53,14 +46,13 @@ export const registerCreateCategory: RegisterFn = (server, ctx, opts) => {
         const data: any = await client.post(`/categories.json`, payload);
         const category = data?.category || data;
 
-        const id = category?.id;
-        const slug = category?.slug || (category?.name ? String(category.name).toLowerCase().replace(/\s+/g, "-") : undefined);
-        const title = category?.name || name;
-
-        const link = id && slug ? `${base}/c/${slug}/${id}` : `${base}/categories`;
-        return { content: [{ type: "text", text: `Created category "${title}": ${link}` }] };
+        return jsonResponse({
+          id: category?.id,
+          slug: category?.slug || (category?.name ? String(category.name).toLowerCase().replace(/\s+/g, "-") : null),
+          name: category?.name || name,
+        });
       } catch (e: any) {
-        return { content: [{ type: "text", text: `Failed to create category: ${e?.message || String(e)}` }], isError: true };
+        return jsonError(`Failed to create category: ${e?.message || String(e)}`);
       }
     }
   );

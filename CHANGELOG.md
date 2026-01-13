@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.0](https://github.com/discourse/discourse-mcp/compare/v0.1.17...v0.2.0) (2026-01-13)
+
+### Breaking Changes
+
+* All tool outputs now return strict JSON instead of Markdown
+* List tools converted to MCP Resources (URI-addressable endpoints):
+  - `discourse_list_categories` → `discourse://site/categories`
+  - `discourse_list_tags` → `discourse://site/tags`
+  - `discourse_list_chat_channels` → `discourse://chat/channels`
+  - `discourse_list_user_chat_channels` → `discourse://user/chat-channels`
+  - `discourse_list_drafts` → `discourse://user/drafts`
+
+### Features
+
+* Add MCP Resources for static/semi-static data (categories, tags, groups, chat channels, drafts)
+* Add `discourse://site/groups` resource with visibility and membership settings
+* Add lean JSON response format optimized for token efficiency
+* Centralize rate limiting and JSON response builders (DRY refactor)
+
 ### [0.1.17](https://github.com/discourse/discourse-mcp/compare/v0.1.16...v0.1.17) (2026-01-12)
 
 * Publish server to MCP registry

@@ -1,10 +1,9 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-
-let lastTopicAt = 0;
+import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
 
 export const registerCreateTopic: RegisterFn = (server, ctx, opts) => {
-  if (!opts.allowWrites) return; // disabled by default
+  if (!opts.allowWrites) return;
 
   const schema = z.object({
     title: z.string().min(1).max(300),
@@ -18,22 +17,16 @@ export const registerCreateTopic: RegisterFn = (server, ctx, opts) => {
     "discourse_create_topic",
     {
       title: "Create Topic",
-      description: "Create a new topic with the given title and first post.",
+      description: "Create a new topic. Returns JSON with id, topic_id, slug, and title.",
       inputSchema: schema.shape,
     },
     async (input: any, _extra: any) => {
       const { title, raw, category_id, tags, author_username } = schema.parse(input);
 
-      // Simple 1 req/sec rate limit
-      const now = Date.now();
-      if (now - lastTopicAt < 1000) {
-        const wait = 1000 - (now - lastTopicAt);
-        await new Promise((r) => setTimeout(r, wait));
-      }
-      lastTopicAt = Date.now();
+      await rateLimit("topic");
 
       try {
-        const { base, client } = ctx.siteState.ensureSelectedSite();
+        const { client } = ctx.siteState.ensureSelectedSite();
 
         const payload: any = { title, raw };
         const headers: Record<string, string> = {};
@@ -44,20 +37,14 @@ export const registerCreateTopic: RegisterFn = (server, ctx, opts) => {
 
         const data: any = await client.post(`/posts.json`, payload, { headers });
 
-        const topicId = data?.topic_id || data?.topicId || data?.topic?.id;
-        const slug = data?.topic_slug || data?.topic?.slug;
-        const postNumber = data?.post_number || data?.post?.post_number || 1;
-        const titleOut = data?.topic_title || data?.title || title;
-
-        const link = topicId
-          ? slug
-            ? `${base}/t/${slug}/${topicId}`
-            : `${base}/t/${topicId}/${postNumber}`
-          : `${base}/latest`;
-
-        return { content: [{ type: "text", text: `Created topic "${titleOut}": ${link}` }] };
+        return jsonResponse({
+          id: data?.id || data?.post?.id,
+          topic_id: data?.topic_id || data?.topicId || data?.topic?.id,
+          slug: data?.topic_slug || data?.topic?.slug || null,
+          title: data?.topic_title || data?.title || title,
+        });
       } catch (e: any) {
-        return { content: [{ type: "text", text: `Failed to create topic: ${e?.message || String(e)}` }], isError: true };
+        return jsonError(`Failed to create topic: ${e?.message || String(e)}`);
       }
     }
   );
