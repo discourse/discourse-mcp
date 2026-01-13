@@ -1,10 +1,9 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-
-let lastPostAt = 0;
+import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
 
 export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
-  if (!opts.allowWrites) return; // disabled by default
+  if (!opts.allowWrites) return;
 
   const schema = z.object({
     topic_id: z.number().int().positive(),
@@ -16,37 +15,30 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
     "discourse_create_post",
     {
       title: "Create Post",
-      description: "Create a post in a topic.",
+      description: "Create a post in a topic. Returns JSON with id, topic_id, and post_number.",
       inputSchema: schema.shape,
     },
     async (input: any, _extra: any) => {
       const { topic_id, raw, author_username } = schema.parse(input);
 
-      // Simple 1 req/sec rate limit
-      const now = Date.now();
-      if (now - lastPostAt < 1000) {
-        const wait = 1000 - (now - lastPostAt);
-        await new Promise((r) => setTimeout(r, wait));
-      }
-      lastPostAt = Date.now();
+      await rateLimit("post");
 
       try {
-        const { base, client } = ctx.siteState.ensureSelectedSite();
+        const { client } = ctx.siteState.ensureSelectedSite();
         const payload: any = { topic_id, raw };
         const headers: Record<string, string> = {};
 
         if (author_username && author_username.length > 0) headers["Api-Username"] = author_username;
 
         const data = (await client.post(`/posts.json`, payload, { headers })) as any;
-        const postId = data?.id || data?.post?.id;
-        const topicId = data?.topic_id || topic_id;
-        const postNumber = data?.post_number || data?.post?.post_number;
-        const link = postId && topicId && postNumber
-          ? `${base}/t/${topicId}/${postNumber}`
-          : `${base}/t/${topicId}`;
-        return { content: [{ type: "text", text: `Created post: ${link}` }] };
+
+        return jsonResponse({
+          id: data?.id || data?.post?.id,
+          topic_id: data?.topic_id || topic_id,
+          post_number: data?.post_number || data?.post?.post_number,
+        });
       } catch (e: any) {
-        return { content: [{ type: "text", text: `Failed to create post: ${e?.message || String(e)}` }], isError: true };
+        return jsonError(`Failed to create post: ${e?.message || String(e)}`);
       }
     }
   );

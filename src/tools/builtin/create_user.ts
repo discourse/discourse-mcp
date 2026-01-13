@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
+import { jsonResponse, jsonError } from "../../util/json_response.js";
 
 export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
   if (!opts?.allowWrites) return;
@@ -17,7 +18,7 @@ export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
     "discourse_create_user",
     {
       title: "Create User",
-      description: "Create a new user account in Discourse.",
+      description: "Create a new user account. Returns JSON with success status and user details.",
       inputSchema: schema.shape,
     },
     async (args, _extra: any) => {
@@ -36,34 +37,19 @@ export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
         const response = await client.post("/users.json", userData) as any;
         
         if (response.success) {
-          return {
-            content: [{
-              type: "text",
-              text: `User created successfully!\n` +
-                    `Username: ${args.username}\n` +
-                    `Name: ${args.name}\n` +
-                    `Email: ${args.email}\n` +
-                    `Status: ${response.active ? 'Active' : 'Inactive'}\n` +
-                    `Message: ${response.message || 'Account created'}`
-            }]
-          };
+          return jsonResponse({
+            success: true,
+            username: args.username,
+            name: args.name,
+            email: args.email,
+            active: response.active ?? args.active,
+            message: response.message || "Account created",
+          });
         } else {
-          return {
-            content: [{
-              type: "text",
-              text: `Failed to create user: ${response.message || 'Unknown error'}`
-            }],
-            isError: true
-          };
+          return jsonError(response.message || "Unknown error");
         }
       } catch (e: any) {
-        return {
-          content: [{
-            type: "text",
-            text: `Failed to create user: ${e?.message || String(e)}`
-          }],
-          isError: true
-        };
+        return jsonError(`Failed to create user: ${e?.message || String(e)}`);
       }
     }
   );

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
+import { jsonResponse, jsonError } from "../../util/json_response.js";
 
 export const registerGetUser: RegisterFn = (server, ctx) => {
   const schema = z.object({
@@ -10,29 +11,27 @@ export const registerGetUser: RegisterFn = (server, ctx) => {
     "discourse_get_user",
     {
       title: "Get User",
-      description: "Get basic user info.",
+      description: "Get user info. Returns JSON with id, username, name, trust_level, created_at, and bio.",
       inputSchema: schema.shape,
     },
     async ({ username }, _extra: any) => {
       try {
-        const { base, client } = ctx.siteState.ensureSelectedSite();
+        const { client } = ctx.siteState.ensureSelectedSite();
         const data = (await client.get(`/u/${encodeURIComponent(username)}.json`)) as any;
-        const user = data?.user || data?.user_badges || data;
-        const name = user?.name || username;
-        const trust = user?.trust_level;
-        const created = user?.created_at || user?.user?.created_at || "";
-        const bio = user?.bio_raw || "";
-        const lines = [
-          `@${username} (${name})`,
-          trust != null ? `Trust level: ${trust}` : undefined,
-          created ? `Joined: ${created}` : undefined,
-          bio ? "" : undefined,
-          bio ? bio.slice(0, 1000) : undefined,
-          `Profile: ${base}/u/${encodeURIComponent(username)}`,
-        ].filter(Boolean) as string[];
-        return { content: [{ type: "text", text: lines.join("\n") }] };
+        const user = data?.user || data;
+
+        return jsonResponse({
+          id: user?.id,
+          username: user?.username || username,
+          name: user?.name || null,
+          trust_level: user?.trust_level ?? null,
+          created_at: user?.created_at || null,
+          bio: user?.bio_raw ? user.bio_raw.slice(0, 500) : null,
+          admin: user?.admin || false,
+          moderator: user?.moderator || false,
+        });
       } catch (e: any) {
-        return { content: [{ type: "text", text: `Failed to get user ${username}: ${e?.message || String(e)}` }], isError: true };
+        return jsonError(`Failed to get user ${username}: ${e?.message || String(e)}`);
       }
     }
   );

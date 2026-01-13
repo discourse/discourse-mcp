@@ -1,23 +1,25 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
+import { jsonResponse, jsonError, paginatedResponse } from "../../util/json_response.js";
 
 export const registerListUserPosts: RegisterFn = (server, ctx) => {
   const schema = z.object({
     username: z.string().min(1),
     page: z.number().int().min(0).optional(),
+    limit: z.number().int().min(1).max(50).optional().describe("Posts per page (max 50, default 30)"),
   });
 
   server.registerTool(
     "discourse_list_user_posts",
     {
       title: "List User Posts",
-      description: "Get a list of user posts and replies from a Discourse instance, with the most recent first. Returns 30 posts per page by default. Use the page parameter to paginate (page 0 = offset 0, page 1 = offset 30, etc.).",
+      description: "Get paginated list of user posts/replies. Returns JSON with post id, topic_id, post_number, created_at, excerpt, and category_id.",
       inputSchema: schema.shape,
     },
-    async ({ username, page }, _extra: any) => {
+    async ({ username, page = 0, limit = 30 }, _extra: any) => {
       try {
-        const { base, client } = ctx.siteState.ensureSelectedSite();
-        const offset = (page || 0) * 30;
+        const { client } = ctx.siteState.ensureSelectedSite();
+        const offset = page * limit;
 
         // The filter parameter 4,5 corresponds to posts and replies
         const data = (await client.get(
@@ -26,57 +28,24 @@ export const registerListUserPosts: RegisterFn = (server, ctx) => {
 
         const userActions = data?.user_actions || [];
 
-        if (userActions.length === 0) {
-          return {
-            content: [{
-              type: "text",
-              text: page && page > 0
-                ? `No more posts found for @${username} at page ${page}.`
-                : `No posts found for @${username}.`
-            }]
-          };
-        }
+        const posts = userActions.slice(0, limit).map((action: any) => ({
+          id: action.post_id || action.id,
+          topic_id: action.topic_id,
+          post_number: action.post_number,
+          slug: action.slug,
+          title: action.title,
+          created_at: action.created_at,
+          excerpt: action.excerpt || null,
+          category_id: action.category_id || null,
+        }));
 
-        const posts = userActions.map((action: any) => {
-          const excerpt = action.excerpt || "";
-          const truncated = action.truncated ? "..." : "";
-          const date = action.created_at || "";
-          const topicTitle = action.title || "";
-          const topicSlug = action.slug || "";
-          const topicId = action.topic_id || "";
-          const postNumber = action.post_number || "";
-          const categoryId = action.category_id || "";
-
-          const postUrl = `${base}/t/${topicSlug}/${topicId}/${postNumber}`;
-
-          return [
-            `**${topicTitle}**`,
-            `Posted: ${date}`,
-            `Topic: ${postUrl}`,
-            categoryId ? `Category ID: ${categoryId}` : undefined,
-            excerpt ? `\n${excerpt}${truncated}` : undefined,
-          ].filter(Boolean).join("\n");
-        });
-
-        const totalShown = userActions.length;
-        const pageInfo = page && page > 0 ? ` (page ${page})` : "";
-        const header = `Showing ${totalShown} posts for @${username}${pageInfo}:\n\n`;
-        const footer = totalShown === 30 ? `\n\nTo see more posts, use page ${(page || 0) + 1}.` : "";
-
-        return {
-          content: [{
-            type: "text",
-            text: header + posts.join("\n\n---\n\n") + footer
-          }]
-        };
+        return jsonResponse(paginatedResponse("posts", posts, {
+          page,
+          limit,
+          has_more: userActions.length >= limit,
+        }));
       } catch (e: any) {
-        return {
-          content: [{
-            type: "text",
-            text: `Failed to get posts for ${username}: ${e?.message || String(e)}`
-          }],
-          isError: true
-        };
+        return jsonError(`Failed to get posts for ${username}: ${e?.message || String(e)}`);
       }
     }
   );
