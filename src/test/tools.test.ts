@@ -100,11 +100,12 @@ test('select-site then search flow works with mocked HTTP', async () => {
     const selectRes = await tools['discourse_select_site'].handler({ site: 'https://example.com' }, {});
     assert.equal(selectRes?.isError, undefined);
 
-    // Search
+    // Search - now returns JSON-only (v0.2.0)
     const searchRes = await tools['discourse_search'].handler({ query: 'hello' }, {});
     const text = String(searchRes?.content?.[0]?.text || '');
-    assert.match(text, /Top results/);
-    assert.match(text, /hello-world/);
+    const json = JSON.parse(text);
+    assert.ok(json.results);
+    assert.equal(json.results[0].slug, 'hello-world');
   } finally {
     globalThis.fetch = originalFetch as any;
   }
@@ -148,11 +149,12 @@ test('tethered mode hides select_site and allows search without selection', asyn
     // Ensure select tool is not exposed
     assert.ok(!('discourse_select_site' in tools));
 
-    // Search should work without calling select first
+    // Search should work without calling select first - now returns JSON-only (v0.2.0)
     const searchRes = await tools['discourse_search'].handler({ query: 'hello' }, {});
     const text = String(searchRes?.content?.[0]?.text || '');
-    assert.match(text, /Top results/);
-    assert.match(text, /hello-world/);
+    const json = JSON.parse(text);
+    assert.ok(json.results);
+    assert.equal(json.results[0].slug, 'hello-world');
   } finally {
     globalThis.fetch = originalFetch as any;
   }
