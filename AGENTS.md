@@ -147,17 +147,20 @@ All tools return **strict JSON** (no Markdown). Every response includes relevant
   - `--auth_pairs` (JSON)
   - `--read_only` (default true), `--allow_writes` (default false)
   - `--timeout_ms <number>` (default 15000)
+  - `--concurrency <number>` (default 4)
+  - `--cache_dir <path>` (currently unused; in-memory caching is built-in)
   - `--log_level <silent|error|info|debug>` (default info)
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default auto)
-  - `--site <url>`: tether to a single site
-  - `--default-search <prefix>`: prefix every search query
-  - `--max-read-length <number>` (default 50000): max characters for post content
+  - `--profile <path.json>`: load partial config from JSON (flags override)
+  - `--site <url>`: tether to a single site (hides `discourse_select_site`)
+  - `--default-search <prefix>`: unconditionally prefix every search query (e.g., `category:support tag:ai`)
+  - `--max-read-length <number>` (default 50000): maximum number of characters returned for post content in `discourse_read_post` and per-post content in `discourse_read_topic`. Tools prefer `raw` content via Discourse API (`include_raw=true`) when available.
 
 ### Networking & resilience
 
 - User-Agent: `Discourse-MCP/0.x (+https://github.com/discourse/discourse-mcp)`.
 - Retries on 429/5xx with backoff (3 attempts).
-- Lightweight in-memory GET cache for selected endpoints.
+- Lightweight in-memory GET cache for selected endpoints (e.g., topics, site metadata).
 
 ### Errors & rate limits
 
@@ -173,6 +176,7 @@ All tools return **strict JSON** (no Markdown). Every response includes relevant
 - Built-in tools: `src/tools/builtin/*`
 - JSON helpers: `src/util/json_response.ts`
 - Remote tools: `src/tools/remote/tool_exec_api.ts`
+- Logging/redaction: `src/util/logger.ts`, `src/util/redact.ts`
 
 ### Quick start (for human operators)
 
