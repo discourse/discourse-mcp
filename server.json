@@ -6,12 +6,12 @@
     "url": "https://github.com/discourse/discourse-mcp",
     "source": "github"
   },
-  "version": "0.1.17",
+  "version": "0.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@discourse/mcp",
-      "version": "0.1.17",
+      "version": "0.0.0",
       "transport": {
         "type": "stdio"
       }

@@ -28,11 +28,7 @@
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist",
     "sync:fixtures": "node scripts/sync-fixtures.mjs",
-    "test": "node --test dist/test/**/*.js",
-    "release": "standard-version",
-    "release:dry": "standard-version --dry-run",
-    "release:alpha": "standard-version --prerelease alpha",
-    "release:beta": "standard-version --prerelease beta"
+    "test": "node --test dist/test/**/*.js"
   },
   "files": [
     "dist/**",
@@ -51,7 +47,6 @@
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
-    "standard-version": "^9.5.0",
     "typescript": "^5.5.4"
   },
   "packageManager": "pnpm@10.14.0"
