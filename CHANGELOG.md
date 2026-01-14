@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/discourse/discourse-mcp/compare/v0.2.1...v0.2.2) (2026-01-14)
+
+### Features
+
+* Add HTTP Basic Auth support for sites behind reverse proxies
+  - New `http_basic_user` and `http_basic_pass` fields in `auth_pairs` configuration
+  - Sends `Authorization: Basic` header alongside Discourse API authentication headers
+
 ## [0.2.1](https://github.com/discourse/discourse-mcp/compare/v0.1.17...v0.2.1) (2026-01-13)
 
 ### Breaking Changes

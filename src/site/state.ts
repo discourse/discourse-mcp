@@ -7,6 +7,8 @@ export type AuthOverride = {
   api_username?: string;
   user_api_key?: string;
   user_api_client_id?: string;
+  http_basic_user?: string;
+  http_basic_pass?: string;
 };
 
 function normalizeBase(url: string): string {
@@ -47,13 +49,18 @@ export class SiteState {
     const cached = this.clientCache.get(base);
     if (cached) return { base, client: cached };
 
-    const auth = this.resolveAuthForSite(base);
+    const match = this.findAuthOverride(base);
+    const auth = this.resolveAuthFromOverride(match);
+    const httpBasicAuth = match?.http_basic_user && match?.http_basic_pass
+      ? { user: match.http_basic_user, pass: match.http_basic_pass }
+      : undefined;
     const client = new HttpClient({
       baseUrl: base,
       timeoutMs: this.opts.timeoutMs,
       logger: this.opts.logger,
       auth,
-    } as any);
+      httpBasicAuth,
+    });
     this.clientCache.set(base, client);
     return { base, client };
   }
@@ -65,9 +72,12 @@ export class SiteState {
     return { base, client };
   }
 
-  private resolveAuthForSite(base: string): AuthMode {
+  private findAuthOverride(base: string): AuthOverride | undefined {
     const overrides = this.opts.authOverrides || [];
-    const match = overrides.find((o) => normalizeBase(o.site) === base || this.sameOrigin(o.site, base));
+    return overrides.find((o) => normalizeBase(o.site) === base || this.sameOrigin(o.site, base));
+  }
+
+  private resolveAuthFromOverride(match: AuthOverride | undefined): AuthMode {
     if (match) {
       // Prefer user_api_key if provided
       if (match.user_api_key) return { type: "user_api_key", key: match.user_api_key, client_id: match.user_api_client_id };

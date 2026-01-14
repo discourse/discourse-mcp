@@ -20,6 +20,7 @@
 - Supported auth:
   - **None** (read-only public data)
   - Per-site overrides via `--auth_pairs`, e.g. `[{"site":"https://example.com","api_key":"...","api_username":"system"}]`.
+  - **HTTP Basic Auth** (for sites behind a reverse proxy): Add `http_basic_user` and `http_basic_pass` to any `auth_pairs` entry.
 - **Writes are disabled by default**. Write tools are only registered when:
   - `--allow_writes` AND not `--read_only` AND a matching `auth_pairs` entry exists for the selected site.
 - Secrets are never logged; config is redacted before logging.
