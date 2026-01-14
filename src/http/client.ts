@@ -10,6 +10,7 @@ export interface HttpClientOptions {
   timeoutMs: number;
   logger: Logger;
   auth: AuthMode;
+  httpBasicAuth?: { user: string; pass: string };
 }
 
 export class HttpError extends Error {
@@ -39,6 +40,11 @@ export class HttpClient {
     } else if (this.opts.auth.type === "user_api_key") {
       h["User-Api-Key"] = this.opts.auth.key;
       if (this.opts.auth.client_id) h["User-Api-Client-Id"] = this.opts.auth.client_id;
+    }
+    if (this.opts.httpBasicAuth) {
+      const { user, pass } = this.opts.httpBasicAuth;
+      const encoded = Buffer.from(`${user}:${pass}`).toString("base64");
+      h["Authorization"] = `Basic ${encoded}`;
     }
     return h;
   }

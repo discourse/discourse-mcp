@@ -62,6 +62,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - **None** by default.
   - **Admin API Keys** (require admin permissions): **`--auth_pairs '[{"site":"https://example.com","api_key":"...","api_username":"system"}]'`**
   - **User API Keys** (any user can generate): **`--auth_pairs '[{"site":"https://example.com","user_api_key":"...","user_api_client_id":"..."}]'`**
+  - **HTTP Basic Auth** (for sites behind a reverse proxy): Add `http_basic_user` and `http_basic_pass` to any `auth_pairs` entry. This is useful for Discourse sites protected by HTTP Basic Authentication at the reverse proxy level.
   - You can include multiple entries in `auth_pairs`; the matching entry is used for the selected site. If both `user_api_key` and `api_key` are provided for the same site, `user_api_key` takes precedence.
 
 - **Write safety**
@@ -105,6 +106,13 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
       "site": "https://example.com",
       "user_api_key": "<user_api_key>",
       "user_api_client_id": "<client_id>"
+    },
+    {
+      "site": "https://protected.example.com",
+      "api_key": "<redacted>",
+      "api_username": "system",
+      "http_basic_user": "username",
+      "http_basic_pass": "password"
     }
   ],
   "read_only": false,
@@ -339,6 +347,12 @@ npx -y @discourse/mcp@latest --transport http --port 3000 --site https://try.dis
 # Server will start on http://localhost:3000
 # Health check: http://localhost:3000/health
 # MCP endpoint: http://localhost:3000/mcp
+```
+
+- Connect to a site behind HTTP Basic Auth:
+
+```bash
+npx -y @discourse/mcp@latest --auth_pairs '[{"site":"https://protected.example.com","api_key":"'$DISCOURSE_API_KEY'","api_username":"system","http_basic_user":"username","http_basic_pass":"password"}]' --site https://protected.example.com
 ```
 
 ## Authentication

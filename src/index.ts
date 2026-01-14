@@ -40,6 +40,8 @@ const ProfileSchema = z
             api_username: z.string().optional(),
             user_api_key: z.string().optional(),
             user_api_client_id: z.string().optional(),
+            http_basic_user: z.string().optional(),
+            http_basic_pass: z.string().optional(),
           })
           .strict()
       )
