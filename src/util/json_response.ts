@@ -164,15 +164,19 @@ export function transformGroup(raw: any): LeanGroup {
 
 /**
  * Transforms raw Discourse tag data to lean format.
+ * Note: Discourse tags use `name` as the primary identifier (used in filters).
+ * The `id` field is the numeric database ID.
  */
 export interface LeanTag {
-  id: string;
+  id: number;
+  name: string;
   count: number;
 }
 
 export function transformTag(raw: any): LeanTag {
   return {
-    id: raw.id ?? raw.name,
+    id: raw.id ?? 0,
+    name: raw.name ?? raw.text ?? String(raw.id),
     count: raw.count ?? raw.topic_count ?? 0,
   };
 }

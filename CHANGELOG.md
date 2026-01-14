@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.2.3](https://github.com/discourse/discourse-mcp/compare/v0.2.2...v0.2.3) (2026-01-14)
+
+### Bug Fixes
+
+* Fix tags resource to include tag names alongside id and count
+  - `discourse://site/tags` now returns `{id, name, count}` instead of just `{id, count}`
+  - Tag `name` is the string used in filters (e.g., `tag:mcp-test`)
+
+* Fix `discourse_list_user_posts` to always include `id` field
+  - `id` is now always present (may be `null` for first posts/topic creation where `post_number: 1`)
+  - Use `topic_id` + `post_number` to reference posts when `id` is `null`
+
+* Fix `discourse_filter_topics` to respect `per_page` limit
+  - Results are now properly sliced to the requested `per_page` value
+  - `has_more` correctly indicates when more results are available
+
+### Documentation
+
+* Fix tool descriptions to accurately describe return types:
+  - `discourse_filter_topics`: "Returns JSON array" → "Returns JSON object with results array"
+  - `discourse_get_chat_messages`: "Returns JSON array" → "Returns JSON object with channel_id, messages array, and meta"
+  - `discourse_get_user`: Added missing `admin, moderator` fields to description
+  - `discourse_list_user_posts`: Clarified return structure with posts array and meta
+
+* Update README.md to reflect correct output formats for tags and chat messages
+
 ## [0.2.2](https://github.com/discourse/discourse-mcp/compare/v0.2.1...v0.2.2) (2026-01-14)
 
 ### Features

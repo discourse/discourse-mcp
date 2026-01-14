@@ -28,7 +28,7 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
     .strict();
 
   const description =
-    "Filter topics with a concise query language. Returns JSON array with id, slug, title. " +
+    "Filter topics with a concise query language. Returns JSON object with results array (id, slug, title) and meta (page, limit, has_more). " +
     "Query syntax: category/categories (comma=OR, '=category'=without subcats, '-'=exclude), " +
     "tag/tags (comma=OR, '+'=AND), status:(open|closed|archived|listed|unlisted|public), " +
     "in:(bookmarked|watching|tracking|muted|pinned), dates: created/activity-(before|after) YYYY-MM-DD or N days, " +
@@ -57,7 +57,10 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
         const moreUrl: string | undefined =
           list?.more_topics_url || list?.more_url || undefined;
 
-        const results = topics.map((t) => ({
+        const slicedTopics = topics.slice(0, per_page);
+        const hasMore = !!moreUrl || topics.length > per_page;
+
+        const results = slicedTopics.map((t) => ({
           id: t.id,
           slug: t.slug || String(t.id),
           title: t.title || t.fancy_title || `Topic ${t.id}`,
@@ -66,7 +69,7 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
         return jsonResponse(paginatedResponse("results", results, {
           page,
           limit: per_page,
-          has_more: !!moreUrl,
+          has_more: hasMore,
         }));
       } catch (e: any) {
         return jsonError(`Failed to filter topics: ${e?.message || String(e)}`);
