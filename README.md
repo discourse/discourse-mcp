@@ -5,7 +5,7 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 - **Entry point**: `src/index.ts` → compiled to `dist/index.js` (binary name: `discourse-mcp`)
 - **SDK**: `@modelcontextprotocol/sdk`
 - **Node**: >= 18
-- **Version**: 0.2.0 (breaking changes from 0.1.x - JSON-only output, resources replace list tools)
+- **Version**: 0.2.3 (0.2.x has breaking changes from 0.1.x - JSON-only output, resources replace list tools)
 
 ### Quick start (release)
 
@@ -161,7 +161,7 @@ Resources provide static/semi-static read-only data via URI addressing. Use thes
 - **discourse://site/tags**
 
   - List all tags with usage counts
-  - Output: `{ tags: [{id, count}], meta: {total} }`
+  - Output: `{ tags: [{id, name, count}], meta: {total} }`
 
 - **discourse://site/groups**
 
@@ -211,7 +211,7 @@ Built‑in tools (always present unless noted). All tools return **strict JSON**
   - Query language (succinct): key:value tokens separated by spaces; category/categories (comma = OR, `=category` = without subcats, `-` prefix = exclude); tag/tags (comma = OR, `+` = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public); personal `in:` (bookmarked|watching|tracking|muted|pinned); dates: created/activity/latest-post-(before|after) with `YYYY-MM-DD` or relative days `N`; numeric: likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); order: activity|created|latest-post|likes|likes-op|posters|title|views|category with optional `-asc`; free text terms are matched.
 - `discourse_get_chat_messages`
   - Input: `{ channel_id: number; page_size?: number (1–50, default 50); target_message_id?: number; direction?: "past" | "future"; target_date?: string (ISO 8601) }`
-  - Output: `{ messages: [{id, username, created_at, message, edited, thread_id, in_reply_to_id}], meta }`
+  - Output: `{ channel_id, messages: [{id, username, created_at, message, edited, thread_id, in_reply_to_id}], meta }`
 - `discourse_get_draft`
   - Input: `{ draft_key: string; sequence?: number }`
   - Output: `{ draft_key, sequence, found, data: {title, reply, category_id, tags, action} }`

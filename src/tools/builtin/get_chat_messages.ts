@@ -15,7 +15,7 @@ export const registerGetChatMessages: RegisterFn = (server, ctx) => {
     "discourse_get_chat_messages",
     {
       title: "Get Chat Messages",
-      description: "Get messages from a chat channel. Returns JSON array with id, username, created_at, message, and pagination meta.",
+      description: "Get messages from a chat channel. Returns JSON object with channel_id, messages array (id, username, created_at, message, edited, thread_id, in_reply_to_id), and meta.",
       inputSchema: schema.shape,
     },
     async ({

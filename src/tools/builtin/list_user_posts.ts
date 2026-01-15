@@ -13,7 +13,7 @@ export const registerListUserPosts: RegisterFn = (server, ctx) => {
     "discourse_list_user_posts",
     {
       title: "List User Posts",
-      description: "Get paginated list of user posts/replies. Returns JSON with post id, topic_id, post_number, created_at, excerpt, and category_id.",
+      description: "Get paginated list of user posts/replies. Returns JSON object with posts array (id, topic_id, post_number, slug, title, created_at, excerpt, category_id) and meta (page, limit, has_more).",
       inputSchema: schema.shape,
     },
     async ({ username, page = 0, limit = 30 }, _extra: any) => {
@@ -28,16 +28,19 @@ export const registerListUserPosts: RegisterFn = (server, ctx) => {
 
         const userActions = data?.user_actions || [];
 
-        const posts = userActions.slice(0, limit).map((action: any) => ({
-          id: action.post_id || action.id,
-          topic_id: action.topic_id,
-          post_number: action.post_number,
-          slug: action.slug,
-          title: action.title,
-          created_at: action.created_at,
-          excerpt: action.excerpt || null,
-          category_id: action.category_id || null,
-        }));
+        const posts = userActions.slice(0, limit).map((action: any) => {
+          const postId = action.post_id ?? action.id ?? null;
+          return {
+            id: postId,
+            topic_id: action.topic_id,
+            post_number: action.post_number,
+            slug: action.slug,
+            title: action.title,
+            created_at: action.created_at,
+            excerpt: action.excerpt || null,
+            category_id: action.category_id || null,
+          };
+        });
 
         return jsonResponse(paginatedResponse("posts", posts, {
           page,

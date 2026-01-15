@@ -38,7 +38,8 @@ Resources provide static/semi-static data via URI addressing. Use these instead 
 
 - **discourse://site/tags**
 
-  - **Output**: JSON with `tags` array (`id`, `count`) and `meta.total`
+  - **Output**: JSON with `tags` array (`id`, `name`, `count`) and `meta.total`
+  - **Tag fields**: `id` (numeric database ID), `name` (tag name used in filters), `count` (topic count)
 
 - **discourse://site/groups**
 
@@ -97,6 +98,7 @@ All tools return **strict JSON** (no Markdown). Every response includes relevant
 
   - **Input**: `{ username: string; page?: number (0-based); limit?: number (1–50, default 30) }`
   - **Output**: `{ posts: [{id, topic_id, post_number, slug, title, created_at, excerpt, category_id}], meta: {page, limit, has_more} }`
+  - **Note**: `id` is `null` for first posts (topic creation, `post_number: 1`); use `topic_id` + `post_number` to reference these posts
 
 - **discourse_get_chat_messages**
 
