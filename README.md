@@ -68,7 +68,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
 - **Write safety**
 
   - Writes are disabled by default.
-  - The tools `discourse_create_post`, `discourse_create_topic`, `discourse_create_category`, and `discourse_create_user` are only registered when all are true:
+  - The tools `discourse_create_post`, `discourse_create_topic`, `discourse_create_category`, `discourse_create_user`, `discourse_update_user`, and `discourse_upload_file` are only registered when all are true:
     - `--allow_writes` AND not `--read_only` AND some auth is configured (either default flags or a matching `auth_pairs` entry).
   - A ~1 req/sec rate limit is enforced for write actions.
 
@@ -87,6 +87,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest`).
   - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic`. The tools prefer `raw` content by requesting `include_raw=true`.
+  - `--allowed_upload_paths <paths>`: Comma-separated list or JSON array of directories allowed for local file uploads. Required to enable local file uploads in `discourse_upload_file`. Example: `--allowed_upload_paths "/home/user/images,/tmp/uploads"` or `--allowed_upload_paths '["/home/user/images"]'`
   - `--transport <stdio|http>` (default: stdio): Transport type. Use `stdio` for standard input/output (default), or `http` for Streamable HTTP transport (stateless mode with JSON responses).
   - `--port <number>` (default: 3000): Port to listen on when using HTTP transport.
   - `--cache_dir <path>` (reserved)
@@ -123,7 +124,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   "default_search": "tag:ai order:latest",
   "max_read_length": 50000,
   "transport": "stdio",
-  "port": 3000
+  "port": 3000,
+  "allowed_upload_paths": ["/home/user/images", "/tmp/uploads"]
 }
 ```
 
@@ -227,9 +229,26 @@ Built‑in tools (always present unless noted). All tools return **strict JSON**
 - `discourse_create_topic` (only when writes enabled; see Write safety)
   - Input: `{ title: string; raw: string (≤ 30k chars); category_id?: number; tags?: string[] }`
   - Output: `{ id, topic_id, slug, title }`
+- `discourse_list_users` (requires admin API key)
+  - Input: `{ query?: "active"|"new"|"staff"|"suspended"|"silenced"|"pending"|"staged"; filter?: string; order?: "created"|"last_emailed"|"seen"|"username"|"trust_level"|"days_visited"|"posts"; asc?: boolean; page?: number }`
+  - Output: `{ users: [{id, username, name, email, avatar_template, trust_level, created_at, last_seen_at, admin, moderator, suspended, silenced}], meta: {page, has_more} }`
+  - Note: Returns ~100 users per page (Discourse's fixed page size). `avatar_template` contains `{size}` placeholder - replace with pixel size (e.g., 120) to get avatar URL
 - `discourse_create_user` (only when writes enabled; see Write safety)
-  - Input: `{ username: string (1-20 chars); email: string; name: string; password: string; active?: boolean; approved?: boolean }`
-  - Output: `{ success, username, name, email, active, message }`
+  - Input: `{ username: string (1-20 chars); email: string; name: string; password: string; active?: boolean; approved?: boolean; upload_id?: number }`
+  - Output: `{ success, username, name, email, active, avatar_updated, message, avatar_error? }`
+  - Note: If `upload_id` is provided but avatar update fails, `avatar_error` contains the error message
+- `discourse_update_user` (only when writes enabled; see Write safety)
+  - Input: `{ username: string; name?: string; bio_raw?: string; location?: string; website?: string; title?: string; date_of_birth?: string; locale?: string; profile_background_upload_url?: string; card_background_upload_url?: string; upload_id?: number }`
+  - Output: `{ success, username, updated_fields, avatar_updated, user: {...}, avatar_error? }`
+  - Note: If `upload_id` is provided but avatar update fails, `avatar_error` contains the error message
+- `discourse_upload_file` (only when writes enabled; see Write safety)
+  - Input: `{ upload_type: "avatar"|"profile_background"|"card_background"|"composer"; image_data?: string (base64); url?: string; filename?: string; user_id?: number }`
+  - Output: `{ id, url, short_url, short_path, original_filename, extension, width, height, filesize, human_filesize }`
+  - Constraints:
+    - Provide exactly one of: `image_data` (requires `filename`), remote HTTP(S) URL, or absolute local file path
+    - `user_id` is required for avatar/profile_background/card_background uploads
+    - Local file uploads require `--allowed_upload_paths` configuration (security: prevents arbitrary file reads)
+  - Note: Use `short_url` (e.g., `upload://abc123.png`) to embed images in posts.
 - `discourse_create_category` (only when writes enabled; see Write safety)
   - Input: `{ name: string; color?: hex; text_color?: hex; parent_category_id?: number; description?: string }`
   - Output: `{ id, slug, name }`

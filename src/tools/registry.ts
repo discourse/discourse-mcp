@@ -12,6 +12,9 @@ import { registerSelectSite } from "./builtin/select_site.js";
 import { registerFilterTopics } from "./builtin/filter_topics.js";
 import { registerCreateUser } from "./builtin/create_user.js";
 import { registerListUserPosts } from "./builtin/list_user_posts.js";
+import { registerListUsers } from "./builtin/list_users.js";
+import { registerUpdateUser } from "./builtin/update_user.js";
+import { registerUploadFile } from "./builtin/upload_file.js";
 import { registerGetChatMessages } from "./builtin/get_chat_messages.js";
 import {
   registerGetDraft,
@@ -35,6 +38,10 @@ export interface RegistryOptions {
   hideSelectSite?: boolean;
   // Optional default search prefix to add to all searches
   defaultSearchPrefix?: string;
+  // Allowed directories for local file uploads (if empty/undefined, local uploads are disabled)
+  allowedUploadPaths?: string[];
+  // When true, admin-only tools (e.g., list_users) are registered
+  hasAdminApiKey?: boolean;
 }
 
 export async function registerAllTools(
@@ -43,7 +50,7 @@ export async function registerAllTools(
   logger: Logger,
   opts: RegistryOptions & { maxReadLength?: number }
 ) {
-  const ctx = { siteState, logger, defaultSearchPrefix: opts.defaultSearchPrefix, maxReadLength: opts.maxReadLength ?? 50000 } as const;
+  const ctx = { siteState, logger, defaultSearchPrefix: opts.defaultSearchPrefix, maxReadLength: opts.maxReadLength ?? 50000, allowedUploadPaths: opts.allowedUploadPaths } as const;
 
   // Built-in tools (actions and parameterized queries)
   if (!opts.hideSelectSite) {
@@ -59,6 +66,9 @@ export async function registerAllTools(
   registerReadPost(server, ctx, { allowWrites: false });
   registerGetUser(server, ctx, { allowWrites: false });
   registerListUserPosts(server, ctx, { allowWrites: false });
+  if (opts.hasAdminApiKey) {
+    registerListUsers(server, ctx, { allowWrites: false });
+  }
   registerGetChatMessages(server, ctx, { allowWrites: false });
   registerGetDraft(server, ctx, { allowWrites: false });
   
@@ -67,6 +77,8 @@ export async function registerAllTools(
   registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateTopic(server, ctx, { allowWrites: opts.allowWrites });
+  registerUpdateUser(server, ctx, { allowWrites: opts.allowWrites });
+  registerUploadFile(server, ctx, { allowWrites: opts.allowWrites });
   registerSaveDraft(server, ctx, { allowWrites: opts.allowWrites });
   registerDeleteDraft(server, ctx, { allowWrites: opts.allowWrites });
 }

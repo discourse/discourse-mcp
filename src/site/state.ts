@@ -44,6 +44,18 @@ export class SiteState {
     return { base: this.currentSiteBase, client: this.currentClient };
   }
 
+  /**
+   * Get the auth type for the current site (or a specific site URL).
+   * Returns "api_key", "user_api_key", or "none".
+   */
+  getAuthType(siteUrl?: string): "api_key" | "user_api_key" | "none" {
+    const base = siteUrl ? normalizeBase(siteUrl) : this.currentSiteBase;
+    if (!base) return "none";
+    const match = this.findAuthOverride(base);
+    const auth = this.resolveAuthFromOverride(match);
+    return auth.type;
+  }
+
   buildClientForSite(siteUrl: string): { base: string; client: HttpClient } {
     const base = normalizeBase(siteUrl);
     const cached = this.clientCache.get(base);

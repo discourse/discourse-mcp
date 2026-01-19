@@ -8,6 +8,8 @@ export interface ToolContext {
   defaultSearchPrefix?: string;
   // Maximum number of characters to include when returning post content
   maxReadLength: number;
+  // Allowed directories for local file uploads (if empty, local uploads are disabled)
+  allowedUploadPaths?: string[];
 }
 
 export type RegisterFn = (server: McpServer, ctx: ToolContext, opts: { allowWrites: boolean; toolsMode?: string }) => void | Promise<void>;
