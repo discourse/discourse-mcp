@@ -71,8 +71,15 @@ export class HttpClient {
     return this.request("DELETE", path, body, { signal, extraHeaders: headers });
   }
 
+  async put(path: string, body: unknown, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
+    return this.request("PUT", path, body, { signal, extraHeaders: headers });
+  }
+
+  async postMultipart(path: string, formData: FormData, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
+    return this.requestMultipart("POST", path, formData, { signal, extraHeaders: headers });
+  }
+
   private async request(method: string, path: string, body?: unknown, { signal, extraHeaders }: { signal?: AbortSignal, extraHeaders?: Record<string, string>} = {}) {
-    const url = new URL(path, this.base).toString();
     const headers = this.headers();
     if (body !== undefined) {
       headers["Content-Type"] = "application/json";
@@ -80,7 +87,23 @@ export class HttpClient {
     if (extraHeaders) {
       Object.assign(headers, extraHeaders);
     }
+    return this.executeRequest(method, path, body !== undefined ? JSON.stringify(body) : undefined, headers, signal);
+  }
 
+  private async requestMultipart(method: string, path: string, formData: FormData, { signal, extraHeaders }: { signal?: AbortSignal, extraHeaders?: Record<string, string>} = {}) {
+    const headers = this.headers();
+    if (extraHeaders) {
+      Object.assign(headers, extraHeaders);
+    }
+    // Do NOT set Content-Type - let fetch set it with the multipart boundary
+    // Delete after merging extraHeaders to prevent overrides breaking the boundary
+    delete headers["Content-Type"];
+    // Disable retries for multipart - FormData body is consumed after first attempt
+    return this.executeRequest(method, path, formData, headers, signal, /* allowRetries */ false);
+  }
+
+  private async executeRequest(method: string, path: string, body: BodyInit | undefined, headers: Record<string, string>, signal?: AbortSignal, allowRetries = true) {
+    const url = new URL(path, this.base).toString();
     this.opts.logger.debug(`HTTP ${method} ${url}`);
 
     const controller = new AbortController();
@@ -92,7 +115,7 @@ export class HttpClient {
         const res = await fetch(url, {
           method,
           headers,
-          body: body !== undefined ? JSON.stringify(body) : undefined,
+          body,
           signal: combinedSignal,
         });
 
@@ -111,12 +134,10 @@ export class HttpClient {
           return res.text();
         }
       } catch (e: any) {
-        // Enhanced error logging for fetch failures
         if (e instanceof HttpError) {
-          throw e; // Already logged above
+          throw e;
         }
 
-        // Check for common fetch failure reasons
         if (e.name === "AbortError") {
           const timeoutMsg = `Request timeout after ${this.opts.timeoutMs}ms for ${method} ${url}`;
           this.opts.logger.error(timeoutMsg);
@@ -132,7 +153,6 @@ export class HttpClient {
           throw new Error(detailedMsg);
         }
 
-        // Generic network error
         const genericMsg = `Fetch error for ${method} ${url}: ${e.name}: ${e.message}`;
         this.opts.logger.error(genericMsg);
         if (e.cause) {
@@ -146,7 +166,9 @@ export class HttpClient {
     };
 
     try {
-      return await withRetries(attempt, this.opts.logger, url, method);
+      // Disable retries when allowRetries is false (e.g., for multipart where body is consumed)
+      const maxRetries = allowRetries ? 3 : 1;
+      return await withRetries(attempt, this.opts.logger, url, method, maxRetries);
     } finally {
       clearTimeout(timeout);
     }

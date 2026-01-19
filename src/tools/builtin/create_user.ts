@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-import { jsonResponse, jsonError } from "../../util/json_response.js";
+import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
 
 export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
   if (!opts?.allowWrites) return;
@@ -12,19 +12,21 @@ export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
     password: z.string().min(10).max(200),
     active: z.boolean().optional().default(true),
     approved: z.boolean().optional().default(true),
+    upload_id: z.number().int().positive().optional().describe("Avatar upload_id (from discourse_upload_file)"),
   });
 
   server.registerTool(
     "discourse_create_user",
     {
       title: "Create User",
-      description: "Create a new user account. Returns JSON with success status and user details.",
+      description: "Create a new user account. If upload_id is provided, sets the user's avatar after creation. Returns JSON with success status and user details.",
       inputSchema: schema.shape,
     },
     async (args, _extra: any) => {
       try {
+        await rateLimit("user");
         const { client } = ctx.siteState.ensureSelectedSite();
-        
+
         const userData = {
           username: args.username,
           email: args.email,
@@ -35,21 +37,53 @@ export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
         };
 
         const response = await client.post("/users.json", userData) as any;
-        
+
         if (response.success) {
-          return jsonResponse({
+          // Use canonical username from response (Discourse may normalize it)
+          const createdUsername = response.username || args.username;
+          let avatarUpdated = false;
+          let avatarError: string | undefined;
+
+          // Set avatar if upload_id was provided
+          if (args.upload_id !== undefined) {
+            try {
+              await rateLimit("user");
+              await client.put(
+                `/u/${encodeURIComponent(createdUsername)}/preferences/avatar/pick.json`,
+                { upload_id: args.upload_id, type: "uploaded" }
+              );
+              avatarUpdated = true;
+            } catch (e: any) {
+              // Log but don't fail the whole operation
+              avatarError = e?.message || String(e);
+              ctx.logger.error(`Failed to set avatar for new user ${createdUsername}: ${avatarError}`);
+            }
+          }
+
+          const result: Record<string, unknown> = {
             success: true,
-            username: args.username,
+            username: createdUsername,
             name: args.name,
             email: args.email,
             active: response.active ?? args.active,
+            avatar_updated: avatarUpdated,
             message: response.message || "Account created",
-          });
+          };
+          if (avatarError) {
+            result.avatar_error = avatarError;
+          }
+          return jsonResponse(result);
         } else {
-          return jsonError(response.message || "Unknown error");
+          const details: Record<string, unknown> = {};
+          if (response.errors) details.errors = response.errors;
+          if (response.values) details.values = response.values;
+          return jsonError(response.message || "Unknown error", Object.keys(details).length > 0 ? details : undefined);
         }
       } catch (e: any) {
-        return jsonError(`Failed to create user: ${e?.message || String(e)}`);
+        const details: Record<string, unknown> = {};
+        if (e?.body) details.body = e.body;
+        if (e?.status) details.status = e.status;
+        return jsonError(`Failed to create user: ${e?.message || String(e)}`, Object.keys(details).length > 0 ? details : undefined);
       }
     }
   );

@@ -64,6 +64,16 @@ const ProfileSchema = z
       .describe("Maximum number of characters to include when returning post content (set via --max-read-length)"),
     transport: z.enum(["stdio", "http"]).optional().default("stdio").describe("Transport type: stdio (default) or http"),
     port: z.number().int().positive().optional().default(3000).describe("Port to listen on when using HTTP transport"),
+    allowed_upload_paths: z.union([z.array(z.string()), z.string()])
+      .optional()
+      .transform((val) => {
+        // Normalize to array (parseAllowedUploadPaths handles this, but schema re-validates after merge)
+        if (val === undefined) return undefined;
+        if (Array.isArray(val)) return val;
+        // Comma-separated string
+        return val.split(",").map(s => s.trim()).filter(Boolean);
+      })
+      .describe("Allowed directories for local file uploads (array or comma-separated string)"),
   })
   .strict();
 
@@ -110,6 +120,28 @@ async function loadProfile(path?: string): Promise<Partial<Profile>> {
   return parsed.data;
 }
 
+function parseAllowedUploadPaths(value: unknown, source: string): string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (Array.isArray(value)) return value.map(String);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    // Try parsing as JSON array first
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed.map(String);
+        throw new Error(`allowed_upload_paths ${source} must be an array, got ${typeof parsed}`);
+      } catch (e: any) {
+        if (e.message?.includes("allowed_upload_paths")) throw e;
+        throw new Error(`Failed to parse allowed_upload_paths ${source} as JSON: ${e.message}`);
+      }
+    }
+    // Parse as comma-separated list
+    return value.split(",").map(s => s.trim()).filter(Boolean);
+  }
+  throw new Error(`allowed_upload_paths ${source} must be a string or array, got ${typeof value}`);
+}
+
 function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>): Profile {
   const merged = {
     auth_pairs: (flags.auth_pairs as any) ?? profile.auth_pairs,
@@ -125,6 +157,7 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     max_read_length: (((flags.max_read_length ?? flags["max-read-length"]) as number | undefined) ?? profile.max_read_length ?? 50000) as number,
     transport: ((flags.transport as "stdio" | "http" | undefined) ?? profile.transport ?? "stdio") as "stdio" | "http",
     port: ((flags.port as number | undefined) ?? profile.port ?? 3000) as number,
+    allowed_upload_paths: parseAllowedUploadPaths(flags.allowed_upload_paths ?? flags["allowed-upload-paths"], "from CLI") ?? parseAllowedUploadPaths(profile.allowed_upload_paths, "from profile"),
   } satisfies Profile;
   const result = ProfileSchema.safeParse(merged);
   if (!result.success) throw new Error(`Invalid configuration: ${result.error.message}`);
@@ -208,6 +241,7 @@ async function main() {
   );
 
   const allowWrites = Boolean(config.allow_writes && !config.read_only && (config.auth_pairs && config.auth_pairs.length > 0));
+  const hasAdminApiKey = Boolean(config.auth_pairs?.some(p => p.api_key));
 
   // If tethered to a site, validate and preselect it before registering tools,
   // and trigger remote tool discovery when enabled.
@@ -231,6 +265,8 @@ async function main() {
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
     maxReadLength: config.max_read_length,
+    allowedUploadPaths: config.allowed_upload_paths,
+    hasAdminApiKey,
   });
 
   // Register MCP resources (URI-addressable read-only data)
