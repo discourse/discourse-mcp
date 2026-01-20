@@ -16,7 +16,7 @@ export const registerListUserPosts: RegisterFn = (server, ctx) => {
       description: "Get paginated list of user posts/replies. Returns JSON object with posts array (id, topic_id, post_number, slug, title, created_at, excerpt, category_id) and meta (page, limit, has_more).",
       inputSchema: schema.shape,
     },
-    async ({ username, page = 0, limit = 30 }, _extra: any) => {
+    async ({ username, page = 0, limit = 30 }, _extra) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
         const offset = page * limit;

@@ -1,7 +1,7 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { Logger } from "../../util/logger.js";
 import type { SiteState } from "../../site/state.js";
+import type { ToolRegistrar } from "../types.js";
 
 type RemoteTool = {
   name: string;
@@ -10,7 +10,7 @@ type RemoteTool = {
 };
 
 export async function tryRegisterRemoteTools(
-  server: McpServer,
+  server: ToolRegistrar,
   siteState: SiteState,
   logger: Logger
 ) {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireWriteAccess } from "../../util/access.js";
 
 export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
   if (!opts.allowWrites) return;
@@ -18,12 +19,15 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
       description: "Create a post in a topic. Returns JSON with id, topic_id, and post_number.",
       inputSchema: schema.shape,
     },
-    async (input: any, _extra: any) => {
-      const { topic_id, raw, author_username } = schema.parse(input);
-
-      await rateLimit("post");
-
+    async (input, _extra) => {
       try {
+        const { topic_id, raw, author_username } = schema.parse(input);
+
+        const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+        if (accessError) return accessError;
+
+        await rateLimit("post");
+
         const { client } = ctx.siteState.ensureSelectedSite();
         const payload: any = { topic_id, raw };
         const headers: Record<string, string> = {};
@@ -37,10 +41,11 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
           topic_id: data?.topic_id || topic_id,
           post_number: data?.post_number || data?.post?.post_number,
         });
-      } catch (e: any) {
-        return jsonError(`Failed to create post: ${e?.message || String(e)}`);
+      } catch (e: unknown) {
+        if (isZodError(e)) return zodError(e);
+        const err = e as any;
+        return jsonError(`Failed to create post: ${err?.message || String(e)}`);
       }
     }
   );
 };
-

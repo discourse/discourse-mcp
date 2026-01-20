@@ -178,8 +178,7 @@ export class HttpClient {
 async function withRetries<T>(fn: () => Promise<T>, logger: Logger, url: string, method: string, retries = 3): Promise<T> {
   let attempt = 0;
   let delay = 250;
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
+  for (;;) {
     try {
       return await fn();
     } catch (e: any) {

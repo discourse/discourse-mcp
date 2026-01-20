@@ -14,7 +14,7 @@ export const registerGetUser: RegisterFn = (server, ctx) => {
       description: "Get user info. Returns JSON with id, username, name, trust_level, created_at, bio, admin, and moderator.",
       inputSchema: schema.shape,
     },
-    async ({ username }, _extra: any) => {
+    async ({ username }, _extra) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
         const data = (await client.get(`/u/${encodeURIComponent(username)}.json`)) as any;

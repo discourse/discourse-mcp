@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.2.4](https://github.com/discourse/discourse-mcp/compare/v0.2.3...v0.2.4) (2026-01-20)
+
+### Features
+
+* Add `discourse_list_users` tool to query and filter users (requires admin API key)
+* Add `discourse_update_user` tool to update user profiles with avatar support
+* Add `discourse_upload_file` tool to upload images via base64, URL, or local file
+* Add `discourse_update_topic` tool to update existing topics
+  - Update title, category, tags, and featured_link via `PUT /t/-/:topic_id.json`
+  - Conflict detection via optional `original_title` and `original_tags` parameters
+* Enhance `discourse_create_user` to accept `upload_id` for avatar setting
+  - Note: `active` and `approved` default to `true` (Discourse defaults both to `false`)
+  - This means users created via this tool are immediately usable without manual activation/approval
+
+### Maintenance
+
+* Add ESLint configuration with typescript-eslint
+  - New `npm run lint` script
+  - Fix existing lint issues across codebase
+* Add HTTP client PUT method and multipart form data support
+* Improve TypeScript types: add `ToolRegistrar` and `ResourceRegistrar` narrowed interfaces
+
+### Bug Fixes
+
+* Remove unused `with_private` parameter from `discourse_search` schema
+* Return consistent JSON error format for input validation failures
+  - Validation errors now return `{error: "Validation failed", issues: [{path, message}]}`
+  - Previously threw unstructured errors that bypassed the standard error format
+* Support `--flag=value` syntax in `generate-user-api-key` subcommand
+  - Fixes handling of values that start with `--` (e.g., encrypted payloads)
+
 ## [0.2.3](https://github.com/discourse/discourse-mcp/compare/v0.2.2...v0.2.3) (2026-01-14)
 
 ### Bug Fixes

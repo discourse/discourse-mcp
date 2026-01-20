@@ -2,6 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Logger } from "../util/logger.js";
 import type { SiteState } from "../site/state.js";
 
+/** Narrowed interface for tool registration - only requires registerTool method */
+export type ToolRegistrar = Pick<McpServer, "registerTool">;
+
 export interface ToolContext {
   siteState: SiteState;
   logger: Logger;
@@ -12,5 +15,5 @@ export interface ToolContext {
   allowedUploadPaths?: string[];
 }
 
-export type RegisterFn = (server: McpServer, ctx: ToolContext, opts: { allowWrites: boolean; toolsMode?: string }) => void | Promise<void>;
+export type RegisterFn = (server: ToolRegistrar, ctx: ToolContext, opts: { allowWrites: boolean; allowAdminTools?: boolean; toolsMode?: string }) => void | Promise<void>;
 

@@ -1,6 +1,6 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Logger } from "../util/logger.js";
 import type { SiteState } from "../site/state.js";
+import type { ToolRegistrar } from "./types.js";
 import { registerSearch } from "./builtin/search.js";
 import { registerReadTopic } from "./builtin/read_topic.js";
 import { registerReadPost } from "./builtin/read_post.js";
@@ -8,6 +8,7 @@ import { registerGetUser } from "./builtin/get_user.js";
 import { registerCreatePost } from "./builtin/create_post.js";
 import { registerCreateCategory } from "./builtin/create_category.js";
 import { registerCreateTopic } from "./builtin/create_topic.js";
+import { registerUpdateTopic } from "./builtin/update_topic.js";
 import { registerSelectSite } from "./builtin/select_site.js";
 import { registerFilterTopics } from "./builtin/filter_topics.js";
 import { registerCreateUser } from "./builtin/create_user.js";
@@ -33,6 +34,8 @@ export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
 export interface RegistryOptions {
   allowWrites: boolean;
+  // When true, expose admin-only tools (e.g., list_users). Requires api_key auth.
+  allowAdminTools?: boolean;
   toolsMode: ToolsMode;
   // When true, do not register the discourse_select_site tool
   hideSelectSite?: boolean;
@@ -40,12 +43,10 @@ export interface RegistryOptions {
   defaultSearchPrefix?: string;
   // Allowed directories for local file uploads (if empty/undefined, local uploads are disabled)
   allowedUploadPaths?: string[];
-  // When true, admin-only tools (e.g., list_users) are registered
-  hasAdminApiKey?: boolean;
 }
 
 export async function registerAllTools(
-  server: McpServer,
+  server: ToolRegistrar,
   siteState: SiteState,
   logger: Logger,
   opts: RegistryOptions & { maxReadLength?: number }
@@ -66,9 +67,7 @@ export async function registerAllTools(
   registerReadPost(server, ctx, { allowWrites: false });
   registerGetUser(server, ctx, { allowWrites: false });
   registerListUserPosts(server, ctx, { allowWrites: false });
-  if (opts.hasAdminApiKey) {
-    registerListUsers(server, ctx, { allowWrites: false });
-  }
+  registerListUsers(server, ctx, { allowWrites: false, allowAdminTools: opts.allowAdminTools });
   registerGetChatMessages(server, ctx, { allowWrites: false });
   registerGetDraft(server, ctx, { allowWrites: false });
   
@@ -77,6 +76,7 @@ export async function registerAllTools(
   registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateTopic(server, ctx, { allowWrites: opts.allowWrites });
+  registerUpdateTopic(server, ctx, { allowWrites: opts.allowWrites });
   registerUpdateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerUploadFile(server, ctx, { allowWrites: opts.allowWrites });
   registerSaveDraft(server, ctx, { allowWrites: opts.allowWrites });

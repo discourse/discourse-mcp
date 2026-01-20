@@ -4,8 +4,8 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 
 - **Entry point**: `src/index.ts` → compiled to `dist/index.js` (binary name: `discourse-mcp`)
 - **SDK**: `@modelcontextprotocol/sdk`
-- **Node**: >= 18
-- **Version**: 0.2.3 (0.2.x has breaking changes from 0.1.x - JSON-only output, resources replace list tools)
+- **Node**: >= 24
+- **Version**: 0.2.4 (0.2.x has breaking changes from 0.1.x - JSON-only output, resources replace list tools)
 
 ### Quick start (release)
 
@@ -68,8 +68,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
 - **Write safety**
 
   - Writes are disabled by default.
-  - The tools `discourse_create_post`, `discourse_create_topic`, `discourse_create_category`, `discourse_create_user`, `discourse_update_user`, and `discourse_upload_file` are only registered when all are true:
-    - `--allow_writes` AND not `--read_only` AND some auth is configured (either default flags or a matching `auth_pairs` entry).
+  - Write tools (`discourse_create_post`, `discourse_create_topic`, `discourse_create_category`, `discourse_update_topic`, `discourse_create_user`, `discourse_update_user`, `discourse_upload_file`, `discourse_save_draft`, `discourse_delete_draft`) are only registered when `--allow_writes` AND not `--read_only`.
+  - Write tools require a matching `auth_pairs` entry for the selected site; otherwise they return an error.
   - A ~1 req/sec rate limit is enforced for write actions.
 
 - **Flags & defaults**
@@ -224,11 +224,14 @@ Built‑in tools (always present unless noted). All tools return **strict JSON**
   - Input: `{ draft_key: string; sequence: number }`
   - Output: `{ draft_key, deleted }`
 - `discourse_create_post` (only when writes enabled; see Write safety)
-  - Input: `{ topic_id: number; raw: string (≤ 30k chars) }`
+  - Input: `{ topic_id: number; raw: string (<= 30k chars); author_username?: string }`
   - Output: `{ id, topic_id, post_number }`
 - `discourse_create_topic` (only when writes enabled; see Write safety)
-  - Input: `{ title: string; raw: string (≤ 30k chars); category_id?: number; tags?: string[] }`
+  - Input: `{ title: string; raw: string (<= 30k chars); category_id?: number; tags?: string[]; author_username?: string }`
   - Output: `{ id, topic_id, slug, title }`
+- `discourse_update_topic` (only when writes enabled; see Write safety)
+  - Input: `{ topic_id: number; title?: string; category_id?: number; tags?: string[]; featured_link?: string; original_title?: string; original_tags?: string[] }`
+  - Output: `{ success, topic_id, updated_fields, topic: {id, title, slug, category_id, tags, featured_link} }`
 - `discourse_list_users` (requires admin API key)
   - Input: `{ query?: "active"|"new"|"staff"|"suspended"|"silenced"|"pending"|"staged"; filter?: string; order?: "created"|"last_emailed"|"seen"|"username"|"trust_level"|"days_visited"|"posts"; asc?: boolean; page?: number }`
   - Output: `{ users: [{id, username, name, email, avatar_template, trust_level, created_at, last_seen_at, admin, moderator, suspended, silenced}], meta: {page, has_more} }`
@@ -250,7 +253,7 @@ Built‑in tools (always present unless noted). All tools return **strict JSON**
     - Local file uploads require `--allowed_upload_paths` configuration (security: prevents arbitrary file reads)
   - Note: Use `short_url` (e.g., `upload://abc123.png`) to embed images in posts.
 - `discourse_create_category` (only when writes enabled; see Write safety)
-  - Input: `{ name: string; color?: hex; text_color?: hex; parent_category_id?: number; description?: string }`
+  - Input: `{ name: string; color?: hex; text_color?: hex; emoji?: string; icon?: string; parent_category_id?: number; description?: string }`
   - Output: `{ id, slug, name }`
 - `discourse_select_site` (hidden when `--site` is provided)
   - Input: `{ site: string }`
@@ -258,7 +261,7 @@ Built‑in tools (always present unless noted). All tools return **strict JSON**
 
 ## Development
 
-- **Requirements**: Node >= 18, `pnpm`.
+- **Requirements**: Node >= 24, `pnpm`.
 
 - **Install / Build / Typecheck / Test**
 

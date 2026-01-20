@@ -16,13 +16,13 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
       description: "Read topic metadata and posts. Returns JSON with id, title, slug, category_id, tags, and posts array.",
       inputSchema: schema.shape,
     },
-    async ({ topic_id, post_limit = 5, start_post_number }, _extra: any) => {
+    async ({ topic_id, post_limit = 5, start_post_number }, _extra) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
         const start = start_post_number ?? 1;
 
         let current = start;
-        let fetchedPosts: Array<{
+        const fetchedPosts: Array<{
           id: number;
           post_number: number;
           username: string;

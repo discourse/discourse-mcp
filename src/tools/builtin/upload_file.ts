@@ -3,7 +3,8 @@ import { readFile, realpath } from "node:fs/promises";
 import { basename, isAbsolute, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RegisterFn } from "../types.js";
-import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireWriteAccess } from "../../util/access.js";
 
 // Upload types that require user_id
 const USER_REQUIRED_TYPES = ["avatar", "profile_background", "card_background"];
@@ -49,8 +50,13 @@ export const registerUploadFile: RegisterFn = (server, ctx, opts) => {
       description: "Upload an image or file to Discourse. Provide either: image_data (base64 with filename), a remote HTTP(S) URL, or an absolute local file path. user_id is required for avatar/background uploads. Returns upload_id for use in avatar/profile updates. Use short_url to embed images in posts.",
       inputSchema: schema.shape,
     },
-    async (args: z.infer<typeof schema>, _extra: any) => {
+    async (input, _extra) => {
       try {
+        const args = schema.parse(input);
+
+        const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+        if (accessError) return accessError;
+
         // Validate: must provide either image_data OR url, not both or neither
         const hasImageData = !!args.image_data;
         const hasUrl = !!args.url;
@@ -194,8 +200,10 @@ export const registerUploadFile: RegisterFn = (server, ctx, opts) => {
           filesize: response.filesize,
           human_filesize: response.human_filesize,
         });
-      } catch (e: any) {
-        return jsonError(`Failed to upload file: ${e?.message || String(e)}`);
+      } catch (e: unknown) {
+        if (isZodError(e)) return zodError(e);
+        const err = e as any;
+        return jsonError(`Failed to upload file: ${err?.message || String(e)}`);
       }
     }
   );

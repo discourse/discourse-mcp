@@ -107,6 +107,15 @@ export class SiteState {
       return false;
     }
   }
+
+  /**
+   * Check if any configured site has admin-level auth (api_key).
+   * Used to determine whether to expose admin-only tools.
+   */
+  hasAdminAuth(): boolean {
+    if (this.opts.defaultAuth.type === "api_key") return true;
+    return (this.opts.authOverrides || []).some((o) => !!o.api_key);
+  }
 }
 
 export type SiteStateInit = ConstructorParameters<typeof SiteState>[0];

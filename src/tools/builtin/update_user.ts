@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireWriteAccess } from "../../util/access.js";
 
 export const registerUpdateUser: RegisterFn = (server, ctx, opts) => {
   if (!opts?.allowWrites) return;
@@ -26,8 +27,13 @@ export const registerUpdateUser: RegisterFn = (server, ctx, opts) => {
       description: "Update user profile fields. If upload_id is provided, also sets the user's avatar. Returns JSON with success status and updated user details.",
       inputSchema: schema.shape,
     },
-    async (args, _extra: any) => {
+    async (input, _extra) => {
       try {
+        const args = schema.parse(input);
+
+        const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+        if (accessError) return accessError;
+
         await rateLimit("user");
         const { client } = ctx.siteState.ensureSelectedSite();
 
@@ -136,11 +142,13 @@ export const registerUpdateUser: RegisterFn = (server, ctx, opts) => {
           result.avatar_error = avatarError;
         }
         return jsonResponse(result);
-      } catch (e: any) {
+      } catch (e: unknown) {
+        if (isZodError(e)) return zodError(e);
+        const err = e as any;
         const details: Record<string, unknown> = {};
-        if (e?.body) details.body = e.body;
-        if (e?.status) details.status = e.status;
-        return jsonError(`Failed to update user: ${e?.message || String(e)}`, Object.keys(details).length > 0 ? details : undefined);
+        if (err?.body) details.body = err.body;
+        if (err?.status) details.status = err.status;
+        return jsonError(`Failed to update user: ${err?.message || String(e)}`, Object.keys(details).length > 0 ? details : undefined);
       }
     }
   );

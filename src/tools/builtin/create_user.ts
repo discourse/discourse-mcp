@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireWriteAccess } from "../../util/access.js";
 
 export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
   if (!opts?.allowWrites) return;
@@ -22,8 +23,13 @@ export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
       description: "Create a new user account. If upload_id is provided, sets the user's avatar after creation. Returns JSON with success status and user details.",
       inputSchema: schema.shape,
     },
-    async (args, _extra: any) => {
+    async (input, _extra) => {
       try {
+        const args = schema.parse(input);
+
+        const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+        if (accessError) return accessError;
+
         await rateLimit("user");
         const { client } = ctx.siteState.ensureSelectedSite();
 
@@ -79,11 +85,13 @@ export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
           if (response.values) details.values = response.values;
           return jsonError(response.message || "Unknown error", Object.keys(details).length > 0 ? details : undefined);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
+        if (isZodError(e)) return zodError(e);
+        const err = e as any;
         const details: Record<string, unknown> = {};
-        if (e?.body) details.body = e.body;
-        if (e?.status) details.status = e.status;
-        return jsonError(`Failed to create user: ${e?.message || String(e)}`, Object.keys(details).length > 0 ? details : undefined);
+        if (err?.body) details.body = err.body;
+        if (err?.status) details.status = err.status;
+        return jsonError(`Failed to create user: ${err?.message || String(e)}`, Object.keys(details).length > 0 ? details : undefined);
       }
     }
   );

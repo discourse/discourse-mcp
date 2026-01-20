@@ -3,6 +3,8 @@
  * Ensures consistent, token-efficient output across all endpoints.
  */
 
+import { ZodError } from "zod";
+
 // Shared rate limiter for write operations
 const rateLimiters = new Map<string, number>();
 
@@ -73,6 +75,25 @@ export function jsonError(message: string, details?: Record<string, unknown>): {
     content: [{ type: "text", text: JSON.stringify(error) }],
     isError: true,
   };
+}
+
+/**
+ * Creates a JSON error response for Zod validation errors.
+ * Formats issues as a readable list of field errors.
+ */
+export function zodError(error: ZodError): { content: Array<{ type: "text"; text: string }>; isError: true } {
+  const issues = error.issues.map(issue => ({
+    path: issue.path.join(".") || "(root)",
+    message: issue.message,
+  }));
+  return jsonError("Validation failed", { issues });
+}
+
+/**
+ * Type guard to check if an error is a ZodError.
+ */
+export function isZodError(error: unknown): error is ZodError {
+  return error instanceof ZodError;
 }
 
 /**
