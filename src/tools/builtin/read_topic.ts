@@ -22,7 +22,7 @@ export const registerReadTopic: RegisterFn = (server, ctx) => {
         const start = start_post_number ?? 1;
 
         let current = start;
-        let fetchedPosts: Array<{
+        const fetchedPosts: Array<{
           id: number;
           post_number: number;
           username: string;

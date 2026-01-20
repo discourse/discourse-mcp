@@ -26,6 +26,7 @@
     "prepublishOnly": "pnpm build",
     "dev": "node --enable-source-maps dist/index.js",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
     "clean": "rm -rf dist",
     "sync:fixtures": "node scripts/sync-fixtures.mjs",
     "test": "node --test dist/test/**/*.js"
@@ -46,8 +47,11 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/node": "^20.14.10",
-    "typescript": "^5.5.4"
+    "eslint": "^9.39.2",
+    "typescript": "^5.5.4",
+    "typescript-eslint": "^8.53.1"
   },
   "packageManager": "pnpm@10.14.0"
 }

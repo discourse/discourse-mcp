@@ -1,19 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { Logger } from '../util/logger.js';
 import { registerAllTools } from '../tools/registry.js';
 import { SiteState } from '../site/state.js';
 
-function createFakeTransport() {
-  // Minimal stub transport to allow server.connect to proceed without a client.
-  // We won't actually send/receive messages; we only verify registration doesn't throw.
-  return new StdioServerTransport({
-    stdin: new ReadableStream(),
-    stdout: new WritableStream(),
-  } as any);
-}
+type ToolHandler = (args: any, extra: any) => Promise<any>;
 
 test('registers built-in tools', async () => {
   const logger = new Logger('silent');
@@ -24,19 +16,47 @@ test('registers built-in tools', async () => {
     const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
     // Minimal fake server to capture tool registrations
-    const tools: Record<string, { handler: Function }> = {};
+    const tools: Record<string, { handler: ToolHandler }> = {};
     const fakeServer: any = {
-      registerTool(name: string, _meta: any, handler: Function) {
+      registerTool(name: string, _meta: any, handler: ToolHandler) {
         tools[name] = { handler };
       },
     };
 
     await registerAllTools(fakeServer, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } as any);
 
-    // When writes are enabled, both create tools should be registered
+    // When writes are enabled, create and update tools should be registered
     assert.ok('discourse_create_post' in tools);
     assert.ok('discourse_create_category' in tools);
+    assert.ok('discourse_create_topic' in tools);
+    assert.ok('discourse_update_topic' in tools);
+    assert.ok('discourse_update_user' in tools);
   });
+
+  test('does not register write tools when allowWrites=false', async () => {
+    const logger = new Logger('silent');
+    const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+
+    const tools: Record<string, { handler: ToolHandler }> = {};
+    const fakeServer: any = {
+      registerTool(name: string, _meta: any, handler: ToolHandler) {
+        tools[name] = { handler };
+      },
+    };
+
+    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } as any);
+
+    // Write tools should NOT be registered
+    assert.ok(!('discourse_create_post' in tools));
+    assert.ok(!('discourse_create_topic' in tools));
+    assert.ok(!('discourse_update_topic' in tools));
+    assert.ok(!('discourse_update_user' in tools));
+
+    // Read tools should still be registered
+    assert.ok('discourse_search' in tools);
+    assert.ok('discourse_read_topic' in tools);
+  });
+
   const server = new McpServer({ name: 'test', version: '0.0.0' }, { capabilities: { tools: { listChanged: false } } });
 
   await registerAllTools(server as any, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' });
@@ -73,9 +93,9 @@ test('select-site then search flow works with mocked HTTP', async () => {
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
   // Minimal fake server to capture tool handlers
-  const tools: Record<string, { handler: Function }> = {};
+  const tools: Record<string, { handler: ToolHandler }> = {};
   const fakeServer: any = {
-    registerTool(name: string, _meta: any, handler: Function) {
+    registerTool(name: string, _meta: any, handler: ToolHandler) {
       tools[name] = { handler };
     },
   };
@@ -117,9 +137,9 @@ test('tethered mode hides select_site and allows search without selection', asyn
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
   // Minimal fake server to capture tool handlers
-  const tools: Record<string, { handler: Function }> = {};
+  const tools: Record<string, { handler: ToolHandler }> = {};
   const fakeServer: any = {
-    registerTool(name: string, _meta: any, handler: Function) {
+    registerTool(name: string, _meta: any, handler: ToolHandler) {
       tools[name] = { handler };
     },
   };
@@ -164,9 +184,9 @@ test('default-search prefix is applied to queries', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
-  const tools: Record<string, { handler: Function }> = {};
+  const tools: Record<string, { handler: ToolHandler }> = {};
   const fakeServer: any = {
-    registerTool(name: string, _meta: any, handler: Function) {
+    registerTool(name: string, _meta: any, handler: ToolHandler) {
       tools[name] = { handler };
     },
   };

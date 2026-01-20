@@ -5,7 +5,6 @@ import { jsonResponse, jsonError, paginatedResponse } from "../../util/json_resp
 export const registerSearch: RegisterFn = (server, ctx) => {
   const schema = z.object({
     query: z.string().min(1).describe("Search query"),
-    with_private: z.boolean().optional(),
     max_results: z.number().int().min(1).max(50).optional(),
   });
 
@@ -17,7 +16,7 @@ export const registerSearch: RegisterFn = (server, ctx) => {
       inputSchema: schema.shape,
     },
     async (args, _extra: any) => {
-      const { query, with_private = false, max_results = 10 } = args;
+      const { query, max_results = 10 } = args;
       const { client } = ctx.siteState.ensureSelectedSite();
       const q = new URLSearchParams();
       q.set("expanded", "true");

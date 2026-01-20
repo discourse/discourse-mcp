@@ -1,6 +1,6 @@
 import type { RegisterFn } from "../types.js";
 import { z } from "zod";
-import { jsonResponse, jsonError, paginatedResponse } from "../../util/json_response.js";
+import { jsonResponse, jsonError } from "../../util/json_response.js";
 
 export const registerGetChatMessages: RegisterFn = (server, ctx) => {
   const schema = z.object({

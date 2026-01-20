@@ -8,6 +8,7 @@ import { registerGetUser } from "./builtin/get_user.js";
 import { registerCreatePost } from "./builtin/create_post.js";
 import { registerCreateCategory } from "./builtin/create_category.js";
 import { registerCreateTopic } from "./builtin/create_topic.js";
+import { registerUpdateTopic } from "./builtin/update_topic.js";
 import { registerSelectSite } from "./builtin/select_site.js";
 import { registerFilterTopics } from "./builtin/filter_topics.js";
 import { registerCreateUser } from "./builtin/create_user.js";
@@ -77,6 +78,7 @@ export async function registerAllTools(
   registerCreateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateCategory(server, ctx, { allowWrites: opts.allowWrites });
   registerCreateTopic(server, ctx, { allowWrites: opts.allowWrites });
+  registerUpdateTopic(server, ctx, { allowWrites: opts.allowWrites });
   registerUpdateUser(server, ctx, { allowWrites: opts.allowWrites });
   registerUploadFile(server, ctx, { allowWrites: opts.allowWrites });
   registerSaveDraft(server, ctx, { allowWrites: opts.allowWrites });

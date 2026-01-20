@@ -128,7 +128,7 @@ function registerTagsResource(server: McpServer, ctx: ResourceContext): void {
             },
           ],
         };
-      } catch (e: any) {
+      } catch {
         // Tags may be disabled
         const response = paginatedResponse("tags", [], { total: 0 });
         return {
