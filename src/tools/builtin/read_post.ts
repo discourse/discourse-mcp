@@ -14,7 +14,7 @@ export const registerReadPost: RegisterFn = (server, ctx) => {
       description: "Read a specific post. Returns JSON with id, topic_id, post_number, username, created_at, and raw content.",
       inputSchema: schema.shape,
     },
-    async ({ post_id }, _extra: any) => {
+    async ({ post_id }, _extra) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
         const data = (await client.getCached(`/posts/${post_id}.json?include_raw=true`, 10000)) as any;

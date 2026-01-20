@@ -24,7 +24,7 @@ export const registerGetChatMessages: RegisterFn = (server, ctx) => {
       target_message_id,
       direction,
       target_date,
-    }, _extra: any) => {
+    }, _extra) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
 

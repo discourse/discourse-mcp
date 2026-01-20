@@ -1,6 +1,6 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Logger } from "../util/logger.js";
 import type { SiteState } from "../site/state.js";
+import type { ToolRegistrar } from "./types.js";
 import { registerSearch } from "./builtin/search.js";
 import { registerReadTopic } from "./builtin/read_topic.js";
 import { registerReadPost } from "./builtin/read_post.js";
@@ -46,7 +46,7 @@ export interface RegistryOptions {
 }
 
 export async function registerAllTools(
-  server: McpServer,
+  server: ToolRegistrar,
   siteState: SiteState,
   logger: Logger,
   opts: RegistryOptions & { maxReadLength?: number }

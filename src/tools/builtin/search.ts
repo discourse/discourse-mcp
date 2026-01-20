@@ -15,7 +15,7 @@ export const registerSearch: RegisterFn = (server, ctx) => {
       description: "Search site content. Returns JSON object with results array of matching topics (id, slug, title) and meta (total, has_more).",
       inputSchema: schema.shape,
     },
-    async (args, _extra: any) => {
+    async (args, _extra) => {
       const { query, max_results = 10 } = args;
       const { client } = ctx.siteState.ensureSelectedSite();
       const q = new URLSearchParams();

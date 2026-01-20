@@ -5,7 +5,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { generateUserApiKey } from "./user-api-key-generator.js";
+import { generateUserApiKey, type GenerateOptions } from "./user-api-key-generator.js";
 
 // Read package version at runtime to avoid import-attributes incompatibility
 async function getPackageVersion(): Promise<string> {
@@ -20,6 +20,7 @@ async function getPackageVersion(): Promise<string> {
 }
 import { Logger, type LogLevel } from "./util/logger.js";
 import { redactObject } from "./util/redact.js";
+import { parseArgs } from "./util/cli.js";
 import { type AuthMode } from "./http/client.js";
 import { registerAllTools, type ToolsMode } from "./tools/registry.js";
 import { tryRegisterRemoteTools } from "./tools/remote/tool_exec_api.js";
@@ -28,7 +29,7 @@ import { SiteState, type AuthOverride } from "./site/state.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 
-// CLI config schema
+// CLI config schema - see also src/util/cli.ts for parseArgs
 const ProfileSchema = z
   .object({
     auth_pairs: z
@@ -78,38 +79,6 @@ const ProfileSchema = z
   .strict();
 
 type Profile = z.infer<typeof ProfileSchema>;
-
-function parseArgs(argv: string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i];
-    if (!arg.startsWith("--")) continue;
-    const eq = arg.indexOf("=");
-    if (eq !== -1) {
-      const key = arg.slice(2, eq);
-      const val = arg.slice(eq + 1);
-      out[key] = coerceValue(val);
-    } else {
-      const key = arg.slice(2);
-      const next = argv[i + 1];
-      if (next && !next.startsWith("--")) {
-        out[key] = coerceValue(next);
-        i++;
-      } else {
-        out[key] = true;
-      }
-    }
-  }
-  return out;
-}
-
-function coerceValue(val: string): unknown {
-  if (val === "true") return true;
-  if (val === "false") return false;
-  const num = Number(val);
-  if (!Number.isNaN(num) && val.trim() !== "") return num;
-  return val;
-}
 
 async function loadProfile(path?: string): Promise<Partial<Profile>> {
   if (!path) return {};
@@ -173,22 +142,27 @@ async function main() {
   // Check if user wants to generate a User API Key
   const args = process.argv.slice(2);
   if (args[0] === "generate-user-api-key") {
-    const options: any = { site: "" };
-    for (let i = 1; i < args.length; i++) {
-      const arg = args[i];
-      const next = args[i + 1];
-      if (arg === "--site") { options.site = next; i++; }
-      else if (arg === "--scopes") { options.scopes = next; i++; }
-      else if (arg === "--application-name") { options.applicationName = next; i++; }
-      else if (arg === "--client-id") { options.clientId = next; i++; }
-      else if (arg === "--nonce") { options.nonce = next; i++; }
-      else if (arg === "--payload") { options.payload = next; i++; }
-      else if (arg === "--save-to") { options.saveTo = next; i++; }
-      else if (arg === "--help" || arg === "-h") {
-        await generateUserApiKey({ site: "" }); // Will show help and exit
-        return;
-      }
+    // Use rawStrings to preserve nonce/payload values (e.g., leading zeros in numeric strings)
+    const subArgs = parseArgs(args.slice(1), { rawStrings: true });
+
+    // Show help if requested
+    if (subArgs.help || subArgs.h) {
+      await generateUserApiKey({ site: "" }); // Will show help and exit
+      return;
     }
+
+    // Map parsed args to GenerateOptions (kebab-case CLI to camelCase options)
+    // All values are already strings due to rawStrings option
+    const options: GenerateOptions = {
+      site: (subArgs.site as string) ?? "",
+      scopes: subArgs.scopes as string | undefined,
+      applicationName: subArgs["application-name"] as string | undefined,
+      clientId: subArgs["client-id"] as string | undefined,
+      nonce: subArgs.nonce as string | undefined,
+      payload: subArgs.payload as string | undefined,
+      saveTo: subArgs["save-to"] as string | undefined,
+    };
+
     await generateUserApiKey(options);
     return;
   }
@@ -259,7 +233,7 @@ async function main() {
     }
   }
 
-  await registerAllTools(server as any, siteState, logger, {
+  await registerAllTools(server, siteState, logger, {
     allowWrites,
     toolsMode: config.tools_mode,
     hideSelectSite,
@@ -270,11 +244,11 @@ async function main() {
   });
 
   // Register MCP resources (URI-addressable read-only data)
-  registerAllResources(server as any, { siteState, logger });
+  registerAllResources(server, { siteState, logger });
 
   // If tethered and remote tool discovery is enabled, discover now
   if (config.site && config.tools_mode !== "discourse_api_only") {
-    await tryRegisterRemoteTools(server as any, siteState, logger);
+    await tryRegisterRemoteTools(server, siteState, logger);
   }
 
   // Create transport based on configuration

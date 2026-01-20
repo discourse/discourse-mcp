@@ -41,7 +41,7 @@ export const registerFilterTopics: RegisterFn = (server, ctx) => {
       description,
       inputSchema: schema.shape,
     },
-    async ({ filter, page = 0, per_page = 20 }, _extra: any) => {
+    async ({ filter, page = 0, per_page = 20 }, _extra) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
         const params = new URLSearchParams();

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
 
 export const registerCreateTopic: RegisterFn = (server, ctx, opts) => {
   if (!opts.allowWrites) return;
@@ -20,12 +20,12 @@ export const registerCreateTopic: RegisterFn = (server, ctx, opts) => {
       description: "Create a new topic. Returns JSON with id, topic_id, slug, and title.",
       inputSchema: schema.shape,
     },
-    async (input: any, _extra: any) => {
-      const { title, raw, category_id, tags, author_username } = schema.parse(input);
-
-      await rateLimit("topic");
-
+    async (input, _extra) => {
       try {
+        const { title, raw, category_id, tags, author_username } = schema.parse(input);
+
+        await rateLimit("topic");
+
         const { client } = ctx.siteState.ensureSelectedSite();
 
         const payload: any = { title, raw };
@@ -43,8 +43,10 @@ export const registerCreateTopic: RegisterFn = (server, ctx, opts) => {
           slug: data?.topic_slug || data?.topic?.slug || null,
           title: data?.topic_title || data?.title || title,
         });
-      } catch (e: any) {
-        return jsonError(`Failed to create topic: ${e?.message || String(e)}`);
+      } catch (e: unknown) {
+        if (isZodError(e)) return zodError(e);
+        const err = e as any;
+        return jsonError(`Failed to create topic: ${err?.message || String(e)}`);
       }
     }
   );

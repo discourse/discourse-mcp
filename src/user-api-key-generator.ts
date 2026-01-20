@@ -8,7 +8,7 @@ interface KeyPair {
   privateKey: string;
 }
 
-interface GenerateOptions {
+export interface GenerateOptions {
   site: string;
   scopes?: string;
   applicationName?: string;

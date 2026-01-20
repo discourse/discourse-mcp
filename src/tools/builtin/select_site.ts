@@ -15,7 +15,7 @@ export const registerSelectSite: RegisterFn = (server, ctx, opts) => {
       description: "Validate and select a Discourse site. Returns JSON with site URL and title.",
       inputSchema: schema.shape,
     },
-    async ({ site }, _extra: any) => {
+    async ({ site }, _extra) => {
       try {
         const { base, client } = ctx.siteState.buildClientForSite(site);
         const about = (await client.get(`/about.json`)) as any;

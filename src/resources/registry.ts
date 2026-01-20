@@ -24,6 +24,9 @@ import {
   type LeanDraft,
 } from "../util/json_response.js";
 
+/** Narrowed interface for resource registration - only requires resource method */
+export type ResourceRegistrar = Pick<McpServer, "resource">;
+
 export interface ResourceContext {
   siteState: SiteState;
   logger: Logger;
@@ -34,7 +37,7 @@ export interface ResourceContext {
  * Resources are read-only, URI-addressable data endpoints.
  */
 export function registerAllResources(
-  server: McpServer,
+  server: ResourceRegistrar,
   ctx: ResourceContext
 ): void {
   registerCategoriesResource(server, ctx);
@@ -49,7 +52,7 @@ export function registerAllResources(
  * discourse://site/categories
  * Lists all categories with hierarchy and permissions.
  */
-function registerCategoriesResource(server: McpServer, ctx: ResourceContext): void {
+function registerCategoriesResource(server: ResourceRegistrar, ctx: ResourceContext): void {
   server.resource(
     "site_categories",
     "discourse://site/categories",
@@ -101,7 +104,7 @@ function registerCategoriesResource(server: McpServer, ctx: ResourceContext): vo
  * discourse://site/tags
  * Lists all tags with usage counts.
  */
-function registerTagsResource(server: McpServer, ctx: ResourceContext): void {
+function registerTagsResource(server: ResourceRegistrar, ctx: ResourceContext): void {
   server.resource(
     "site_tags",
     "discourse://site/tags",
@@ -149,7 +152,7 @@ function registerTagsResource(server: McpServer, ctx: ResourceContext): void {
  * discourse://site/groups
  * Lists all groups for gid -> name resolution.
  */
-function registerGroupsResource(server: McpServer, ctx: ResourceContext): void {
+function registerGroupsResource(server: ResourceRegistrar, ctx: ResourceContext): void {
   server.resource(
     "site_groups",
     "discourse://site/groups",
@@ -197,7 +200,7 @@ function registerGroupsResource(server: McpServer, ctx: ResourceContext): void {
  * discourse://chat/channels
  * Lists all public chat channels.
  */
-function registerChatChannelsResource(server: McpServer, ctx: ResourceContext): void {
+function registerChatChannelsResource(server: ResourceRegistrar, ctx: ResourceContext): void {
   server.resource(
     "chat_channels",
     "discourse://chat/channels",
@@ -245,7 +248,7 @@ function registerChatChannelsResource(server: McpServer, ctx: ResourceContext): 
  * discourse://user/chat-channels
  * Lists all chat channels for the authenticated user (public + DMs).
  */
-function registerUserChatChannelsResource(server: McpServer, ctx: ResourceContext): void {
+function registerUserChatChannelsResource(server: ResourceRegistrar, ctx: ResourceContext): void {
   server.resource(
     "user_chat_channels",
     "discourse://user/chat-channels",
@@ -305,7 +308,7 @@ function registerUserChatChannelsResource(server: McpServer, ctx: ResourceContex
  * discourse://user/drafts
  * Lists all drafts for the authenticated user.
  */
-function registerUserDraftsResource(server: McpServer, ctx: ResourceContext): void {
+function registerUserDraftsResource(server: ResourceRegistrar, ctx: ResourceContext): void {
   server.resource(
     "user_drafts",
     "discourse://user/drafts",

@@ -26,7 +26,7 @@ export const registerListUsers: RegisterFn = (server, ctx) => {
       description: "List users via admin API. Requires admin API key. Returns ~100 users per page (Discourse's fixed page size). Returns JSON with users array and pagination meta.",
       inputSchema: schema.shape,
     },
-    async (args, _extra: any) => {
+    async (args, _extra) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
 

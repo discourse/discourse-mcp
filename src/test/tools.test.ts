@@ -2,10 +2,28 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Logger } from '../util/logger.js';
-import { registerAllTools } from '../tools/registry.js';
+import { registerAllTools, type RegistryOptions } from '../tools/registry.js';
 import { SiteState } from '../site/state.js';
+import type { ToolRegistrar } from '../tools/types.js';
 
-type ToolHandler = (args: any, extra: any) => Promise<any>;
+interface ToolResult {
+  isError?: boolean;
+  content?: Array<{ type: string; text: string }>;
+}
+
+type ToolHandler = (args: Record<string, unknown>, extra: unknown) => Promise<ToolResult>;
+
+/** Creates a minimal mock server that captures tool registrations for testing */
+function createMockServer(): { server: ToolRegistrar; tools: Record<string, { handler: ToolHandler }> } {
+  const tools: Record<string, { handler: ToolHandler }> = {};
+  // Cast needed because mock doesn't implement full SDK callback signature
+  const server = {
+    registerTool(name: string, _meta: Record<string, unknown>, handler: ToolHandler) {
+      tools[name] = { handler };
+    },
+  } as ToolRegistrar;
+  return { server, tools };
+}
 
 test('registers built-in tools', async () => {
   const logger = new Logger('silent');
@@ -15,15 +33,9 @@ test('registers built-in tools', async () => {
     const logger = new Logger('silent');
     const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
-    // Minimal fake server to capture tool registrations
-    const tools: Record<string, { handler: ToolHandler }> = {};
-    const fakeServer: any = {
-      registerTool(name: string, _meta: any, handler: ToolHandler) {
-        tools[name] = { handler };
-      },
-    };
+    const { server, tools } = createMockServer();
 
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } as any);
+    await registerAllTools(server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
 
     // When writes are enabled, create and update tools should be registered
     assert.ok('discourse_create_post' in tools);
@@ -37,14 +49,9 @@ test('registers built-in tools', async () => {
     const logger = new Logger('silent');
     const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
-    const tools: Record<string, { handler: ToolHandler }> = {};
-    const fakeServer: any = {
-      registerTool(name: string, _meta: any, handler: ToolHandler) {
-        tools[name] = { handler };
-      },
-    };
+    const { server, tools } = createMockServer();
 
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } as any);
+    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
 
     // Write tools should NOT be registered
     assert.ok(!('discourse_create_post' in tools));
@@ -59,7 +66,7 @@ test('registers built-in tools', async () => {
 
   const server = new McpServer({ name: 'test', version: '0.0.0' }, { capabilities: { tools: { listChanged: false } } });
 
-  await registerAllTools(server as any, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' });
+  await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
 
   // If no error is thrown we consider registration successful.
   assert.ok(true);
@@ -92,19 +99,13 @@ test('select-site then search flow works with mocked HTTP', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
-  // Minimal fake server to capture tool handlers
-  const tools: Record<string, { handler: ToolHandler }> = {};
-  const fakeServer: any = {
-    registerTool(name: string, _meta: any, handler: ToolHandler) {
-      tools[name] = { handler };
-    },
-  };
+  const { server, tools } = createMockServer();
 
-  await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' });
+  await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' });
 
   // Mock fetch
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: any, _init?: any) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, _init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
     if (url.endsWith('/about.json')) {
       return new Response(JSON.stringify({ about: { title: 'Example Discourse' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -136,17 +137,11 @@ test('tethered mode hides select_site and allows search without selection', asyn
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
-  // Minimal fake server to capture tool handlers
-  const tools: Record<string, { handler: ToolHandler }> = {};
-  const fakeServer: any = {
-    registerTool(name: string, _meta: any, handler: ToolHandler) {
-      tools[name] = { handler };
-    },
-  };
+  const { server, tools } = createMockServer();
 
   // Mock fetch
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: any, _init?: any) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, _init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
     if (url.endsWith('/about.json')) {
       return new Response(JSON.stringify({ about: { title: 'Example Discourse' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
@@ -164,7 +159,7 @@ test('tethered mode hides select_site and allows search without selection', asyn
     siteState.selectSite(base);
 
     // Register tools with select_site hidden
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } as any);
+    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } satisfies RegistryOptions);
 
     // Ensure select tool is not exposed
     assert.ok(!('discourse_select_site' in tools));
@@ -184,17 +179,12 @@ test('default-search prefix is applied to queries', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
-  const tools: Record<string, { handler: ToolHandler }> = {};
-  const fakeServer: any = {
-    registerTool(name: string, _meta: any, handler: ToolHandler) {
-      tools[name] = { handler };
-    },
-  };
+  const { server, tools } = createMockServer();
 
   // Mock fetch to capture the search URL
   let lastUrl: string | undefined;
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = (async (input: any, _init?: any) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, _init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
     lastUrl = url;
     if (url.endsWith('/about.json')) {
@@ -211,7 +201,7 @@ test('default-search prefix is applied to queries', async () => {
     await client.get('/about.json');
     siteState.selectSite(base);
 
-    await registerAllTools(fakeServer, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest' } as any);
+    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest' } satisfies RegistryOptions);
 
     await tools['discourse_search'].handler({ query: 'hello world' }, {});
     assert.ok(lastUrl && lastUrl.includes('/search.json?'));

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
 
 export const registerUpdateTopic: RegisterFn = (server, ctx, opts) => {
   if (!opts?.allowWrites) return;
@@ -22,17 +22,17 @@ export const registerUpdateTopic: RegisterFn = (server, ctx, opts) => {
       description: "Update an existing topic (title, category, tags, featured_link). Returns JSON with updated topic details.",
       inputSchema: schema.shape,
     },
-    async (args, _extra: any) => {
-      const { topic_id, title, category_id, tags, featured_link, original_title, original_tags } = schema.parse(args);
-
-      // Fail fast if no updatable fields provided
-      if (title === undefined && category_id === undefined && tags === undefined && featured_link === undefined) {
-        return jsonError("At least one of title, category_id, tags, or featured_link is required");
-      }
-
-      await rateLimit("topic");
-
+    async (args, _extra) => {
       try {
+        const { topic_id, title, category_id, tags, featured_link, original_title, original_tags } = schema.parse(args);
+
+        // Fail fast if no updatable fields provided
+        if (title === undefined && category_id === undefined && tags === undefined && featured_link === undefined) {
+          return jsonError("At least one of title, category_id, tags, or featured_link is required");
+        }
+
+        await rateLimit("topic");
+
         const { client } = ctx.siteState.ensureSelectedSite();
 
         // Fetch current topic state for conflict detection
@@ -101,9 +101,11 @@ export const registerUpdateTopic: RegisterFn = (server, ctx, opts) => {
             featured_link: topic.featured_link ?? featured_link ?? null,
           },
         });
-      } catch (e: any) {
-        const status = e?.status || e?.response?.status;
-        const body = e?.body || e?.response?.body;
+      } catch (e: unknown) {
+        if (isZodError(e)) return zodError(e);
+        const err = e as any;
+        const status = err?.status || err?.response?.status;
+        const body = err?.body || err?.response?.body;
 
         if (status === 403) {
           return jsonError("Permission denied: cannot update this topic", { status });
@@ -117,7 +119,7 @@ export const registerUpdateTopic: RegisterFn = (server, ctx, opts) => {
         }
 
         if (status === 422) {
-          const errors = body?.errors || e?.message;
+          const errors = body?.errors || err?.message;
           return jsonError(`Validation failed: ${Array.isArray(errors) ? errors.join(", ") : errors}`, {
             status,
             body,
@@ -127,7 +129,7 @@ export const registerUpdateTopic: RegisterFn = (server, ctx, opts) => {
         const details: Record<string, unknown> = {};
         if (status) details.status = status;
         if (body) details.body = body;
-        return jsonError(`Failed to update topic: ${e?.message || String(e)}`, Object.keys(details).length > 0 ? details : undefined);
+        return jsonError(`Failed to update topic: ${err?.message || String(e)}`, Object.keys(details).length > 0 ? details : undefined);
       }
     }
   );

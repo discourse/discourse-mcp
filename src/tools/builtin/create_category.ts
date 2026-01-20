@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
-import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
 
 export const registerCreateCategory: RegisterFn = (server, ctx, opts) => {
   if (!opts.allowWrites) return;
@@ -22,12 +22,12 @@ export const registerCreateCategory: RegisterFn = (server, ctx, opts) => {
       description: "Create a new category. Returns JSON with id, slug, and name.",
       inputSchema: schema.shape,
     },
-    async (input: any, _extra: any) => {
-      const { name, color, text_color, emoji, icon, parent_category_id, description } = schema.parse(input);
-
-      await rateLimit("category");
-
+    async (input, _extra) => {
       try {
+        const { name, color, text_color, emoji, icon, parent_category_id, description } = schema.parse(input);
+
+        await rateLimit("category");
+
         const { client } = ctx.siteState.ensureSelectedSite();
 
         const payload: any = { name };
@@ -51,8 +51,10 @@ export const registerCreateCategory: RegisterFn = (server, ctx, opts) => {
           slug: category?.slug || (category?.name ? String(category.name).toLowerCase().replace(/\s+/g, "-") : null),
           name: category?.name || name,
         });
-      } catch (e: any) {
-        return jsonError(`Failed to create category: ${e?.message || String(e)}`);
+      } catch (e: unknown) {
+        if (isZodError(e)) return zodError(e);
+        const err = e as any;
+        return jsonError(`Failed to create category: ${err?.message || String(e)}`);
       }
     }
   );
