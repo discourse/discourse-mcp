@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.4](https://github.com/discourse/discourse-mcp/compare/v0.2.3...v0.2.4) (2026-01-20)
+
+### Features
+
+* Add `discourse_list_users` tool to query and filter users (requires admin API key)
+* Add `discourse_update_user` tool to update user profiles with avatar support
+* Add `discourse_upload_file` tool to upload images via base64, URL, or local file
+* Add `discourse_update_topic` tool to update existing topics
+  - Update title, category, tags, and featured_link via `PUT /t/-/:topic_id.json`
+  - Conflict detection via optional `original_title` and `original_tags` parameters
+* Enhance `discourse_create_user` to accept `upload_id` for avatar setting
+
+### Maintenance
+
+* Add ESLint configuration with typescript-eslint
+  - New `npm run lint` script
+  - Fix existing lint issues across codebase
+* Add HTTP client PUT method and multipart form data support
+
+### Bug Fixes
+
+* Remove unused `with_private` parameter from `discourse_search` schema
+
 ## [0.2.3](https://github.com/discourse/discourse-mcp/compare/v0.2.2...v0.2.3) (2026-01-14)
 
 ### Bug Fixes
