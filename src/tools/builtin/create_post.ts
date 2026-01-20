@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
 import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireWriteAccess } from "../../util/access.js";
 
 export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
   if (!opts.allowWrites) return;
@@ -21,6 +22,9 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
     async (input, _extra) => {
       try {
         const { topic_id, raw, author_username } = schema.parse(input);
+
+        const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+        if (accessError) return accessError;
 
         await rateLimit("post");
 
@@ -45,4 +49,3 @@ export const registerCreatePost: RegisterFn = (server, ctx, opts) => {
     }
   );
 };
-

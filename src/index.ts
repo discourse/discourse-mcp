@@ -89,6 +89,24 @@ async function loadProfile(path?: string): Promise<Partial<Profile>> {
   return parsed.data;
 }
 
+function parseAuthPairs(value: unknown, source: string): AuthOverride[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (Array.isArray(value)) return value as AuthOverride[];
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed as AuthOverride[];
+      throw new Error(`auth_pairs ${source} must be a JSON array`);
+    } catch (e: any) {
+      if (e.message?.includes("auth_pairs")) throw e;
+      throw new Error(`Failed to parse auth_pairs ${source} as JSON: ${e.message}`);
+    }
+  }
+  throw new Error(`auth_pairs ${source} must be a JSON array or array value`);
+}
+
 function parseAllowedUploadPaths(value: unknown, source: string): string[] | undefined {
   if (value === undefined || value === null) return undefined;
   if (Array.isArray(value)) return value.map(String);
@@ -113,7 +131,7 @@ function parseAllowedUploadPaths(value: unknown, source: string): string[] | und
 
 function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>): Profile {
   const merged = {
-    auth_pairs: (flags.auth_pairs as any) ?? profile.auth_pairs,
+    auth_pairs: parseAuthPairs(flags.auth_pairs ?? flags["auth-pairs"], "from CLI") ?? parseAuthPairs(profile.auth_pairs, "from profile"),
     read_only: ((flags.read_only ?? flags["read-only"]) as boolean | undefined) ?? profile.read_only ?? true,
     allow_writes: ((flags.allow_writes ?? flags["allow-writes"]) as boolean | undefined) ?? profile.allow_writes ?? false,
     timeout_ms: ((flags.timeout_ms ?? flags["timeout-ms"]) as number | undefined) ?? profile.timeout_ms ?? DEFAULT_TIMEOUT_MS,
@@ -183,17 +201,9 @@ async function main() {
   logger.debug(`Config: ${JSON.stringify(redactObject({ ...config }))}`);
 
   // Initialize dynamic site state
-  let authOverrides: AuthOverride[] | undefined = undefined;
-  if (Array.isArray(config.auth_pairs)) {
-    authOverrides = config.auth_pairs as unknown as AuthOverride[];
-  } else if (typeof (config as any).auth_pairs === "string") {
-    try {
-      const parsed = JSON.parse((config as any).auth_pairs);
-      if (Array.isArray(parsed)) authOverrides = parsed as AuthOverride[];
-    } catch {
-      // ignore
-    }
-  }
+  const authOverrides = Array.isArray(config.auth_pairs)
+    ? (config.auth_pairs as unknown as AuthOverride[])
+    : undefined;
   const siteState = new SiteState({
     logger,
     timeoutMs: config.timeout_ms,
@@ -214,8 +224,8 @@ async function main() {
     }
   );
 
-  const allowWrites = Boolean(config.allow_writes && !config.read_only && (config.auth_pairs && config.auth_pairs.length > 0));
-  const hasAdminApiKey = Boolean(config.auth_pairs?.some(p => p.api_key));
+  const allowWrites = Boolean(config.allow_writes && !config.read_only);
+  const allowAdminTools = siteState.hasAdminAuth();
 
   // If tethered to a site, validate and preselect it before registering tools,
   // and trigger remote tool discovery when enabled.
@@ -235,12 +245,12 @@ async function main() {
 
   await registerAllTools(server, siteState, logger, {
     allowWrites,
+    allowAdminTools,
     toolsMode: config.tools_mode,
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
     maxReadLength: config.max_read_length,
     allowedUploadPaths: config.allowed_upload_paths,
-    hasAdminApiKey,
   });
 
   // Register MCP resources (URI-addressable read-only data)

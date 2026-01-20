@@ -34,6 +34,8 @@ export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
 export interface RegistryOptions {
   allowWrites: boolean;
+  // When true, expose admin-only tools (e.g., list_users). Requires api_key auth.
+  allowAdminTools?: boolean;
   toolsMode: ToolsMode;
   // When true, do not register the discourse_select_site tool
   hideSelectSite?: boolean;
@@ -41,8 +43,6 @@ export interface RegistryOptions {
   defaultSearchPrefix?: string;
   // Allowed directories for local file uploads (if empty/undefined, local uploads are disabled)
   allowedUploadPaths?: string[];
-  // When true, admin-only tools (e.g., list_users) are registered
-  hasAdminApiKey?: boolean;
 }
 
 export async function registerAllTools(
@@ -67,9 +67,7 @@ export async function registerAllTools(
   registerReadPost(server, ctx, { allowWrites: false });
   registerGetUser(server, ctx, { allowWrites: false });
   registerListUserPosts(server, ctx, { allowWrites: false });
-  if (opts.hasAdminApiKey) {
-    registerListUsers(server, ctx, { allowWrites: false });
-  }
+  registerListUsers(server, ctx, { allowWrites: false, allowAdminTools: opts.allowAdminTools });
   registerGetChatMessages(server, ctx, { allowWrites: false });
   registerGetDraft(server, ctx, { allowWrites: false });
   

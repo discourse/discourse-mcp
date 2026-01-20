@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
 import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireWriteAccess } from "../../util/access.js";
 
 export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
   if (!opts?.allowWrites) return;
@@ -25,6 +26,10 @@ export const registerCreateUser: RegisterFn = (server, ctx, opts) => {
     async (input, _extra) => {
       try {
         const args = schema.parse(input);
+
+        const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+        if (accessError) return accessError;
+
         await rateLimit("user");
         const { client } = ctx.siteState.ensureSelectedSite();
 

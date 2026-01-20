@@ -1,11 +1,14 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
 import { jsonResponse, jsonError, paginatedResponse } from "../../util/json_response.js";
+import { requireAdminAccess } from "../../util/access.js";
 
 // Discourse admin API returns ~100 users per page (fixed by the API)
 const DISCOURSE_PAGE_SIZE = 100;
 
-export const registerListUsers: RegisterFn = (server, ctx) => {
+export const registerListUsers: RegisterFn = (server, ctx, opts) => {
+  // Admin tools require explicit opt-in via allowAdminTools
+  if (!opts?.allowAdminTools) return;
   const schema = z.object({
     query: z.enum(["active", "new", "staff", "suspended", "silenced", "pending", "staged"])
       .optional()
@@ -28,6 +31,9 @@ export const registerListUsers: RegisterFn = (server, ctx) => {
     },
     async (args, _extra) => {
       try {
+        const accessError = requireAdminAccess(ctx.siteState);
+        if (accessError) return accessError;
+
         const { client } = ctx.siteState.ensureSelectedSite();
 
         const query = args.query || "active";

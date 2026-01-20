@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
 import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+import { requireWriteAccess } from "../../util/access.js";
 
 /**
  * Discourse Draft Tools
@@ -126,6 +127,9 @@ export const registerSaveDraft: RegisterFn = (server, ctx, opts) => {
     async (input: unknown, _extra: unknown) => {
       const { draft_key, reply, title, category_id, tags, sequence, action } = schema.parse(input);
 
+      const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+      if (accessError) return accessError;
+
       await rateLimit("draft", 500);
 
       try {
@@ -202,6 +206,9 @@ export const registerDeleteDraft: RegisterFn = (server, ctx, opts) => {
     },
     async (input: unknown, _extra: unknown) => {
       const { draft_key, sequence } = schema.parse(input);
+
+      const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+      if (accessError) return accessError;
 
       await rateLimit("draft", 500);
 

@@ -4,6 +4,7 @@ import { basename, isAbsolute, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RegisterFn } from "../types.js";
 import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireWriteAccess } from "../../util/access.js";
 
 // Upload types that require user_id
 const USER_REQUIRED_TYPES = ["avatar", "profile_background", "card_background"];
@@ -52,6 +53,10 @@ export const registerUploadFile: RegisterFn = (server, ctx, opts) => {
     async (input, _extra) => {
       try {
         const args = schema.parse(input);
+
+        const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+        if (accessError) return accessError;
+
         // Validate: must provide either image_data OR url, not both or neither
         const hasImageData = !!args.image_data;
         const hasUrl = !!args.url;

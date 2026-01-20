@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { RegisterFn } from "../types.js";
 import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireWriteAccess } from "../../util/access.js";
 
 export const registerUpdateTopic: RegisterFn = (server, ctx, opts) => {
   if (!opts?.allowWrites) return;
@@ -25,6 +26,9 @@ export const registerUpdateTopic: RegisterFn = (server, ctx, opts) => {
     async (args, _extra) => {
       try {
         const { topic_id, title, category_id, tags, featured_link, original_title, original_tags } = schema.parse(args);
+
+        const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+        if (accessError) return accessError;
 
         // Fail fast if no updatable fields provided
         if (title === undefined && category_id === undefined && tags === undefined && featured_link === undefined) {
