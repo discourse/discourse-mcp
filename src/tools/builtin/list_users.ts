@@ -19,6 +19,7 @@ export const registerListUsers: RegisterFn = (server, ctx, opts) => {
       .optional()
       .describe("Sort order field"),
     asc: z.boolean().optional().default(false).describe("Sort ascending (default: false/descending)"),
+    show_emails: z.boolean().optional().default(false).describe("Whether to include email addresses in the response"),
     page: z.number().int().min(0).optional().describe("Page number (0-indexed)"),
   });
 
@@ -46,6 +47,7 @@ export const registerListUsers: RegisterFn = (server, ctx, opts) => {
         if (args.filter) params.set("filter", args.filter);
         if (args.order) params.set("order", args.order);
         if (args.asc) params.set("asc", "true");
+        if (args.show_emails) params.set("show_emails", "true");
 
         const data = (await client.get(
           `/admin/users/list/${query}.json?${params.toString()}`
