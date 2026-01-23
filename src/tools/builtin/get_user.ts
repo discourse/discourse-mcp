@@ -3,7 +3,7 @@ import type { RegisterFn } from "../types.js";
 import { jsonResponse, jsonError } from "../../util/json_response.js";
 import { requireAdminAccess } from "../../util/access.js";
 
-export const registerGetUser: RegisterFn = (server, ctx) => {
+export const registerGetUser: RegisterFn = (server, ctx, opts) => {
   const schema = z.object({
     username: z.string().min(1),
   });
@@ -35,7 +35,7 @@ export const registerGetUser: RegisterFn = (server, ctx) => {
 
         const hasAdminAccess = !requireAdminAccess(ctx.siteState);
 
-        if (hasAdminAccess) {
+        if (hasAdminAccess && opts.showEmails) {
           const emailData = (await client.get(`/u/${encodeURIComponent(username)}/emails.json`)) as any;
           response.email = emailData?.email || null;
         }

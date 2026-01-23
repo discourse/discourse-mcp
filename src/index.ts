@@ -53,6 +53,7 @@ const ProfileSchema = z
     concurrency: z.number().int().positive().optional().default(4),
     cache_dir: z.string().optional(),
     log_level: z.enum(["silent", "error", "info", "debug"]).optional().default("info"),
+    show_emails: z.boolean().optional().default(false),
     tools_mode: z.enum(["auto", "discourse_api_only", "tool_exec_api"]).optional().default("auto"),
     site: z.string().url().optional().describe("Tether MCP to a single Discourse site; hides select_site and preselects this site"),
     default_search: z.string().optional().describe("Optional search prefix added to every search query (set via --default-search)"),
@@ -138,6 +139,7 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     concurrency: (flags.concurrency as number | undefined) ?? profile.concurrency ?? 4,
     cache_dir: ((flags.cache_dir ?? flags["cache-dir"]) as string | undefined) ?? profile.cache_dir,
     log_level: (((flags.log_level ?? flags["log-level"]) as LogLevel | undefined) ?? (profile.log_level as LogLevel | undefined) ?? "info") as LogLevel,
+    show_emails: (((flags.show_emails ?? flags["show-emails"]) as boolean | undefined) ?? (profile.show_emails as boolean | undefined) ?? false) as boolean,
     tools_mode: (((flags.tools_mode ?? flags["tools-mode"]) as ToolsMode | undefined) ?? (profile.tools_mode as ToolsMode | undefined) ?? "auto") as ToolsMode,
     site: (flags.site as string | undefined) ?? profile.site,
     default_search: (((flags.default_search ?? flags["default-search"]) as string | undefined) ?? profile.default_search) as string | undefined,
@@ -225,6 +227,7 @@ async function main() {
   );
 
   const allowWrites = Boolean(config.allow_writes && !config.read_only);
+  const showEmails = Boolean(config.show_emails);
   const allowAdminTools = siteState.hasAdminAuth();
 
   // If tethered to a site, validate and preselect it before registering tools,
@@ -251,6 +254,7 @@ async function main() {
     defaultSearchPrefix: config.default_search,
     maxReadLength: config.max_read_length,
     allowedUploadPaths: config.allowed_upload_paths,
+    showEmails
   });
 
   // Register MCP resources (URI-addressable read-only data)
