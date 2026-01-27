@@ -43,6 +43,8 @@ export interface RegistryOptions {
   defaultSearchPrefix?: string;
   // Allowed directories for local file uploads (if empty/undefined, local uploads are disabled)
   allowedUploadPaths?: string[];
+  // When true, include email addresses in user information
+  showEmails?: boolean;
 }
 
 export async function registerAllTools(
@@ -65,9 +67,9 @@ export async function registerAllTools(
   // Read tools (parameterized lookups)
   registerReadTopic(server, ctx, { allowWrites: false });
   registerReadPost(server, ctx, { allowWrites: false });
-  registerGetUser(server, ctx, { allowWrites: false });
+  registerGetUser(server, ctx, { allowWrites: false, showEmails: opts.showEmails });
   registerListUserPosts(server, ctx, { allowWrites: false });
-  registerListUsers(server, ctx, { allowWrites: false, allowAdminTools: opts.allowAdminTools });
+  registerListUsers(server, ctx, { allowWrites: false, allowAdminTools: opts.allowAdminTools, showEmails: opts.showEmails });
   registerGetChatMessages(server, ctx, { allowWrites: false });
   registerGetDraft(server, ctx, { allowWrites: false });
   

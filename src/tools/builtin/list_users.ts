@@ -46,6 +46,7 @@ export const registerListUsers: RegisterFn = (server, ctx, opts) => {
         if (args.filter) params.set("filter", args.filter);
         if (args.order) params.set("order", args.order);
         if (args.asc) params.set("asc", "true");
+        if (opts.showEmails) params.set("show_emails", "true");
 
         const data = (await client.get(
           `/admin/users/list/${query}.json?${params.toString()}`

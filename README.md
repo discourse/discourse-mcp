@@ -83,6 +83,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
     - `info`: Shows retry attempts and general operational messages
     - `error`: Shows only errors
     - `silent`: No logging output
+  - `--show_emails` (default: false). includes emails in user tools. Requires admin access
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest`).
@@ -118,6 +119,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   ],
   "read_only": false,
   "allow_writes": true,
+  "show_emails": true,
   "log_level": "info",
   "tools_mode": "auto",
   "site": "https://try.discourse.org",
