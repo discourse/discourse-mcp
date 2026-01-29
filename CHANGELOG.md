@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.5](https://github.com/discourse/discourse-mcp/compare/v0.2.4...v0.2.5) (2026-01-29)
+
+### Bug Fixes
+
+* Expand `~` in `--profile` paths before reading file
+
 ## [0.2.4](https://github.com/discourse/discourse-mcp/compare/v0.2.3...v0.2.4) (2026-01-20)
 
 ### Features
