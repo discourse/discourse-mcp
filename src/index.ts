@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { homedir } from "node:os";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -83,7 +84,8 @@ type Profile = z.infer<typeof ProfileSchema>;
 
 async function loadProfile(path?: string): Promise<Partial<Profile>> {
   if (!path) return {};
-  const txt = await readFile(path, "utf8");
+  const resolved = path.replace(/^~(?=$|\/)/, homedir());
+  const txt = await readFile(resolved, "utf8");
   const raw = JSON.parse(txt);
   const parsed = ProfileSchema.partial().safeParse(raw);
   if (!parsed.success) throw new Error(`Invalid profile JSON: ${parsed.error.message}`);
