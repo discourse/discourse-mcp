@@ -260,10 +260,10 @@ async function main() {
   });
 
   // Register MCP resources (URI-addressable read-only data)
-  registerAllResources(server, { siteState, logger });
+  registerAllResources(server, { siteState, logger, allowAdminTools });
 
   // Register MCP prompts (guided workflows)
-  registerAllPrompts(server, { siteState, logger });
+  registerAllPrompts(server, { siteState, logger, allowAdminTools });
 
   // If tethered and remote tool discovery is enabled, discover now
   if (config.site && config.tools_mode !== "discourse_api_only") {

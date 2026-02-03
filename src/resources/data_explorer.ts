@@ -37,6 +37,21 @@ const CORE_TABLES = new Set([
 ]);
 
 /**
+ * Extracts error message from admin access error response.
+ * Safely parses JSON and falls back to default message.
+ */
+function getAdminAccessErrorMessage(accessError: { content: Array<{ text?: string }> }): string {
+  const errorText = accessError.content[0]?.text || "";
+  let message = "Admin API key required";
+  try {
+    message = JSON.parse(errorText)?.error ?? message;
+  } catch {
+    // Keep default message if JSON parsing fails
+  }
+  return message;
+}
+
+/**
  * Formats schema as compact text.
  * Format: table: col, col*, col:int, col:ts, col>fk_table
  * - No type = text (default, most common)
@@ -46,13 +61,14 @@ const CORE_TABLES = new Set([
 function formatSchemaAsText(
   schema: Record<string, any[]>,
   tablesToInclude: Set<string> | "all"
-): string {
+): { text: string; tableCount: number } {
   const lines: string[] = [];
 
   const sortedTables = Object.keys(schema).sort();
 
   for (const tableName of sortedTables) {
-    if (tablesToInclude !== "all" && !tablesToInclude.has(tableName)) {
+    // Case-insensitive comparison for requested tables
+    if (tablesToInclude !== "all" && !tablesToInclude.has(tableName.toLowerCase())) {
       continue;
     }
 
@@ -90,7 +106,7 @@ function formatSchemaAsText(
     lines.push(`${tableName}: ${colDefs.join(", ")}`);
   }
 
-  return lines.join("\n");
+  return { text: lines.join("\n"), tableCount: lines.length };
 }
 
 /**
@@ -154,13 +170,12 @@ async function fetchAndFormatSchema(
 ): Promise<{ contents: Array<{ uri: string; mimeType: string; text: string }> }> {
   const accessError = requireAdminAccess(ctx.siteState);
   if (accessError) {
-    const errorText = accessError.content[0]?.text || '{"error":"Admin API key required"}';
     return {
       contents: [
         {
           uri: uri.href,
           mimeType: "text/plain",
-          text: `Error: ${JSON.parse(errorText).error}`,
+          text: `Error: ${getAdminAccessErrorMessage(accessError)}`,
         },
       ],
     };
@@ -176,32 +191,39 @@ async function fetchAndFormatSchema(
 
     // Determine which tables to include
     let tablesToInclude: Set<string> | "all";
+    let isExplicitSelection = false;
 
-    if (!tablesParam) {
-      // Default: core tables only
+    // Normalize tablesParam once and filter empty entries
+    const normalized = tablesParam?.trim();
+    if (!normalized) {
+      // Default: core tables only (already lowercase)
       tablesToInclude = CORE_TABLES;
-    } else if (tablesParam.toLowerCase() === "all") {
+    } else if (normalized.toLowerCase() === "all") {
       tablesToInclude = "all";
+      isExplicitSelection = true;
     } else {
-      // Specific tables requested
+      // Specific tables requested (normalized to lowercase for case-insensitive matching)
       tablesToInclude = new Set(
-        tablesParam.split(",").map((t) => t.trim().toLowerCase())
+        normalized.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean)
       );
+      // Fall back to core tables if all entries were empty/whitespace
+      if (tablesToInclude.size === 0) {
+        tablesToInclude = CORE_TABLES;
+      } else {
+        isExplicitSelection = true;
+      }
     }
 
-    const text = formatSchemaAsText(data, tablesToInclude);
+    const { text, tableCount } = formatSchemaAsText(data, tablesToInclude);
+    const totalTables = Object.keys(data).length;
 
-    // Add header with info
-    const tableCount =
-      tablesToInclude === "all"
-        ? Object.keys(data).length
-        : tablesToInclude.size;
+    // Add header with info (use actual tableCount from formatted output)
     const header =
       tablesToInclude === "all"
-        ? `-- All ${Object.keys(data).length} tables | id = PK, no type = text, :int :ts :bool :json | * = sensitive, >t = fkey\n\n`
-        : tablesParam
+        ? `-- All ${totalTables} tables | id = PK, no type = text, :int :ts :bool :json | * = sensitive, >t = fkey\n\n`
+        : isExplicitSelection
           ? `-- ${tableCount} tables | id = PK, no type = text, :int :ts :bool :json | * = sensitive, >t = fkey\n\n`
-          : `-- Core tables (${tableCount}/${Object.keys(data).length}) | id = PK, no type = text, :int :ts :bool :json | * = sensitive, >t = fkey\n\n`;
+          : `-- Core tables (${tableCount}/${totalTables}) | id = PK, no type = text, :int :ts :bool :json | * = sensitive, >t = fkey\n\n`;
 
     return {
       contents: [
@@ -278,13 +300,12 @@ async function fetchAndFormatQueries(
 ): Promise<{ contents: Array<{ uri: string; mimeType: string; text: string }> }> {
   const accessError = requireAdminAccess(ctx.siteState);
   if (accessError) {
-    const errorText = accessError.content[0]?.text || '{"error":"Admin API key required"}';
     return {
       contents: [
         {
           uri: uri.href,
           mimeType: "text/plain",
-          text: `Error: ${JSON.parse(errorText).error}`,
+          text: `Error: ${getAdminAccessErrorMessage(accessError)}`,
         },
       ],
     };
@@ -293,11 +314,13 @@ async function fetchAndFormatQueries(
   const { client } = ctx.siteState.ensureSelectedSite();
 
   try {
-    const data = (await client.get(
-      "/admin/plugins/explorer/queries.json"
+    const data = (await client.getCached(
+      "/admin/plugins/explorer/queries.json",
+      30000
     )) as any;
 
-    const rawQueries: any[] = data?.queries || [];
+    // Copy array to avoid mutating cached response
+    const rawQueries: any[] = [...(data?.queries || [])];
 
     // Sort by last_run_at descending (most recently used first), nulls last
     rawQueries.sort((a, b) => {
@@ -307,9 +330,22 @@ async function fetchAndFormatQueries(
       return new Date(b.last_run_at).getTime() - new Date(a.last_run_at).getTime();
     });
 
+    // Handle empty query list
+    if (rawQueries.length === 0) {
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "text/plain",
+            text: "-- No queries found",
+          },
+        ],
+      };
+    }
+
     // Paginate
     const totalPages = Math.ceil(rawQueries.length / QUERIES_PER_PAGE);
-    const safePage = Math.max(1, Math.min(page, totalPages || 1));
+    const safePage = Math.max(1, Math.min(page, totalPages));
     const startIdx = (safePage - 1) * QUERIES_PER_PAGE;
     const pageQueries = rawQueries.slice(startIdx, startIdx + QUERIES_PER_PAGE);
 
