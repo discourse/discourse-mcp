@@ -233,6 +233,8 @@ const READ_ONLY_TOOLS = [
 
 const ADMIN_TOOLS = [
   'discourse_list_users',
+  'discourse_get_query',
+  'discourse_run_query',
 ];
 
 const WRITE_TOOLS = [
@@ -245,6 +247,12 @@ const WRITE_TOOLS = [
   'discourse_upload_file',
   'discourse_save_draft',
   'discourse_delete_draft',
+];
+
+const ADMIN_WRITE_TOOLS = [
+  'discourse_create_query',
+  'discourse_update_query',
+  'discourse_delete_query',
 ];
 
 test('read-only mode without admin auth exposes only read tools', async () => {
@@ -291,7 +299,7 @@ test('write mode with admin auth exposes all tools', async () => {
   });
 
   const registeredTools = Object.keys(tools).sort();
-  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_TOOLS, ...WRITE_TOOLS].sort();
+  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_TOOLS, ...WRITE_TOOLS, ...ADMIN_WRITE_TOOLS].sort();
   assert.deepEqual(registeredTools, expectedTools);
 });
 

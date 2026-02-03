@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.5](https://github.com/discourse/discourse-mcp/compare/v0.2.4...v0.2.5) (2026-02-03)
+
+### Features
+
+* Add Data Explorer plugin integration
+  - `explorer_schema` resource: database schema in compact text format (core tables by default)
+  - `explorer_schema_tables` resource: schema for specific or all tables
+  - `explorer_queries` resource: saved queries with pagination (30/page, sorted by last used)
+  - `discourse_get_query` tool: get query details including SQL and parameters
+  - `discourse_run_query` tool: execute query with parameters
+  - `discourse_create_query` tool: create new saved query
+  - `discourse_update_query` tool: update existing query
+  - `discourse_delete_query` tool: delete query
+  - `sql_query` prompt: guided SQL workflow for schema discovery and query execution
+
 ## [0.2.4](https://github.com/discourse/discourse-mcp/compare/v0.2.3...v0.2.4) (2026-01-20)
 
 ### Features

@@ -25,6 +25,7 @@ import { type AuthMode } from "./http/client.js";
 import { registerAllTools, type ToolsMode } from "./tools/registry.js";
 import { tryRegisterRemoteTools } from "./tools/remote/tool_exec_api.js";
 import { registerAllResources } from "./resources/registry.js";
+import { registerAllPrompts } from "./prompts/registry.js";
 import { SiteState, type AuthOverride } from "./site/state.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -222,6 +223,7 @@ async function main() {
       capabilities: {
         tools: { listChanged: false },
         resources: { listChanged: false },
+        prompts: { listChanged: false },
       },
     }
   );
@@ -259,6 +261,9 @@ async function main() {
 
   // Register MCP resources (URI-addressable read-only data)
   registerAllResources(server, { siteState, logger });
+
+  // Register MCP prompts (guided workflows)
+  registerAllPrompts(server, { siteState, logger });
 
   // If tethered and remote tool discovery is enabled, discover now
   if (config.site && config.tools_mode !== "discourse_api_only") {

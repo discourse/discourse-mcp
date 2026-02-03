@@ -23,6 +23,10 @@ import {
   type LeanUserChatChannel,
   type LeanDraft,
 } from "../util/json_response.js";
+import {
+  registerExplorerSchemaResource,
+  registerExplorerQueriesResource,
+} from "./data_explorer.js";
 
 /** Narrowed interface for resource registration - only requires resource method */
 export type ResourceRegistrar = Pick<McpServer, "resource">;
@@ -46,6 +50,8 @@ export function registerAllResources(
   registerChatChannelsResource(server, ctx);
   registerUserChatChannelsResource(server, ctx);
   registerUserDraftsResource(server, ctx);
+  registerExplorerSchemaResource(server, ctx);
+  registerExplorerQueriesResource(server, ctx);
 }
 
 /**
