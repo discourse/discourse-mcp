@@ -12,7 +12,7 @@ import { requireAdminAccess } from "../../../util/access.js";
 export const registerRunQuery: RegisterFn = (server, ctx, opts) => {
   if (!opts.allowAdminTools) return;
   const schema = z.object({
-    id: z.number().int().positive().describe("Query ID to run"),
+    id: z.number().int().describe("Query ID to run"),
     params: z
       .record(z.string(), z.unknown())
       .optional()
@@ -20,7 +20,9 @@ export const registerRunQuery: RegisterFn = (server, ctx, opts) => {
     limit: z
       .union([z.number().int().positive(), z.literal("ALL")])
       .optional()
-      .describe("Maximum number of rows to return (default: query default, use 'ALL' for unlimited)"),
+      .describe(
+        "Maximum number of rows to return (default: query default, use 'ALL' for unlimited)",
+      ),
     explain: z
       .boolean()
       .optional()
@@ -57,7 +59,7 @@ export const registerRunQuery: RegisterFn = (server, ctx, opts) => {
 
         const data = (await client.post(
           `/admin/plugins/explorer/queries/${id}/run.json`,
-          payload
+          payload,
         )) as any;
 
         const result: QueryRunResult = {
@@ -81,6 +83,6 @@ export const registerRunQuery: RegisterFn = (server, ctx, opts) => {
         const err = e as any;
         return jsonError(`Failed to run query: ${err?.message || String(e)}`);
       }
-    }
+    },
   );
 };
