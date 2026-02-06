@@ -283,3 +283,63 @@ export function transformDraft(raw: any): LeanDraft {
     reply_preview: replyPreview,
   };
 }
+
+/**
+ * Data Explorer types and transforms.
+ * Used for query management.
+ */
+
+export interface LeanQuery {
+  id: number;
+  name: string;
+  description: string | null;
+  username: string | null;
+  group_ids: number[];
+  last_run_at: string | null;
+}
+
+export interface LeanQueryDetail extends LeanQuery {
+  sql: string;
+  param_info: Array<{
+    identifier: string;
+    type: string;
+    default: string | null;
+    nullable: boolean;
+  }>;
+}
+
+export function transformQuery(raw: any): LeanQuery {
+  return {
+    id: raw.id,
+    name: raw.name || "",
+    description: raw.description || null,
+    username: raw.username || raw.user?.username || null,
+    group_ids: Array.isArray(raw.group_ids) ? raw.group_ids : [],
+    last_run_at: raw.last_run_at || null,
+  };
+}
+
+export function transformQueryDetail(raw: any): LeanQueryDetail {
+  const base = transformQuery(raw);
+  return {
+    ...base,
+    sql: raw.sql || "",
+    param_info: Array.isArray(raw.param_info)
+      ? raw.param_info.map((p: any) => ({
+          identifier: p.identifier || "",
+          type: p.type || "string",
+          default: p.default ?? null,
+          nullable: p.nullable === true,
+        }))
+      : [],
+  };
+}
+
+export interface QueryRunResult {
+  columns: string[];
+  rows: unknown[][];
+  result_count: number;
+  duration_ms: number;
+  explain?: string;
+  relations?: Record<string, unknown>;
+}

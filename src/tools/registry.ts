@@ -22,6 +22,13 @@ import {
   registerSaveDraft,
   registerDeleteDraft,
 } from "./builtin/drafts.js";
+import {
+  registerGetQuery,
+  registerRunQuery,
+  registerCreateQuery,
+  registerUpdateQuery,
+  registerDeleteQuery,
+} from "./builtin/data_explorer/index.js";
 
 // Note: The following tools have been replaced by MCP Resources (v0.2.0):
 // - discourse_list_categories → discourse://site/categories
@@ -83,4 +90,11 @@ export async function registerAllTools(
   registerUploadFile(server, ctx, { allowWrites: opts.allowWrites });
   registerSaveDraft(server, ctx, { allowWrites: opts.allowWrites });
   registerDeleteDraft(server, ctx, { allowWrites: opts.allowWrites });
+
+  // Data Explorer tools (admin-only)
+  registerGetQuery(server, ctx, { allowWrites: false, allowAdminTools: opts.allowAdminTools });
+  registerRunQuery(server, ctx, { allowWrites: false, allowAdminTools: opts.allowAdminTools });
+  registerCreateQuery(server, ctx, { allowWrites: opts.allowWrites, allowAdminTools: opts.allowAdminTools });
+  registerUpdateQuery(server, ctx, { allowWrites: opts.allowWrites, allowAdminTools: opts.allowAdminTools });
+  registerDeleteQuery(server, ctx, { allowWrites: opts.allowWrites, allowAdminTools: opts.allowAdminTools });
 }

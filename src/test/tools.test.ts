@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Logger } from '../util/logger.js';
 import { registerAllTools, type RegistryOptions } from '../tools/registry.js';
+import { registerAllResources, type ResourceRegistrar } from '../resources/registry.js';
+import { registerAllPrompts, type PromptRegistrar } from '../prompts/registry.js';
 import { SiteState } from '../site/state.js';
 import type { ToolRegistrar } from '../tools/types.js';
 
@@ -233,6 +235,8 @@ const READ_ONLY_TOOLS = [
 
 const ADMIN_TOOLS = [
   'discourse_list_users',
+  'discourse_get_query',
+  'discourse_run_query',
 ];
 
 const WRITE_TOOLS = [
@@ -245,6 +249,12 @@ const WRITE_TOOLS = [
   'discourse_upload_file',
   'discourse_save_draft',
   'discourse_delete_draft',
+];
+
+const ADMIN_WRITE_TOOLS = [
+  'discourse_create_query',
+  'discourse_update_query',
+  'discourse_delete_query',
 ];
 
 test('read-only mode without admin auth exposes only read tools', async () => {
@@ -291,7 +301,7 @@ test('write mode with admin auth exposes all tools', async () => {
   });
 
   const registeredTools = Object.keys(tools).sort();
-  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_TOOLS, ...WRITE_TOOLS].sort();
+  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_TOOLS, ...WRITE_TOOLS, ...ADMIN_WRITE_TOOLS].sort();
   assert.deepEqual(registeredTools, expectedTools);
 });
 
@@ -369,4 +379,94 @@ test('SiteState.hasAdminAuth returns false with no auth', async () => {
     defaultAuth: { type: 'none' }
   });
   assert.ok(!siteState.hasAdminAuth());
+});
+
+// ========================
+// Resource registration tests - verify resources are exposed based on auth context
+// ========================
+
+const BASE_RESOURCES = [
+  'site_categories',
+  'site_tags',
+  'site_groups',
+  'chat_channels',
+  'user_chat_channels',
+  'user_drafts',
+];
+
+const ADMIN_RESOURCES = [
+  'explorer_schema',
+  'explorer_schema_tables',
+  'explorer_queries',
+  'explorer_queries_page',
+];
+
+/** Creates a mock server that captures resource registrations */
+function createMockResourceServer(): { server: ResourceRegistrar; resources: Record<string, unknown> } {
+  const resources: Record<string, unknown> = {};
+  const server = {
+    resource(name: string, ...rest: unknown[]) {
+      resources[name] = rest;
+    },
+  } as ResourceRegistrar;
+  return { server, resources };
+}
+
+test('resources without admin auth excludes Data Explorer resources', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, resources } = createMockResourceServer();
+
+  registerAllResources(server, { siteState, logger, allowAdminTools: false });
+
+  const registeredResources = Object.keys(resources).sort();
+  const expectedResources = [...BASE_RESOURCES].sort();
+  assert.deepEqual(registeredResources, expectedResources);
+});
+
+test('resources with admin auth includes Data Explorer resources', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'api_key', key: 'test' } });
+  const { server, resources } = createMockResourceServer();
+
+  registerAllResources(server, { siteState, logger, allowAdminTools: true });
+
+  const registeredResources = Object.keys(resources).sort();
+  const expectedResources = [...BASE_RESOURCES, ...ADMIN_RESOURCES].sort();
+  assert.deepEqual(registeredResources, expectedResources);
+});
+
+// ========================
+// Prompt registration tests - verify prompts are exposed based on auth context
+// ========================
+
+/** Creates a mock server that captures prompt registrations */
+function createMockPromptServer(): { server: PromptRegistrar; prompts: Record<string, unknown> } {
+  const prompts: Record<string, unknown> = {};
+  const server = {
+    registerPrompt(name: string, ...rest: unknown[]) {
+      prompts[name] = rest;
+    },
+  } as PromptRegistrar;
+  return { server, prompts };
+}
+
+test('prompts without admin auth excludes sql_query prompt', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, prompts } = createMockPromptServer();
+
+  registerAllPrompts(server, { siteState, logger, allowAdminTools: false });
+
+  assert.deepEqual(Object.keys(prompts), []);
+});
+
+test('prompts with admin auth includes sql_query prompt', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'api_key', key: 'test' } });
+  const { server, prompts } = createMockPromptServer();
+
+  registerAllPrompts(server, { siteState, logger, allowAdminTools: true });
+
+  assert.deepEqual(Object.keys(prompts), ['sql_query']);
 });
