@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.6](https://github.com/discourse/discourse-mcp/compare/v0.2.5...v0.2.6) (2026-03-04)
+
+### Bug Fixes
+
+* Always register Data Explorer tools, resources, and prompts regardless of auth type
+  - `prompts/list` no longer errors or returns empty for non-admin users
+  - Admin access is now enforced at call time by Discourse, not at registration time
+* Allow user API key auth for admin-only endpoints (Data Explorer, list_users)
+  - Previously only global API keys were accepted; admin users with user API keys were blocked
+  - Discourse enforces actual admin permissions server-side
+
 ## [0.2.5](https://github.com/discourse/discourse-mcp/compare/v0.2.4...v0.2.5) (2026-02-03)
 
 ### Features

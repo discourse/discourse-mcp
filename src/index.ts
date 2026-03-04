@@ -230,7 +230,6 @@ async function main() {
 
   const allowWrites = Boolean(config.allow_writes && !config.read_only);
   const showEmails = Boolean(config.show_emails);
-  const allowAdminTools = siteState.hasAdminAuth();
 
   // If tethered to a site, validate and preselect it before registering tools,
   // and trigger remote tool discovery when enabled.
@@ -250,7 +249,6 @@ async function main() {
 
   await registerAllTools(server, siteState, logger, {
     allowWrites,
-    allowAdminTools,
     toolsMode: config.tools_mode,
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
@@ -260,10 +258,10 @@ async function main() {
   });
 
   // Register MCP resources (URI-addressable read-only data)
-  registerAllResources(server, { siteState, logger, allowAdminTools });
+  registerAllResources(server, { siteState, logger });
 
   // Register MCP prompts (guided workflows)
-  registerAllPrompts(server, { siteState, logger, allowAdminTools });
+  registerAllPrompts(server, { siteState, logger });
 
   // If tethered and remote tool discovery is enabled, discover now
   if (config.site && config.tools_mode !== "discourse_api_only") {

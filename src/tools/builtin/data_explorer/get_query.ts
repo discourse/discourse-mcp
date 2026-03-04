@@ -9,8 +9,7 @@ import {
 } from "../../../util/json_response.js";
 import { requireAdminAccess } from "../../../util/access.js";
 
-export const registerGetQuery: RegisterFn = (server, ctx, opts) => {
-  if (!opts.allowAdminTools) return;
+export const registerGetQuery: RegisterFn = (server, ctx, _opts) => {
   const schema = z.object({
     id: z.number().int().positive().describe("Query ID"),
   });

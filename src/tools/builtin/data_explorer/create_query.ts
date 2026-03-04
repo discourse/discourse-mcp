@@ -11,7 +11,7 @@ import {
 import { requireAdminAccess } from "../../../util/access.js";
 
 export const registerCreateQuery: RegisterFn = (server, ctx, opts) => {
-  if (!opts.allowAdminTools || !opts.allowWrites) return;
+  if (!opts.allowWrites) return;
 
   const schema = z.object({
     name: z

@@ -233,7 +233,8 @@ const READ_ONLY_TOOLS = [
   'discourse_get_draft',
 ];
 
-const ADMIN_TOOLS = [
+// Admin-only tools are now always registered; access is checked at call time
+const ADMIN_READ_TOOLS = [
   'discourse_list_users',
   'discourse_get_query',
   'discourse_run_query',
@@ -249,75 +250,38 @@ const WRITE_TOOLS = [
   'discourse_upload_file',
   'discourse_save_draft',
   'discourse_delete_draft',
-];
-
-const ADMIN_WRITE_TOOLS = [
   'discourse_create_query',
   'discourse_update_query',
   'discourse_delete_query',
 ];
 
-test('read-only mode without admin auth exposes only read tools', async () => {
+test('read-only mode registers read + admin-read tools (access checked at call time)', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
   const { server, tools } = createMockServer();
 
   await registerAllTools(server, siteState, logger, {
     allowWrites: false,
-    allowAdminTools: false,
     toolsMode: 'discourse_api_only'
   });
 
   const registeredTools = Object.keys(tools).sort();
-  const expectedTools = [...READ_ONLY_TOOLS].sort();
+  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_READ_TOOLS].sort();
   assert.deepEqual(registeredTools, expectedTools);
 });
 
-test('read-only mode with admin auth exposes read + admin tools', async () => {
+test('write mode registers all tools', async () => {
   const logger = new Logger('silent');
-  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'api_key', key: 'test' } });
-  const { server, tools } = createMockServer();
-
-  await registerAllTools(server, siteState, logger, {
-    allowWrites: false,
-    allowAdminTools: true,
-    toolsMode: 'discourse_api_only'
-  });
-
-  const registeredTools = Object.keys(tools).sort();
-  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_TOOLS].sort();
-  assert.deepEqual(registeredTools, expectedTools);
-});
-
-test('write mode with admin auth exposes all tools', async () => {
-  const logger = new Logger('silent');
-  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'api_key', key: 'test' } });
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
   const { server, tools } = createMockServer();
 
   await registerAllTools(server, siteState, logger, {
     allowWrites: true,
-    allowAdminTools: true,
     toolsMode: 'discourse_api_only'
   });
 
   const registeredTools = Object.keys(tools).sort();
-  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_TOOLS, ...WRITE_TOOLS, ...ADMIN_WRITE_TOOLS].sort();
-  assert.deepEqual(registeredTools, expectedTools);
-});
-
-test('write mode without admin auth exposes read + write but not admin tools', async () => {
-  const logger = new Logger('silent');
-  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'user_api_key', key: 'test' } });
-  const { server, tools } = createMockServer();
-
-  await registerAllTools(server, siteState, logger, {
-    allowWrites: true,
-    allowAdminTools: false,
-    toolsMode: 'discourse_api_only'
-  });
-
-  const registeredTools = Object.keys(tools).sort();
-  const expectedTools = [...READ_ONLY_TOOLS, ...WRITE_TOOLS].sort();
+  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_READ_TOOLS, ...WRITE_TOOLS].sort();
   assert.deepEqual(registeredTools, expectedTools);
 });
 
@@ -328,58 +292,15 @@ test('tethered mode hides select_site from tool list', async () => {
 
   await registerAllTools(server, siteState, logger, {
     allowWrites: false,
-    allowAdminTools: false,
     toolsMode: 'discourse_api_only',
     hideSelectSite: true
   });
 
   const registeredTools = Object.keys(tools).sort();
-  const expectedTools = READ_ONLY_TOOLS.filter(t => t !== 'discourse_select_site').sort();
+  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_READ_TOOLS].filter(t => t !== 'discourse_select_site').sort();
   assert.deepEqual(registeredTools, expectedTools);
 });
 
-// SiteState.hasAdminAuth() tests
-test('SiteState.hasAdminAuth returns true when api_key in defaultAuth', async () => {
-  const logger = new Logger('silent');
-  const siteState = new SiteState({
-    logger,
-    timeoutMs: 5000,
-    defaultAuth: { type: 'api_key', key: 'admin-key' }
-  });
-  assert.ok(siteState.hasAdminAuth());
-});
-
-test('SiteState.hasAdminAuth returns true when api_key in authOverrides', async () => {
-  const logger = new Logger('silent');
-  const siteState = new SiteState({
-    logger,
-    timeoutMs: 5000,
-    defaultAuth: { type: 'none' },
-    authOverrides: [{ site: 'https://admin.example.com', api_key: 'admin-key' }]
-  });
-  assert.ok(siteState.hasAdminAuth());
-});
-
-test('SiteState.hasAdminAuth returns false with only user_api_key', async () => {
-  const logger = new Logger('silent');
-  const siteState = new SiteState({
-    logger,
-    timeoutMs: 5000,
-    defaultAuth: { type: 'none' },
-    authOverrides: [{ site: 'https://site.example.com', user_api_key: 'user-key' }]
-  });
-  assert.ok(!siteState.hasAdminAuth());
-});
-
-test('SiteState.hasAdminAuth returns false with no auth', async () => {
-  const logger = new Logger('silent');
-  const siteState = new SiteState({
-    logger,
-    timeoutMs: 5000,
-    defaultAuth: { type: 'none' }
-  });
-  assert.ok(!siteState.hasAdminAuth());
-});
 
 // ========================
 // Resource registration tests - verify resources are exposed based on auth context
@@ -412,24 +333,12 @@ function createMockResourceServer(): { server: ResourceRegistrar; resources: Rec
   return { server, resources };
 }
 
-test('resources without admin auth excludes Data Explorer resources', async () => {
+test('resources always includes Data Explorer resources regardless of auth', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
   const { server, resources } = createMockResourceServer();
 
-  registerAllResources(server, { siteState, logger, allowAdminTools: false });
-
-  const registeredResources = Object.keys(resources).sort();
-  const expectedResources = [...BASE_RESOURCES].sort();
-  assert.deepEqual(registeredResources, expectedResources);
-});
-
-test('resources with admin auth includes Data Explorer resources', async () => {
-  const logger = new Logger('silent');
-  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'api_key', key: 'test' } });
-  const { server, resources } = createMockResourceServer();
-
-  registerAllResources(server, { siteState, logger, allowAdminTools: true });
+  registerAllResources(server, { siteState, logger });
 
   const registeredResources = Object.keys(resources).sort();
   const expectedResources = [...BASE_RESOURCES, ...ADMIN_RESOURCES].sort();
@@ -451,22 +360,12 @@ function createMockPromptServer(): { server: PromptRegistrar; prompts: Record<st
   return { server, prompts };
 }
 
-test('prompts without admin auth excludes sql_query prompt', async () => {
+test('prompts always includes sql_query prompt regardless of auth', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
   const { server, prompts } = createMockPromptServer();
 
-  registerAllPrompts(server, { siteState, logger, allowAdminTools: false });
-
-  assert.deepEqual(Object.keys(prompts), []);
-});
-
-test('prompts with admin auth includes sql_query prompt', async () => {
-  const logger = new Logger('silent');
-  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'api_key', key: 'test' } });
-  const { server, prompts } = createMockPromptServer();
-
-  registerAllPrompts(server, { siteState, logger, allowAdminTools: true });
+  registerAllPrompts(server, { siteState, logger });
 
   assert.deepEqual(Object.keys(prompts), ['sql_query']);
 });

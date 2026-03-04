@@ -10,7 +10,6 @@ import {
 import { requireAdminAccess } from "../../../util/access.js";
 
 export const registerRunQuery: RegisterFn = (server, ctx, opts) => {
-  if (!opts.allowAdminTools) return;
   const schema = z.object({
     id: z.number().int().describe("Query ID to run"),
     params: z
