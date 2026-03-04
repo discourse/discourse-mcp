@@ -34,7 +34,6 @@ export type ResourceRegistrar = Pick<McpServer, "resource">;
 export interface ResourceContext {
   siteState: SiteState;
   logger: Logger;
-  allowAdminTools?: boolean;
 }
 
 /**
@@ -52,13 +51,9 @@ export function registerAllResources(
   registerUserChatChannelsResource(server, ctx);
   registerUserDraftsResource(server, ctx);
 
-  // Only register Data Explorer resources if admin tools allowed
-  // Default to computed auth if not explicitly provided
-  const allowAdminTools = ctx.allowAdminTools ?? ctx.siteState.hasAdminAuth();
-  if (allowAdminTools) {
-    registerExplorerSchemaResource(server, ctx);
-    registerExplorerQueriesResource(server, ctx);
-  }
+  // Data Explorer resources are always registered; access is checked at call time
+  registerExplorerSchemaResource(server, ctx);
+  registerExplorerQueriesResource(server, ctx);
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { SiteState } from "../site/state.js";
 import { jsonError } from "./json_response.js";
 
-type AuthRequirement = "any" | "api_key";
+type AuthRequirement = "any" | "admin";
 
 function requireSiteAuth(siteState: SiteState, requirement: AuthRequirement) {
   const base = siteState.getSiteBase();
@@ -16,8 +16,8 @@ function requireSiteAuth(siteState: SiteState, requirement: AuthRequirement) {
     );
   }
 
-  if (requirement === "api_key" && authType !== "api_key") {
-    return jsonError(`Admin API key required for selected site (${base}).`);
+  if (requirement === "admin" && authType !== "api_key" && authType !== "user_api_key") {
+    return jsonError(`Admin API key or admin user API key required for selected site (${base}).`);
   }
 
   return null;
@@ -31,5 +31,5 @@ export function requireWriteAccess(siteState: SiteState, allowWrites: boolean) {
 }
 
 export function requireAdminAccess(siteState: SiteState) {
-  return requireSiteAuth(siteState, "api_key");
+  return requireSiteAuth(siteState, "admin");
 }

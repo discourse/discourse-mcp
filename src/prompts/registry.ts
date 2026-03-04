@@ -19,7 +19,6 @@ export type PromptRegistrar = Pick<McpServer, "registerPrompt">;
 export interface PromptContext {
   siteState: SiteState;
   logger: Logger;
-  allowAdminTools?: boolean;
 }
 
 /**
@@ -29,12 +28,8 @@ export function registerAllPrompts(
   server: PromptRegistrar,
   ctx: PromptContext
 ): void {
-  // Only register SQL query prompt if admin tools allowed
-  // Default to computed auth if not explicitly provided
-  const allowAdminTools = ctx.allowAdminTools ?? ctx.siteState.hasAdminAuth();
-  if (allowAdminTools) {
-    registerSqlQueryPrompt(server, ctx);
-  }
+  // Always register prompts; access is enforced at tool call time by Discourse
+  registerSqlQueryPrompt(server, ctx);
 }
 
 function registerSqlQueryPrompt(

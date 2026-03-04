@@ -41,8 +41,6 @@ export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 
 export interface RegistryOptions {
   allowWrites: boolean;
-  // When true, expose admin-only tools (e.g., list_users). Requires api_key auth.
-  allowAdminTools?: boolean;
   toolsMode: ToolsMode;
   // When true, do not register the discourse_select_site tool
   hideSelectSite?: boolean;
@@ -76,7 +74,7 @@ export async function registerAllTools(
   registerReadPost(server, ctx, { allowWrites: false });
   registerGetUser(server, ctx, { allowWrites: false, showEmails: opts.showEmails });
   registerListUserPosts(server, ctx, { allowWrites: false });
-  registerListUsers(server, ctx, { allowWrites: false, allowAdminTools: opts.allowAdminTools, showEmails: opts.showEmails });
+  registerListUsers(server, ctx, { allowWrites: false, showEmails: opts.showEmails });
   registerGetChatMessages(server, ctx, { allowWrites: false });
   registerGetDraft(server, ctx, { allowWrites: false });
   
@@ -91,10 +89,10 @@ export async function registerAllTools(
   registerSaveDraft(server, ctx, { allowWrites: opts.allowWrites });
   registerDeleteDraft(server, ctx, { allowWrites: opts.allowWrites });
 
-  // Data Explorer tools (admin-only)
-  registerGetQuery(server, ctx, { allowWrites: false, allowAdminTools: opts.allowAdminTools });
-  registerRunQuery(server, ctx, { allowWrites: false, allowAdminTools: opts.allowAdminTools });
-  registerCreateQuery(server, ctx, { allowWrites: opts.allowWrites, allowAdminTools: opts.allowAdminTools });
-  registerUpdateQuery(server, ctx, { allowWrites: opts.allowWrites, allowAdminTools: opts.allowAdminTools });
-  registerDeleteQuery(server, ctx, { allowWrites: opts.allowWrites, allowAdminTools: opts.allowAdminTools });
+  // Data Explorer tools (admin access checked at call time)
+  registerGetQuery(server, ctx, { allowWrites: false });
+  registerRunQuery(server, ctx, { allowWrites: false });
+  registerCreateQuery(server, ctx, { allowWrites: opts.allowWrites });
+  registerUpdateQuery(server, ctx, { allowWrites: opts.allowWrites });
+  registerDeleteQuery(server, ctx, { allowWrites: opts.allowWrites });
 }

@@ -15,5 +15,5 @@ export interface ToolContext {
   allowedUploadPaths?: string[];
 }
 
-export type RegisterFn = (server: ToolRegistrar, ctx: ToolContext, opts: { allowWrites: boolean; allowAdminTools?: boolean; toolsMode?: string, showEmails?: boolean }) => void | Promise<void>;
+export type RegisterFn = (server: ToolRegistrar, ctx: ToolContext, opts: { allowWrites: boolean; toolsMode?: string, showEmails?: boolean }) => void | Promise<void>;
 

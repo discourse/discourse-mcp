@@ -7,8 +7,6 @@ import { requireAdminAccess } from "../../util/access.js";
 const DISCOURSE_PAGE_SIZE = 100;
 
 export const registerListUsers: RegisterFn = (server, ctx, opts) => {
-  // Admin tools require explicit opt-in via allowAdminTools
-  if (!opts?.allowAdminTools) return;
   const schema = z.object({
     query: z.enum(["active", "new", "staff", "suspended", "silenced", "pending", "staged"])
       .optional()
