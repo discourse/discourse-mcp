@@ -456,3 +456,8 @@ You can also manually create User API Keys via the Discourse UI (if enabled by t
   - Network-level errors (DNS, SSL/TLS, connectivity issues)
   - Retry attempts and timing
   - Timeout diagnostics
+
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/discourse-discourse-mcp).
+
