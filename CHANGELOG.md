@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.7](https://github.com/discourse/discourse-mcp/compare/v0.2.6...v0.2.7) (2026-03-31)
+
+### Features
+
+* Add `discourse_update_post` tool to edit existing post content
+  - Update post body via `PUT /posts/:post_id.json`
+  - Optional `edit_reason` parameter for edit history
+
 ## [0.2.6](https://github.com/discourse/discourse-mcp/compare/v0.2.5...v0.2.6) (2026-03-04)
 
 ### Bug Fixes

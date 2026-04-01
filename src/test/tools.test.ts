@@ -246,6 +246,7 @@ const WRITE_TOOLS = [
   'discourse_create_category',
   'discourse_create_topic',
   'discourse_update_topic',
+  'discourse_update_post',
   'discourse_update_user',
   'discourse_upload_file',
   'discourse_save_draft',
