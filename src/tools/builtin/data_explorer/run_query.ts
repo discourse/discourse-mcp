@@ -9,7 +9,7 @@ import {
 } from "../../../util/json_response.js";
 import { requireAdminAccess } from "../../../util/access.js";
 
-export const registerRunQuery: RegisterFn = (server, ctx, opts) => {
+export const registerRunQuery: RegisterFn = (server, ctx, _opts) => {
   const schema = z.object({
     id: z.number().int().describe("Query ID to run"),
     params: z
