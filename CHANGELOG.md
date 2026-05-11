@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.8](https://github.com/discourse/discourse-mcp/compare/v0.2.7...v0.2.8) (2026-05-11)
+
+### Bug Fixes
+
+* Support Discourse installations served from a subfolder such as `https://example.com/forum`
+  - Preserve the path component when normalizing `--site` and `auth_pairs` site URLs
+  - Route leading-slash API paths like `/about.json` and `/search.json` under the configured subfolder
+  - Keep root-site behavior unchanged for sites hosted at the domain root
+
 ## [0.2.7](https://github.com/discourse/discourse-mcp/compare/v0.2.6...v0.2.7) (2026-03-31)
 
 ### Features

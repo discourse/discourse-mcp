@@ -27,6 +27,18 @@ export class HttpClient {
 
   constructor(private opts: HttpClientOptions) {
     this.base = new URL(opts.baseUrl);
+    if (!this.base.pathname.endsWith("/")) {
+      this.base.pathname += "/";
+    }
+  }
+
+  private urlFor(path: string): string {
+    if (/^https?:\/\//i.test(path)) {
+      return new URL(path).toString();
+    }
+
+    const relativePath = path.replace(/^\/+/, "");
+    return new URL(relativePath, this.base).toString();
   }
 
   private headers(): Record<string, string> {
@@ -54,7 +66,7 @@ export class HttpClient {
   }
 
   async getCached(path: string, ttlMs: number, { signal }: { signal?: AbortSignal } = {}) {
-    const url = new URL(path, this.base).toString();
+    const url = this.urlFor(path);
     const entry = this.cache.get(url);
     const now = Date.now();
     if (entry && entry.expiresAt > now) return entry.value;
@@ -103,7 +115,7 @@ export class HttpClient {
   }
 
   private async executeRequest(method: string, path: string, body: BodyInit | undefined, headers: Record<string, string>, signal?: AbortSignal, allowRetries = true) {
-    const url = new URL(path, this.base).toString();
+    const url = this.urlFor(path);
     this.opts.logger.debug(`HTTP ${method} ${url}`);
 
     const controller = new AbortController();

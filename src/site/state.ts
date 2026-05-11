@@ -13,9 +13,11 @@ export type AuthOverride = {
 
 function normalizeBase(url: string): string {
   const u = new URL(url);
-  u.pathname = "/";
   u.search = "";
   u.hash = "";
+  if (u.pathname !== "/") {
+    u.pathname = u.pathname.replace(/\/+$/, "");
+  }
   return u.toString().replace(/\/$/, "");
 }
 
