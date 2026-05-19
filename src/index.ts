@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
+import { pathToFileURL } from "node:url";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -42,6 +43,8 @@ const ProfileSchema = z
             api_username: z.string().optional(),
             user_api_key: z.string().optional(),
             user_api_client_id: z.string().optional(),
+            cookie: z.string().optional(),
+            cookie_file: z.string().optional(),
             http_basic_user: z.string().optional(),
             http_basic_pass: z.string().optional(),
           })
@@ -159,9 +162,9 @@ function buildAuth(_config: Profile): AuthMode {
   return { type: "none" };
 }
 
-async function main() {
+export async function main(rawArgs = process.argv.slice(2)) {
   // Check if user wants to generate a User API Key
-  const args = process.argv.slice(2);
+  const args = rawArgs;
   if (args[0] === "generate-user-api-key") {
     // Use rawStrings to preserve nonce/payload values (e.g., leading zeros in numeric strings)
     const subArgs = parseArgs(args.slice(1), { rawStrings: true });
@@ -188,7 +191,7 @@ async function main() {
     return;
   }
 
-  const argv = parseArgs(process.argv.slice(2));
+  const argv = parseArgs(rawArgs);
   const profilePath = (argv.profile as string | undefined) ?? undefined;
   const profile = await loadProfile(profilePath).catch((e) => {
     throw new Error(`Failed to load profile: ${e?.message || String(e)}`);
@@ -343,8 +346,10 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  const msg = err?.message || String(err);
-  process.stderr.write(`[${new Date().toISOString()}] ERROR ${msg}\n`);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    const msg = err?.message || String(err);
+    process.stderr.write(`[${new Date().toISOString()}] ERROR ${msg}\n`);
+    process.exit(1);
+  });
+}

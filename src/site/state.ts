@@ -7,6 +7,8 @@ export type AuthOverride = {
   api_username?: string;
   user_api_key?: string;
   user_api_client_id?: string;
+  cookie?: string;
+  cookie_file?: string;
   http_basic_user?: string;
   http_basic_pass?: string;
 };
@@ -48,9 +50,9 @@ export class SiteState {
 
   /**
    * Get the auth type for the current site (or a specific site URL).
-   * Returns "api_key", "user_api_key", or "none".
+   * Returns "api_key", "user_api_key", "cookie", or "none".
    */
-  getAuthType(siteUrl?: string): "api_key" | "user_api_key" | "none" {
+  getAuthType(siteUrl?: string): "api_key" | "user_api_key" | "cookie" | "none" {
     const base = siteUrl ? normalizeBase(siteUrl) : this.currentSiteBase;
     if (!base) return "none";
     const match = this.findAuthOverride(base);
@@ -96,6 +98,7 @@ export class SiteState {
       // Prefer user_api_key if provided
       if (match.user_api_key) return { type: "user_api_key", key: match.user_api_key, client_id: match.user_api_client_id };
       if (match.api_key) return { type: "api_key", key: match.api_key, username: match.api_username };
+      if (match.cookie || match.cookie_file) return { type: "cookie", cookie: match.cookie, cookieFile: match.cookie_file };
     }
     return this.opts.defaultAuth;
   }

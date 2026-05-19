@@ -1,4 +1,7 @@
 dist/*
+dist-win/*
 node_modules/*
+packaging/**/bin/*
+packaging/**/obj/*
 .claude/*
 .mcp.json

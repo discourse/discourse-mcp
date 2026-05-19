@@ -17,7 +17,9 @@
   "private": false,
   "type": "module",
   "bin": {
-    "discourse-mcp": "dist/index.js"
+    "discourse-mcp": "dist/index.js",
+    "shuiyuan-mcp-login": "dist/shuiyuan-login.js",
+    "shuiyuan-mcp": "dist/shuiyuan-mcp.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -28,6 +30,8 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
     "clean": "rm -rf dist",
+    "shuiyuan:login": "node dist/shuiyuan-login.js",
+    "shuiyuan:start": "node dist/shuiyuan-mcp.js",
     "sync:fixtures": "node scripts/sync-fixtures.mjs",
     "test": "node --test dist/test/**/*.js"
   },
@@ -44,6 +48,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "playwright": "^1.60.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

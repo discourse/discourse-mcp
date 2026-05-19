@@ -62,6 +62,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - **None** by default.
   - **Admin API Keys** (require admin permissions): **`--auth_pairs '[{"site":"https://example.com","api_key":"...","api_username":"system"}]'`**
   - **User API Keys** (any user can generate): **`--auth_pairs '[{"site":"https://example.com","user_api_key":"...","user_api_client_id":"..."}]'`**
+  - **Cookie auth** (for SSO-only sites): **`--auth_pairs '[{"site":"https://example.com","cookie_file":"C:\\path\\cookies.json"}]'`**
   - **HTTP Basic Auth** (for sites behind a reverse proxy): Add `http_basic_user` and `http_basic_pass` to any `auth_pairs` entry. This is useful for Discourse sites protected by HTTP Basic Authentication at the reverse proxy level.
   - You can include multiple entries in `auth_pairs`; the matching entry is used for the selected site. If both `user_api_key` and `api_key` are provided for the same site, `user_api_key` takes precedence.
 
@@ -108,6 +109,10 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
       "site": "https://example.com",
       "user_api_key": "<user_api_key>",
       "user_api_client_id": "<client_id>"
+    },
+    {
+      "site": "https://shuiyuan.sjtu.edu.cn",
+      "cookie_file": "C:\\Users\\you\\AppData\\Roaming\\shuiyuan-mcp\\cookies.json"
     },
     {
       "site": "https://protected.example.com",
@@ -306,6 +311,31 @@ pnpm build && pnpm dev
 See `AGENTS.md` for additional guidance on using this server from agent frameworks.
 
 ## Examples
+
+### Shuiyuan (SJTU) Cookie Login
+
+For Shuiyuan's jAccount SSO flow, use the Shuiyuan helpers. They open a browser window, wait for you to finish login, save the Discourse cookies under your user profile, and then let the MCP server reuse those cookies.
+
+```powershell
+# First-time login only
+.\scripts\shuiyuan-login.ps1
+
+# First-time login, then start the MCP stdio server
+.\scripts\shuiyuan-login-and-start.ps1
+
+# Later runs with the saved cookies
+.\scripts\shuiyuan-mcp.ps1
+```
+
+The saved profile defaults to `%APPDATA%\shuiyuan-mcp\profile.json` and points to `%APPDATA%\shuiyuan-mcp\cookies.json`.
+
+To build Windows `.exe` launchers for the same flow:
+
+```powershell
+.\scripts\build-shuiyuan-exe.ps1
+.\dist-win\shuiyuan-mcp-login.exe
+.\dist-win\shuiyuan-mcp.exe
+```
 
 ### Quick Start with User API Key (No Admin Required)
 

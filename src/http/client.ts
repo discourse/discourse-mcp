@@ -1,9 +1,11 @@
+import { readFileSync } from "node:fs";
 import { Logger } from "../util/logger.js";
 
 export type AuthMode =
   | { type: "none" }
   | { type: "api_key"; key: string; username?: string }
-  | { type: "user_api_key"; key: string; client_id?: string };
+  | { type: "user_api_key"; key: string; client_id?: string }
+  | { type: "cookie"; cookie?: string; cookieFile?: string };
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -24,6 +26,7 @@ export class HttpClient {
   private base: URL;
   private userAgent = "Discourse-MCP/0.x (+https://github.com/discourse/discourse-mcp)";
   private cache = new Map<string, { value: any; expiresAt: number }>();
+  private csrfToken?: string;
 
   constructor(private opts: HttpClientOptions) {
     this.base = new URL(opts.baseUrl);
@@ -52,6 +55,9 @@ export class HttpClient {
     } else if (this.opts.auth.type === "user_api_key") {
       h["User-Api-Key"] = this.opts.auth.key;
       if (this.opts.auth.client_id) h["User-Api-Client-Id"] = this.opts.auth.client_id;
+    } else if (this.opts.auth.type === "cookie") {
+      const cookie = this.resolveCookieHeader();
+      if (cookie) h["Cookie"] = cookie;
     }
     if (this.opts.httpBasicAuth) {
       const { user, pass } = this.opts.httpBasicAuth;
@@ -99,6 +105,7 @@ export class HttpClient {
     if (extraHeaders) {
       Object.assign(headers, extraHeaders);
     }
+    await this.addCsrfHeaderIfNeeded(method, headers, signal);
     return this.executeRequest(method, path, body !== undefined ? JSON.stringify(body) : undefined, headers, signal);
   }
 
@@ -107,6 +114,7 @@ export class HttpClient {
     if (extraHeaders) {
       Object.assign(headers, extraHeaders);
     }
+    await this.addCsrfHeaderIfNeeded(method, headers, signal);
     // Do NOT set Content-Type - let fetch set it with the multipart boundary
     // Delete after merging extraHeaders to prevent overrides breaking the boundary
     delete headers["Content-Type"];
@@ -185,6 +193,53 @@ export class HttpClient {
       clearTimeout(timeout);
     }
   }
+
+  private resolveCookieHeader(): string | undefined {
+    const auth = this.opts.auth;
+    if (auth.type !== "cookie") return undefined;
+    if (auth.cookie) return stripCookiePrefix(auth.cookie);
+    if (!auth.cookieFile) return undefined;
+    return cookieHeaderFromFile(auth.cookieFile, this.base.hostname);
+  }
+
+  private async addCsrfHeaderIfNeeded(method: string, headers: Record<string, string>, signal?: AbortSignal) {
+    if (this.opts.auth.type !== "cookie") return;
+    if (["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase())) return;
+    if (headers["X-CSRF-Token"] || headers["x-csrf-token"]) return;
+    const cookie = headers["Cookie"];
+    if (!cookie) return;
+    headers["X-CSRF-Token"] = await this.fetchCsrfToken(cookie, signal);
+  }
+
+  private async fetchCsrfToken(cookie: string, signal?: AbortSignal): Promise<string> {
+    if (this.csrfToken) return this.csrfToken;
+
+    const url = this.urlFor("/session/csrf.json");
+    this.opts.logger.debug(`HTTP GET ${url}`);
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        "User-Agent": this.userAgent,
+        "Accept": "application/json",
+        "Cookie": cookie,
+      },
+      signal,
+    });
+
+    this.opts.logger.debug(`HTTP GET ${url} -> ${res.status} ${res.statusText}`);
+    if (!res.ok) {
+      const text = await safeText(res);
+      throw new HttpError(res.status, `Failed to fetch CSRF token: HTTP ${res.status} ${res.statusText}`, safeJson(text));
+    }
+
+    const data = await res.json() as any;
+    const token = data?.csrf || data?.csrf_token;
+    if (!token || typeof token !== "string") {
+      throw new Error("Failed to fetch CSRF token: response did not include csrf");
+    }
+    this.csrfToken = token;
+    return token;
+  }
 }
 
 async function withRetries<T>(fn: () => Promise<T>, logger: Logger, url: string, method: string, retries = 3): Promise<T> {
@@ -209,6 +264,49 @@ async function withRetries<T>(fn: () => Promise<T>, logger: Logger, url: string,
       throw e;
     }
   }
+}
+
+function stripCookiePrefix(cookie: string): string {
+  return cookie.replace(/^Cookie:\s*/i, "").trim();
+}
+
+function cookieHeaderFromFile(cookieFile: string, hostname: string): string | undefined {
+  const raw = readFileSync(cookieFile, "utf8").trim();
+  if (!raw) return undefined;
+
+  if (!raw.startsWith("{") && !raw.startsWith("[")) {
+    return stripCookiePrefix(raw);
+  }
+
+  const parsed = JSON.parse(raw) as unknown;
+  const cookies = Array.isArray(parsed)
+    ? parsed
+    : Array.isArray((parsed as any)?.cookies)
+      ? (parsed as any).cookies
+      : undefined;
+
+  if (!cookies) {
+    const cookie = (parsed as any)?.cookie;
+    return typeof cookie === "string" ? stripCookiePrefix(cookie) : undefined;
+  }
+
+  const nowSeconds = Date.now() / 1000;
+  const pairs = cookies
+    .filter((cookie: any) => {
+      if (!cookie?.name || cookie.value === undefined) return false;
+      if (typeof cookie.expires === "number" && cookie.expires > 0 && cookie.expires <= nowSeconds) return false;
+      return cookieMatchesHost(cookie.domain, hostname);
+    })
+    .map((cookie: any) => `${cookie.name}=${cookie.value}`);
+
+  return pairs.length > 0 ? pairs.join("; ") : undefined;
+}
+
+function cookieMatchesHost(domain: unknown, hostname: string): boolean {
+  if (!domain || typeof domain !== "string") return true;
+  const normalizedDomain = domain.replace(/^\./, "").toLowerCase();
+  const normalizedHost = hostname.toLowerCase();
+  return normalizedHost === normalizedDomain || normalizedHost.endsWith(`.${normalizedDomain}`);
 }
 
 function mergeSignals(signals: Array<AbortSignal | undefined>): AbortSignal {

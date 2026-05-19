@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { Logger } from '../util/logger.js';
 import { HttpClient } from '../http/client.js';
 import { SiteState } from '../site/state.js';
@@ -96,6 +99,77 @@ test('HttpClient getCached cache key preserves subfolder base path', async () =>
     assert.deepEqual(calls, ['https://example.com/forum/site.json']);
   } finally {
     restoreFetch();
+  }
+});
+
+test('HttpClient cookie_file auth sends matching cookies', async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), 'discourse-mcp-cookie-'));
+  const cookieFile = path.join(dir, 'cookies.json');
+  await writeFile(cookieFile, JSON.stringify({
+    cookies: [
+      { name: '_t', value: 'secret-token', domain: '.example.com', path: '/', expires: -1 },
+      { name: 'ignored', value: 'nope', domain: '.elsewhere.com', path: '/', expires: -1 },
+    ],
+  }), 'utf8');
+
+  const originalFetch = globalThis.fetch;
+  let cookieHeader = '';
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    cookieHeader = String((init?.headers as Record<string, string>)?.Cookie || '');
+    return new Response(JSON.stringify({ about: { title: 'Example Discourse' } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }) as typeof fetch;
+
+  try {
+    const logger = new Logger('silent');
+    const client = new HttpClient({
+      baseUrl: 'https://example.com',
+      timeoutMs: 5000,
+      logger,
+      auth: { type: 'cookie', cookieFile },
+    });
+
+    await client.get('/about.json');
+    assert.equal(cookieHeader, '_t=secret-token');
+  } finally {
+    globalThis.fetch = originalFetch;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('HttpClient cookie auth fetches CSRF token for writes', async () => {
+  const logger = new Logger('silent');
+  const client = new HttpClient({
+    baseUrl: 'https://example.com',
+    timeoutMs: 5000,
+    logger,
+    auth: { type: 'cookie', cookie: '_t=secret-token' },
+  });
+
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ url: string; headers: Record<string, string> }> = [];
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    const headers = (init?.headers || {}) as Record<string, string>;
+    calls.push({ url, headers });
+
+    if (url.endsWith('/session/csrf.json')) {
+      return new Response(JSON.stringify({ csrf: 'csrf-token' }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    if (url.endsWith('/posts.json')) {
+      return new Response(JSON.stringify({ id: 1, topic_id: 2, post_number: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return new Response('not found', { status: 404 });
+  }) as typeof fetch;
+
+  try {
+    await client.post('/posts.json', { raw: 'hello' });
+    assert.equal(calls[0]?.url, 'https://example.com/session/csrf.json');
+    assert.equal(calls[0]?.headers.Cookie, '_t=secret-token');
+    assert.equal(calls[1]?.url, 'https://example.com/posts.json');
+    assert.equal(calls[1]?.headers.Cookie, '_t=secret-token');
+    assert.equal(calls[1]?.headers['X-CSRF-Token'], 'csrf-token');
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 
