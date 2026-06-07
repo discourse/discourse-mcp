@@ -7,6 +7,24 @@ import path from 'node:path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+async function runCli(args: string[]): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const cliProcess = spawn('node', [indexPath, ...args], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+
+  let stdout = '';
+  let stderr = '';
+  cliProcess.stdout.on('data', (data) => { stdout += data; });
+  cliProcess.stderr.on('data', (data) => { stderr += data; });
+
+  return await new Promise((resolve) => {
+    cliProcess.on('exit', (code) => {
+      resolve({ code, stdout, stderr });
+    });
+  });
+}
+
 // Helper to get a free port
 async function getFreePort(): Promise<number> {
   return 3000 + Math.floor(Math.random() * 1000);
@@ -46,6 +64,23 @@ test('HTTP transport starts on specified port', async () => {
     serverProcess.kill('SIGTERM');
     await new Promise(resolve => setTimeout(resolve, 100));
   }
+});
+
+test('version flag prints version and exits', async () => {
+  const result = await runCli(['--version']);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /^discourse-mcp \d+\.\d+\.\d+\n$/);
+  assert.equal(result.stderr, '');
+});
+
+test('help flag prints usage and exits', async () => {
+  const result = await runCli(['--help']);
+
+  assert.equal(result.code, 0);
+  assert.match(result.stdout, /Usage: discourse-mcp \[options\]/);
+  assert.match(result.stdout, /--version, -v/);
+  assert.equal(result.stderr, '');
 });
 
 test('HTTP transport health endpoint returns ok', async () => {
