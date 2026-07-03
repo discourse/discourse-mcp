@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -29,6 +29,48 @@ import { registerAllPrompts } from "./prompts/registry.js";
 import { SiteState, type AuthOverride } from "./site/state.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
+const LOOPBACK_HOST = "127.0.0.1";
+
+function allowedHttpHosts(port: number): string[] {
+  return [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`];
+}
+
+function allowedHttpOrigins(port: number): string[] {
+  return [`http://localhost:${port}`, `http://127.0.0.1:${port}`, `http://[::1]:${port}`];
+}
+
+function httpHostError(req: IncomingMessage, port: number): string | undefined {
+  const host = req.headers.host;
+  if (!host || !allowedHttpHosts(port).includes(host)) {
+    return `Invalid Host header: ${host}`;
+  }
+}
+
+function httpOriginError(req: IncomingMessage, port: number): string | undefined {
+  const origin = req.headers.origin;
+  if (!origin) {
+    return;
+  }
+
+  const originHeader = Array.isArray(origin) ? origin[0] : origin;
+  if (!allowedHttpOrigins(port).includes(originHeader)) {
+    return `Invalid Origin header: ${originHeader}`;
+  }
+}
+
+function rejectMcpRequest(res: ServerResponse, message: string): void {
+  res.writeHead(403, { "Content-Type": "application/json" });
+  res.end(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      error: {
+        code: -32000,
+        message,
+      },
+      id: null,
+    })
+  );
+}
 
 // CLI config schema - see also src/util/cli.ts for parseArgs
 const ProfileSchema = z
@@ -274,6 +316,8 @@ async function main() {
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined, // Stateless mode
       enableJsonResponse: true,
+      enableDnsRebindingProtection: true,
+      allowedHosts: allowedHttpHosts(config.port),
     });
 
     await server.connect(transport);
@@ -288,6 +332,12 @@ async function main() {
 
       // MCP endpoint - handle via StreamableHTTPServerTransport
       if (req.url === "/mcp" || req.url === "/") {
+        const headerError = httpHostError(req, config.port) ?? httpOriginError(req, config.port);
+        if (headerError) {
+          rejectMcpRequest(res, headerError);
+          return;
+        }
+
         let body = "";
         req.on("data", (chunk) => {
           body += chunk;
@@ -312,8 +362,8 @@ async function main() {
       res.end(JSON.stringify({ error: "Not found" }));
     });
 
-    httpServer.listen(config.port, () => {
-      logger.info(`HTTP transport listening on port ${config.port}`);
+    httpServer.listen(config.port, LOOPBACK_HOST, () => {
+      logger.info(`HTTP transport listening on ${LOOPBACK_HOST}:${config.port}`);
       logger.info(`Health check available at http://localhost:${config.port}/health`);
       logger.info(`MCP endpoint available at http://localhost:${config.port}/mcp`);
     });
