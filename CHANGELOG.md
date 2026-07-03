@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.9](https://github.com/discourse/discourse-mcp/compare/v0.2.8...v0.2.9) (2026-07-03)
+
+### Security
+
+* Restrict HTTP transport to local callers
+  - Bind HTTP transport to loopback and reject non-local Host/Origin headers
+
 ## [0.2.8](https://github.com/discourse/discourse-mcp/compare/v0.2.7...v0.2.8) (2026-05-11)
 
 ### Bug Fixes
