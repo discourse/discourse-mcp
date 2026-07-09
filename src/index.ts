@@ -72,6 +72,34 @@ function rejectMcpRequest(res: ServerResponse, message: string): void {
   );
 }
 
+function shouldShowHelp(args: string[]): boolean {
+  return args.includes("--help") || args.includes("-h") || args[0] === "help";
+}
+
+function shouldShowVersion(args: string[]): boolean {
+  return args.includes("--version") || args.includes("-v") || args[0] === "version";
+}
+
+function printHelp(): void {
+  process.stdout.write(`Usage: discourse-mcp [options]
+
+Options:
+  --profile <path>              Load a JSON profile
+  --site <url>                  Tether MCP to a single Discourse site
+  --auth_pairs <json>           Per-site auth configuration
+  --read_only <boolean>         Run in read-only mode (default: true)
+  --allow_writes <boolean>      Enable write tools when read_only is false
+  --transport <stdio|http>      Transport type (default: stdio)
+  --port <number>               HTTP transport port (default: 3000)
+  --log_level <level>           silent, error, info, or debug
+  --version, -v                 Print the CLI version
+  --help, -h                    Print this help
+
+Commands:
+  generate-user-api-key         Generate a Discourse User API key
+`);
+}
+
 // CLI config schema - see also src/util/cli.ts for parseArgs
 const ProfileSchema = z
   .object({
@@ -227,6 +255,17 @@ async function main() {
     };
 
     await generateUserApiKey(options);
+    return;
+  }
+
+  if (shouldShowHelp(args)) {
+    printHelp();
+    return;
+  }
+
+  if (shouldShowVersion(args)) {
+    const version = await getPackageVersion();
+    process.stdout.write(`discourse-mcp ${version}\n`);
     return;
   }
 
