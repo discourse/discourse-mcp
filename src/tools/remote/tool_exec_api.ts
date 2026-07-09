@@ -55,7 +55,7 @@ export async function tryRegisterRemoteTools(
           description: t.description || "",
           inputSchema: (schema as z.ZodObject<any>).shape ?? {},
         },
-        async (args: any, _extra: any) => {
+        (async (args: any, _extra: any) => {
           try {
             const { client } = siteState.ensureSelectedSite();
             const res = (await client.post(`/ai/tools/${encodeURIComponent(t.name)}/call`, {
@@ -74,7 +74,7 @@ export async function tryRegisterRemoteTools(
           } catch (e: any) {
             return { content: [{ type: "text", text: `Remote tool ${t.name} failed: ${e?.message || String(e)}` }], isError: true };
           }
-        }
+        }) as any
       );
     }
     logger.info(`Registered ${list.length} remote tool(s) from Tool Execution API.`);
