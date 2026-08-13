@@ -20,6 +20,7 @@ pnpm clean       # Remove dist/
 | Entry/CLI | `src/index.ts` |
 | HTTP client | `src/http/client.ts` |
 | Tool registry | `src/tools/registry.ts` |
+| Tool definitions/catalog | `src/tools/definition.ts`, `src/tools/builtin/catalog.ts` |
 | Resource registry | `src/resources/registry.ts` |
 | Built-in tools | `src/tools/builtin/*` |
 | Remote tools | `src/tools/remote/tool_exec_api.ts` |
@@ -28,10 +29,11 @@ pnpm clean       # Remove dist/
 ## Key Patterns
 
 **Tool Implementation**
-- Tools live in `src/tools/builtin/` as individual files
-- Each tool exports a registration function called by `src/tools/registry.ts`
+- Tools live in `src/tools/builtin/` as typed `defineTool({...})` definitions
+- `src/tools/builtin/catalog.ts` is the ordered built-in collection; `src/tools/registry.ts` registers it through the shared registrar
+- Every definition declares `availability`: `always`, `writes_enabled`, or `site_selection`
 - All tools return strict JSON (no Markdown) with `isError: true` on failure
-- Write tools require `--allow_writes` flag and matching `auth_pairs` entry
+- Write tools use `writes_enabled` and retain a call-time access check; they require `--allow_writes` and matching `auth_pairs`
 
 **Resources**
 - URI-addressable read-only data (categories, tags, groups, channels, drafts)
@@ -53,37 +55,68 @@ pnpm clean       # Remove dist/
 
 ## Adding a New Tool
 
-1. Create `src/tools/builtin/<name>.ts`
-2. Export a `RegisterFn` function
-3. Import and call it in `src/tools/registry.ts`
+1. Create `src/tools/builtin/<name>.ts` and export a definition using `defineTool()`.
+2. Choose an explicit availability: `always`, `writes_enabled`, or `site_selection`.
+3. Retain the appropriate call-time access check (`requireWriteAccess()` or `requireAdminAccess()`).
+4. Add the definition to `builtinTools` in `src/tools/builtin/catalog.ts`, or to an ordered domain sub-collection included there.
+5. Add handler behavior tests in `src/test/`.
+6. Run `pnpm typecheck`, `pnpm build`, `pnpm test`, and `pnpm lint`.
 
-**Minimal template:**
+A normal built-in does not call `server.registerTool()` and does not require an edit to `src/tools/registry.ts`.
+
+**Read tool example:**
 ```typescript
 import { z } from "zod";
-import type { RegisterFn } from "../types.js";
+import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError } from "../../util/json_response.js";
 
-export const registerMyTool: RegisterFn = (server, ctx, opts) => {
-  if (!opts.allowWrites) return; // omit for read-only tools
+const schema = z.object({ id: z.number().int().positive() });
 
-  server.registerTool(
-    "discourse_my_tool",
-    {
-      title: "My Tool",
-      description: "Does X. Returns JSON with Y.",
-      inputSchema: z.object({ id: z.number() }).shape,
-    },
-    async (args) => {
-      const { client } = ctx.siteState.ensureSelectedSite();
-      try {
-        const data = await client.get(`/endpoint.json`);
-        return jsonResponse(data);
-      } catch (e: any) {
-        return jsonError(`Failed: ${e?.message}`);
-      }
+export const getThingTool = defineTool({
+  name: "discourse_get_thing",
+  title: "Get Thing",
+  description: "Get a thing. Returns JSON with its details.",
+  schema,
+  availability: "always",
+  handler: async ({ id }, _extra, ctx, _opts) => {
+    const { client } = ctx.siteState.ensureSelectedSite();
+    try {
+      return jsonResponse(await client.get(`/things/${id}.json`));
+    } catch (e: any) {
+      return jsonError(`Failed to get thing: ${e?.message || String(e)}`);
     }
-  );
-};
+  },
+});
+```
+
+**Write tool example:**
+```typescript
+import { z } from "zod";
+import { defineTool } from "../definition.js";
+import { requireWriteAccess } from "../../util/access.js";
+import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+
+const schema = z.object({ name: z.string().min(1) });
+
+export const createThingTool = defineTool({
+  name: "discourse_create_thing",
+  title: "Create Thing",
+  description: "Create a thing. Returns JSON with its id and name.",
+  schema,
+  availability: "writes_enabled",
+  handler: async (input, _extra, ctx, opts) => {
+    try {
+      const { name } = schema.parse(input);
+      const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+      if (accessError) return accessError;
+      await rateLimit("thing");
+      const { client } = ctx.siteState.ensureSelectedSite();
+      return jsonResponse(await client.post("/things.json", { name }));
+    } catch (e: any) {
+      return jsonError(`Failed to create thing: ${e?.message || String(e)}`);
+    }
+  },
+});
 ```
 
 **Key helpers:**

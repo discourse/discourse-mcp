@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { RegisterFn } from "../../types.js";
+import { defineTool } from "../../definition.js";
 import {
   jsonResponse,
   jsonError,
@@ -9,39 +9,35 @@ import {
 } from "../../../util/json_response.js";
 import { requireAdminAccess } from "../../../util/access.js";
 
-export const registerGetQuery: RegisterFn = (server, ctx, _opts) => {
-  const schema = z.object({
-    id: z.number().int().positive().describe("Query ID"),
-  });
+const schema = z.object({
+  id: z.number().int().positive().describe("Query ID"),
+});
 
-  server.registerTool(
-    "discourse_get_query",
-    {
-      title: "Get Data Explorer Query",
-      description:
-        "Get full details of a Data Explorer query including SQL and parameters. Requires admin API key.",
-      inputSchema: schema.shape,
-    },
-    async (input: unknown, _extra: unknown) => {
-      try {
-        const { id } = schema.parse(input);
+export const getQueryTool = defineTool({
+  name: "discourse_get_query",
+  title: "Get Data Explorer Query",
+  description: "Get full details of a Data Explorer query including SQL and parameters. Requires admin API key.",
+  schema,
+  availability: "always",
+  handler: async (input: unknown, _extra: unknown, ctx, _opts) => {
+    try {
+      const { id } = schema.parse(input);
 
-        const accessError = requireAdminAccess(ctx.siteState);
-        if (accessError) return accessError;
+      const accessError = requireAdminAccess(ctx.siteState);
+      if (accessError) return accessError;
 
-        const { client } = ctx.siteState.ensureSelectedSite();
+      const { client } = ctx.siteState.ensureSelectedSite();
 
-        const data = (await client.get(
-          `/admin/plugins/explorer/queries/${id}.json`
-        )) as any;
+      const data = (await client.get(
+        `/admin/plugins/explorer/queries/${id}.json`
+      )) as any;
 
-        const query = data?.query || data;
-        return jsonResponse(transformQueryDetail(query));
-      } catch (e: unknown) {
-        if (isZodError(e)) return zodError(e);
-        const err = e as any;
-        return jsonError(`Failed to get query: ${err?.message || String(e)}`);
-      }
+      const query = data?.query || data;
+      return jsonResponse(transformQueryDetail(query));
+    } catch (e: unknown) {
+      if (isZodError(e)) return zodError(e);
+      const err = e as any;
+      return jsonError(`Failed to get query: ${err?.message || String(e)}`);
     }
-  );
-};
+  },
+});
