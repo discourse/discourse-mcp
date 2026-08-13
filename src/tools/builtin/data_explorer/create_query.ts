@@ -33,6 +33,7 @@ export const createQueryTool = defineTool({
   description: "Create a new saved Data Explorer query. Requires admin API key and write access.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["data_explorer"],
   handler: async (input: unknown, _extra: unknown, ctx, _opts) => {
     try {
       const { name, sql, description, group_ids } = schema.parse(input);

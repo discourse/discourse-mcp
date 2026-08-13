@@ -14,6 +14,7 @@ export const readTopicTool = defineTool({
   description: "Read topic metadata and posts. Returns JSON with id, title, slug, category_id, tags, and posts array.",
   schema,
   availability: "always",
+  toolsets: ["topics"],
   handler: async ({ topic_id, post_limit = 5, start_post_number }, _extra, ctx, _opts) => {
     try {
       const { client } = ctx.siteState.ensureSelectedSite();

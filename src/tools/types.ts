@@ -1,6 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Logger } from "../util/logger.js";
 import type { SiteState } from "../site/state.js";
+import type { BuiltinToolsetMembership } from "./toolsets.js";
 
 /** Narrowed interface for tool registration - only requires registerTool method */
 export type ToolRegistrar = Pick<McpServer, "registerTool">;
@@ -11,6 +12,8 @@ export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 export interface ToolRegistrationOptions {
   allowWrites: boolean;
   toolsMode: ToolsMode;
+  // Built-in domains to expose. Undefined preserves the complete catalog.
+  toolsets?: BuiltinToolsetMembership;
   // When true, do not register the discourse_select_site tool
   hideSelectSite?: boolean;
   // Optional default search prefix to add to all searches

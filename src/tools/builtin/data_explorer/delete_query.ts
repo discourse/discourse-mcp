@@ -19,6 +19,7 @@ export const deleteQueryTool = defineTool({
   description: "Soft-delete a Data Explorer query. The query can be restored by an admin. Requires admin API key and write access.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["data_explorer"],
   handler: async (input: unknown, _extra: unknown, ctx, _opts) => {
     try {
       const { id } = schema.parse(input);

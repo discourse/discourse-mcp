@@ -13,6 +13,7 @@ export const selectSiteTool = defineTool({
   description: "Validate and select a Discourse site. Returns JSON with site URL and title.",
   schema,
   availability: "site_selection",
+  toolsets: ["site"],
   handler: async ({ site }, _extra, ctx, opts) => {
     try {
       const { base, client } = ctx.siteState.buildClientForSite(site);

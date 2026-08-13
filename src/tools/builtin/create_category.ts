@@ -19,6 +19,7 @@ export const createCategoryTool = defineTool({
   description: "Create a new category. Returns JSON with id, slug, and name.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["topics"],
   handler: async (input, _extra, ctx, opts) => {
     try {
       const { name, color, text_color, emoji, icon, parent_category_id, description } = schema.parse(input);

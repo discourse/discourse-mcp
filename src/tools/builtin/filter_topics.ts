@@ -39,6 +39,7 @@ export const filterTopicsTool = defineTool({
   description,
   schema,
   availability: "always",
+  toolsets: ["search", "topics"],
   handler: async ({ filter, page = 0, per_page = 20 }, _extra, ctx, _opts) => {
     try {
       const { client } = ctx.siteState.ensureSelectedSite();

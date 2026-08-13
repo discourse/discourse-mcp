@@ -31,6 +31,7 @@ export const updateQueryTool = defineTool({
   description: "Update an existing Data Explorer query. Only provided fields are updated. Requires admin API key and write access.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["data_explorer"],
   handler: async (input: unknown, _extra: unknown, ctx, _opts) => {
     try {
       const { id, name, sql, description, group_ids } = schema.parse(input);

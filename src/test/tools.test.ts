@@ -319,6 +319,62 @@ test('tethered mode hides select_site from tool list', async () => {
   );
 });
 
+test('data_explorer toolset registers only its domain plus untethered site selection', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, calls } = createMockServer();
+
+  await registerAllTools(server, siteState, logger, {
+    allowWrites: false,
+    toolsMode: 'discourse_api_only',
+    toolsets: ['data_explorer']
+  });
+
+  assert.deepEqual(calls.map((call) => call.name), [
+    'discourse_select_site',
+    'discourse_get_query',
+    'discourse_run_query'
+  ]);
+});
+
+test('data_explorer toolset composes with write and tethered registration gates', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, calls } = createMockServer();
+
+  await registerAllTools(server, siteState, logger, {
+    allowWrites: true,
+    toolsMode: 'discourse_api_only',
+    toolsets: ['data_explorer'],
+    hideSelectSite: true
+  });
+
+  assert.deepEqual(calls.map((call) => call.name), [
+    'discourse_get_query',
+    'discourse_run_query',
+    'discourse_create_query',
+    'discourse_update_query',
+    'discourse_delete_query'
+  ]);
+});
+
+test('toolset selection reports empty domains and independent remote discovery', async () => {
+  const logger = new Logger('silent');
+  const messages: string[] = [];
+  logger.info = (message: string) => { messages.push(message); };
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server } = createMockServer();
+
+  await registerAllTools(server, siteState, logger, {
+    allowWrites: false,
+    toolsMode: 'auto',
+    toolsets: ['uploads']
+  });
+
+  assert.ok(messages.some((message) => message.includes("Toolset 'uploads' registered no tools")));
+  assert.ok(messages.some((message) => message.includes('toolsets do not filter remote tools')));
+});
+
 
 // ========================
 // Resource registration tests - verify resources are exposed based on auth context

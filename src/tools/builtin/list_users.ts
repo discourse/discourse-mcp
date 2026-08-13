@@ -25,6 +25,7 @@ export const listUsersTool = defineTool({
   description: "List users via admin API. Requires admin API key. Returns ~100 users per page (Discourse's fixed page size). Returns JSON with users array and pagination meta.",
   schema,
   availability: "always",
+  toolsets: ["users"],
   handler: async (args, _extra, ctx, opts) => {
     try {
       const accessError = requireAdminAccess(ctx.siteState);

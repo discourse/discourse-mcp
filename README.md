@@ -5,7 +5,7 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 - **Entry point**: `src/index.ts` → compiled to `dist/index.js` (binary name: `discourse-mcp`)
 - **SDK**: `@modelcontextprotocol/sdk`
 - **Node**: >= 24
-- **Version**: 0.2.4 (0.2.x has breaking changes from 0.1.x - JSON-only output, resources replace list tools)
+- **Version**: 0.2.9 (0.2.x has breaking changes from 0.1.x - JSON-only output, resources replace list tools)
 
 ### Quick start (release)
 
@@ -25,6 +25,14 @@ Then, in your MCP client, either:
 ```bash
 npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 ```
+
+- **Run with only Data Explorer built-in tools**
+
+```bash
+npx -y @discourse/mcp@latest --toolsets data_explorer --tools_mode discourse_api_only
+```
+
+This exposes `discourse_select_site` plus the read-only Data Explorer tools. Add `--site`, authentication, and the write flags as needed; see [Built-in toolsets](#built-in-toolsets).
 
 - **Use in an MCP client (example: Claude Desktop) — via npx**
 
@@ -68,7 +76,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
 - **Write safety**
 
   - Writes are disabled by default.
-  - Write tools (`discourse_create_post`, `discourse_create_topic`, `discourse_create_category`, `discourse_update_topic`, `discourse_create_user`, `discourse_update_user`, `discourse_upload_file`, `discourse_save_draft`, `discourse_delete_draft`) are only registered when `--allow_writes` AND not `--read_only`.
+  - Built-in write tools are only registered when `--allow_writes` is enabled **and** `--read_only=false`. This includes post, topic, category, user, upload, draft, and saved Data Explorer query mutations.
+  - Toolset selection does not bypass write safety. A selected write tool remains absent unless writes are enabled.
   - Write tools require a matching `auth_pairs` entry for the selected site; otherwise they return an error.
   - A ~1 req/sec rate limit is enforced for write actions.
 
@@ -85,6 +94,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
     - `silent`: No logging output
   - `--show_emails` (default: false). includes emails in user tools. Requires admin access
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
+  - `--toolsets <name[,name...]>`: Expose only the selected built-in tool domains. Omit this flag to preserve the complete built-in catalog. See [Built-in toolsets](#built-in-toolsets).
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest`).
   - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic`. The tools prefer `raw` content by requesting `include_raw=true`.
@@ -138,6 +148,55 @@ node dist/index.js --profile /absolute/path/to/profile.json
 ```
 
 Flags still override values from the profile.
+
+### Built-in toolsets
+
+Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the same complete built-in catalog as before.
+
+Pass one name or a comma-separated union:
+
+```bash
+# Data Explorer reads, plus the site-selection bootstrap tool
+npx -y @discourse/mcp@latest \
+  --toolsets data_explorer \
+  --tools_mode discourse_api_only
+
+# Search and topic tools, retaining canonical registration order
+npx -y @discourse/mcp@latest \
+  --toolsets search,topics \
+  --tools_mode discourse_api_only
+```
+
+Profiles use an array (a comma-separated string is also accepted):
+
+```json
+{
+  "toolsets": ["users", "uploads"]
+}
+```
+
+Available toolsets are:
+
+| Toolset | Built-in tools |
+|---|---|
+| `site` | `discourse_select_site` (also retained implicitly as bootstrap for any untethered subset) |
+| `search` | Search and topic filtering |
+| `topics` | Search/filter, topic and post reads, user-post activity, and topic/post/category mutations |
+| `users` | User lookup/list/activity and user mutations |
+| `chat` | Chat message retrieval |
+| `drafts` | Draft retrieval, save, and deletion |
+| `uploads` | File upload |
+| `data_explorer` | Query retrieval, execution, creation, update, and deletion |
+
+Toolset membership is intentionally separate from safety and authorization:
+
+- Selected toolsets form a union. A tool in multiple selected sets is registered once, in the canonical built-in order.
+- `discourse_select_site` is automatically retained as a bootstrap capability for every untethered subset. With `--site`, it remains hidden as usual.
+- Read-only mode still removes tools that require write enablement. For example, `--toolsets data_explorer` exposes query retrieval and execution by default; add both `--allow_writes` and `--read_only=false` to expose saved-query mutations.
+- Existing call-time authentication and admin checks are unchanged. All Data Explorer tools still require admin access when called.
+- Toolsets filter **built-in tools only; they are not an authorization or complete capability boundary**. MCP resources and prompts remain available, and all existing call-time access checks remain authoritative. Remote Tool Execution API discovery is controlled independently by `--tools_mode`; use `--tools_mode discourse_api_only` when the MCP tool list must contain only the selected built-in domains. The server logs an informational notice when selected toolsets are combined with remote discovery.
+- A selected domain can contribute no tools under the current safety configuration—for example, `uploads` in read-only mode. The server logs an informational notice when this occurs.
+- Unknown or empty toolset selections are configuration errors. Values are de-duplicated after trimming whitespace.
 
 - **Remote Tool Execution API (optional)**
 

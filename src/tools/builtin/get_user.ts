@@ -13,6 +13,7 @@ export const getUserTool = defineTool({
   description: "Get user info. Returns JSON with id, username, name, trust_level, created_at, bio, admin, and moderator.",
   schema,
   availability: "always",
+  toolsets: ["users"],
   handler: async ({ username }, _extra, ctx, opts) => {
     try {
       const { client } = ctx.siteState.ensureSelectedSite();

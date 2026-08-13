@@ -15,6 +15,7 @@ export const createPostTool = defineTool({
   description: "Create a post in a topic. Returns JSON with id, topic_id, and post_number.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["topics"],
   handler: async (input, _extra, ctx, opts) => {
     try {
       const { topic_id, raw, author_username } = schema.parse(input);

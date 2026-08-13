@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { request } from 'node:http';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -27,20 +29,12 @@ async function waitForServer(port: number, maxAttempts = 10): Promise<boolean> {
   return false;
 }
 
-async function postMcp(
+async function postMcpRequest(
   port: number,
+  payload: Record<string, unknown>,
   headers: Record<string, string>
 ): Promise<{ statusCode: number | undefined; body: string }> {
-  const initializeRequest = JSON.stringify({
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'initialize',
-    params: {
-      protocolVersion: '2025-03-26',
-      capabilities: {},
-      clientInfo: { name: 'transport-test', version: '1.0.0' },
-    },
-  });
+  const requestBody = JSON.stringify(payload);
 
   return new Promise((resolve, reject) => {
     const req = request(
@@ -52,7 +46,7 @@ async function postMcp(
         headers: {
           Accept: 'application/json, text/event-stream',
           'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(initializeRequest).toString(),
+          'Content-Length': Buffer.byteLength(requestBody).toString(),
           ...headers,
         },
       },
@@ -67,8 +61,24 @@ async function postMcp(
     );
 
     req.on('error', reject);
-    req.end(initializeRequest);
+    req.end(requestBody);
   });
+}
+
+async function postMcp(
+  port: number,
+  headers: Record<string, string>
+): Promise<{ statusCode: number | undefined; body: string }> {
+  return postMcpRequest(port, {
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2025-03-26',
+      capabilities: {},
+      clientInfo: { name: 'transport-test', version: '1.0.0' },
+    },
+  }, headers);
 }
 
 test('HTTP transport starts on specified port', async () => {
@@ -147,6 +157,112 @@ test('HTTP transport accepts MCP requests from local hosts without an origin', a
   } finally {
     serverProcess.kill('SIGTERM');
     await new Promise(resolve => setTimeout(resolve, 100));
+  }
+});
+
+test('invalid CLI toolsets fail startup with actionable output', () => {
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const result = spawnSync('node', [indexPath, '--toolsets'], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /expected a comma-separated string or string array/);
+  assert.match(result.stderr, /data_explorer/);
+});
+
+test('CLI toolsets override profile toolsets and are reflected by MCP tools/list', async () => {
+  const port = await getFreePort();
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'discourse-mcp-toolsets-'));
+  const profilePath = path.join(tempDirectory, 'profile.json');
+  await writeFile(profilePath, JSON.stringify({
+    toolsets: ['users'],
+    tools_mode: 'discourse_api_only',
+  }));
+  const serverProcess = spawn('node', [
+    indexPath,
+    '--profile', profilePath,
+    '--transport', 'http',
+    '--port', String(port),
+    '--log_level', 'silent',
+    '--toolsets', 'data_explorer'
+  ], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  const headers = { Host: `127.0.0.1:${port}` };
+
+  try {
+    const ready = await waitForServer(port);
+    assert.ok(ready, 'Server should start with selected toolsets');
+    assert.equal((await postMcp(port, headers)).statusCode, 200);
+
+    const response = await postMcpRequest(port, {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list',
+      params: {},
+    }, headers);
+    assert.equal(response.statusCode, 200);
+    const body = JSON.parse(response.body) as {
+      result?: { tools?: Array<{ name: string }> };
+    };
+    assert.deepEqual(body.result?.tools?.map((tool) => tool.name), [
+      'discourse_select_site',
+      'discourse_get_query',
+      'discourse_run_query'
+    ]);
+  } finally {
+    serverProcess.kill('SIGTERM');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await rm(tempDirectory, { recursive: true, force: true });
+  }
+});
+
+test('profile toolsets apply when the CLI does not override them', async () => {
+  const port = await getFreePort();
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const tempDirectory = await mkdtemp(path.join(tmpdir(), 'discourse-mcp-toolsets-'));
+  const profilePath = path.join(tempDirectory, 'profile.json');
+  await writeFile(profilePath, JSON.stringify({
+    toolsets: ['users'],
+    tools_mode: 'discourse_api_only',
+  }));
+  const serverProcess = spawn('node', [
+    indexPath,
+    '--profile', profilePath,
+    '--transport', 'http',
+    '--port', String(port),
+    '--log_level', 'silent'
+  ], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  const headers = { Host: `127.0.0.1:${port}` };
+
+  try {
+    const ready = await waitForServer(port);
+    assert.ok(ready, 'Server should start with profile toolsets');
+    assert.equal((await postMcp(port, headers)).statusCode, 200);
+
+    const response = await postMcpRequest(port, {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list',
+      params: {},
+    }, headers);
+    const body = JSON.parse(response.body) as {
+      result?: { tools?: Array<{ name: string }> };
+    };
+    assert.deepEqual(body.result?.tools?.map((tool) => tool.name), [
+      'discourse_select_site',
+      'discourse_get_user',
+      'discourse_list_user_posts',
+      'discourse_list_users'
+    ]);
+  } finally {
+    serverProcess.kill('SIGTERM');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    await rm(tempDirectory, { recursive: true, force: true });
   }
 });
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* Add typed built-in toolsets and `--toolsets <name[,name...]>` selection
+  - Filter built-in tools by operator-facing domains while preserving canonical registration order
+  - Keep site selection, write enablement, and call-time authorization as independent safety controls
+  - Support comma-separated CLI values and string or array profile configuration
+
+### Maintenance
+
+* Simplify built-in tool registration with typed `defineTool()` definitions and one ordered catalog
+  - Preserve existing MCP names, metadata, schemas, handlers, registration order, and availability
+  - Add compile-time inference fixtures and catalog/registration contract tests
+
 ## [0.2.9](https://github.com/discourse/discourse-mcp/compare/v0.2.8...v0.2.9) (2026-07-03)
 
 ### Security

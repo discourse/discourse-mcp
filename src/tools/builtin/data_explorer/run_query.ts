@@ -33,6 +33,7 @@ export const runQueryTool = defineTool({
   description: "Execute a Data Explorer query with parameters. Returns columns, rows, result_count, duration_ms. Queries run in read-only transactions with 10-second timeout. Requires admin API key.",
   schema,
   availability: "always",
+  toolsets: ["data_explorer"],
   handler: async (input: unknown, _extra: unknown, ctx, _opts) => {
     try {
       const { id, params, limit, explain } = schema.parse(input);

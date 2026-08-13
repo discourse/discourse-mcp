@@ -12,6 +12,7 @@ export const readPostTool = defineTool({
   description: "Read a specific post. Returns JSON with id, topic_id, post_number, username, created_at, and raw content.",
   schema,
   availability: "always",
+  toolsets: ["topics"],
   handler: async ({ post_id }, _extra, ctx, _opts) => {
     try {
       const { client } = ctx.siteState.ensureSelectedSite();

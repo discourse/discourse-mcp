@@ -74,6 +74,13 @@ test('parseArgs handles mixed --flag=value and --flag value syntax', () => {
   assert.equal(result['read-only'], true);
 });
 
+test('parseArgs preserves comma-separated toolsets for domain validation', () => {
+  const spaced = parseArgs(['--toolsets', 'topics,data_explorer']);
+  const equals = parseArgs(['--toolsets=users,uploads']);
+  assert.equal(spaced.toolsets, 'topics,data_explorer');
+  assert.equal(equals.toolsets, 'users,uploads');
+});
+
 // zodError tests
 
 test('zodError formats single field error', () => {

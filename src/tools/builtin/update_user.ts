@@ -23,6 +23,7 @@ export const updateUserTool = defineTool({
   description: "Update user profile fields. If upload_id is provided, also sets the user's avatar. Returns JSON with success status and updated user details.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["users"],
   handler: async (input, _extra, ctx, opts) => {
     try {
       const args = schema.parse(input);

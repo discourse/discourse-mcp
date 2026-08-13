@@ -25,6 +25,7 @@ const inferredTool = defineTool({
   description: "Exercises inferred handler input.",
   schema: inferredSchema,
   availability: "always",
+  toolsets: ["search"],
   handler: (input) => {
     input.count.toFixed();
     input.label.toUpperCase();
@@ -45,6 +46,7 @@ const otherTool = defineTool({
   description: "Has a heterogeneous schema.",
   schema: z.object({ enabled: z.boolean() }),
   availability: "always",
+  toolsets: ["users"],
   handler: ({ enabled }) => jsonResponse({ enabled }),
 });
 
@@ -53,6 +55,30 @@ const heterogeneousDefinitions = [
   otherTool,
 ] as const satisfies readonly ToolDefinition[];
 void heterogeneousDefinitions;
+
+const invalidToolsetTool = defineTool({
+  name: "fixture_invalid_toolset",
+  title: "Invalid Toolset Fixture",
+  description: "Proves toolset names are checked while authoring.",
+  schema: z.object({}),
+  availability: "always",
+  // @ts-expect-error Unknown toolset names are rejected at the definition site.
+  toolsets: ["data_explroer"],
+  handler: () => jsonResponse({ ok: true }),
+});
+void invalidToolsetTool;
+
+const emptyToolsetsTool = defineTool({
+  name: "fixture_empty_toolsets",
+  title: "Empty Toolsets Fixture",
+  description: "Proves every definition belongs to at least one toolset.",
+  schema: z.object({}),
+  availability: "always",
+  // @ts-expect-error A built-in definition must have at least one toolset.
+  toolsets: [],
+  handler: () => jsonResponse({ ok: true }),
+});
+void emptyToolsetsTool;
 
 interface CapturedRegistration {
   name: string;
@@ -101,6 +127,13 @@ const baseOptions: ToolRegistrationOptions = {
   toolsMode: "discourse_api_only",
 };
 
+const invalidEmptySelection: ToolRegistrationOptions = {
+  ...baseOptions,
+  // @ts-expect-error Programmatic toolset selections must also be non-empty.
+  toolsets: [],
+};
+void invalidEmptySelection;
+
 test("registerToolDefinitions filters availability and preserves collection order", () => {
   const { server, calls } = createRegistrar();
   const ctx = createContext(server);
@@ -111,6 +144,7 @@ test("registerToolDefinitions filters availability and preserves collection orde
       description: "Always available.",
       schema: z.object({ value: z.string() }),
       availability: "always",
+      toolsets: ["search"],
       handler: () => jsonResponse({ ok: true }),
     }),
     defineTool({
@@ -119,6 +153,7 @@ test("registerToolDefinitions filters availability and preserves collection orde
       description: "Write gated.",
       schema: z.object({ value: z.number() }),
       availability: "writes_enabled",
+      toolsets: ["users", "topics"],
       handler: () => jsonResponse({ ok: true }),
     }),
     defineTool({
@@ -127,6 +162,7 @@ test("registerToolDefinitions filters availability and preserves collection orde
       description: "Site-selection gated.",
       schema: z.object({ site: z.string() }),
       availability: "site_selection",
+      toolsets: ["site"],
       handler: () => jsonResponse({ ok: true }),
     }),
   ] as const satisfies readonly ToolDefinition[];
@@ -158,6 +194,37 @@ test("registerToolDefinitions filters availability and preserves collection orde
     "always_first",
     "write_second",
   ]);
+
+  calls.length = 0;
+  registerToolDefinitions(definitions, ctx, {
+    ...baseOptions,
+    allowWrites: true,
+    toolsets: ["users"],
+  });
+  assert.deepEqual(calls.map((call) => call.name), [
+    "write_second",
+    "selection_third",
+  ]);
+
+  calls.length = 0;
+  registerToolDefinitions(definitions, ctx, {
+    ...baseOptions,
+    allowWrites: true,
+    toolsets: ["search", "users"],
+  });
+  assert.deepEqual(calls.map((call) => call.name), [
+    "always_first",
+    "write_second",
+    "selection_third",
+  ]);
+
+  calls.length = 0;
+  registerToolDefinitions(definitions, ctx, {
+    ...baseOptions,
+    allowWrites: false,
+    toolsets: ["users"],
+  });
+  assert.deepEqual(calls.map((call) => call.name), ["selection_third"]);
 });
 
 test("registerToolDefinitions forwards metadata, schema shape, handler arguments, context, and options", async () => {
@@ -187,6 +254,7 @@ test("registerToolDefinitions forwards metadata, schema shape, handler arguments
     description: "Forwards registration and invocation values unchanged.",
     schema,
     availability: "always",
+    toolsets: ["search"],
     handler: (handlerInput, handlerExtra, handlerCtx, handlerOpts) => {
       received = {
         input: handlerInput,

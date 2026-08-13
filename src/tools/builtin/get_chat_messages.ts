@@ -16,6 +16,7 @@ export const getChatMessagesTool = defineTool({
   description: "Get messages from a chat channel. Returns JSON object with channel_id, messages array (id, username, created_at, message, edited, thread_id, in_reply_to_id), and meta.",
   schema,
   availability: "always",
+  toolsets: ["chat"],
   handler: async ({
     channel_id,
     page_size = 50,

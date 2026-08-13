@@ -19,6 +19,7 @@ export const getQueryTool = defineTool({
   description: "Get full details of a Data Explorer query including SQL and parameters. Requires admin API key.",
   schema,
   availability: "always",
+  toolsets: ["data_explorer"],
   handler: async (input: unknown, _extra: unknown, ctx, _opts) => {
     try {
       const { id } = schema.parse(input);

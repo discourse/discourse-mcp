@@ -15,6 +15,7 @@ export const updatePostTool = defineTool({
   description: "Update the content of an existing post. Returns JSON with updated post details.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["topics"],
   handler: async (args, _extra, ctx, opts) => {
     try {
       const { post_id, raw, edit_reason } = schema.parse(args);

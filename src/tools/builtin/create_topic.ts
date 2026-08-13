@@ -17,6 +17,7 @@ export const createTopicTool = defineTool({
   description: "Create a new topic. Returns JSON with id, topic_id, slug, and title.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["topics"],
   handler: async (input, _extra, ctx, opts) => {
     try {
       const { title, raw, category_id, tags, author_username } = schema.parse(input);

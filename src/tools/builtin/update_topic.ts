@@ -19,6 +19,7 @@ export const updateTopicTool = defineTool({
   description: "Update an existing topic (title, category, tags, featured_link). Returns JSON with updated topic details.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["topics"],
   handler: async (args, _extra, ctx, opts) => {
     try {
       const { topic_id, title, category_id, tags, featured_link, original_title, original_tags } = schema.parse(args);

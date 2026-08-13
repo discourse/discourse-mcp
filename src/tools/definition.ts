@@ -1,10 +1,15 @@
 import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, type AnyZodObject, type ZodRawShape } from "zod";
 import type {
+  BuiltinToolset,
+  BuiltinToolsetMembership,
+} from "./toolsets.js";
+import type {
   ToolContext,
   ToolRegistrationOptions,
 } from "./types.js";
 
+/** Mutually exclusive configuration gate controlling whether a tool is registered. */
 export type ToolAvailability =
   | "always"
   | "writes_enabled"
@@ -22,6 +27,8 @@ export interface ToolSpec<Schema extends AnyZodObject> {
   readonly description: string;
   readonly schema: Schema;
   readonly availability: ToolAvailability;
+  /** Operator-facing domains; membership is plural and independent of access policy. */
+  readonly toolsets: BuiltinToolsetMembership;
   readonly handler: (
     input: z.output<Schema>,
     extra: ToolExtra,
@@ -37,6 +44,7 @@ export interface ToolDefinition {
   readonly description: string;
   readonly schema: AnyZodObject;
   readonly availability: ToolAvailability;
+  readonly toolsets: BuiltinToolsetMembership;
   readonly handler: (
     input: ErasedToolInput,
     extra: ToolExtra,
@@ -60,8 +68,21 @@ export function registerToolDefinitions(
   definitions: readonly ToolDefinition[],
   ctx: ToolContext,
   opts: ToolRegistrationOptions
-): void {
+): string[] {
+  const registeredNames: string[] = [];
+  const selectedToolsets = opts.toolsets
+    ? new Set<BuiltinToolset>(opts.toolsets)
+    : undefined;
+
   for (const definition of definitions) {
+    // Site selection is the bootstrap capability for every untethered subset.
+    if (
+      selectedToolsets &&
+      definition.availability !== "site_selection" &&
+      !definition.toolsets.some((toolset) => selectedToolsets.has(toolset))
+    ) {
+      continue;
+    }
     if (definition.availability === "writes_enabled" && !opts.allowWrites) {
       continue;
     }
@@ -78,5 +99,8 @@ export function registerToolDefinitions(
       },
       (input, extra) => definition.handler(input, extra, ctx, opts)
     );
+    registeredNames.push(definition.name);
   }
+
+  return registeredNames;
 }

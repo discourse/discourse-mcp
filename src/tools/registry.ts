@@ -38,5 +38,25 @@ export async function registerAllTools(
     allowedUploadPaths: opts.allowedUploadPaths,
   };
 
-  registerToolDefinitions(builtinTools, ctx, opts);
+  const registeredNames = new Set(
+    registerToolDefinitions(builtinTools, ctx, opts)
+  );
+
+  for (const toolset of opts.toolsets ?? []) {
+    const contributed = builtinTools.some(
+      (tool) =>
+        tool.toolsets.includes(toolset) && registeredNames.has(tool.name)
+    );
+    if (!contributed) {
+      logger.info(
+        `Toolset '${toolset}' registered no tools under the current write/tether configuration.`
+      );
+    }
+  }
+
+  if (opts.toolsets && opts.toolsMode !== "discourse_api_only") {
+    logger.info(
+      "Built-in toolsets do not filter remote tools; use --tools_mode discourse_api_only for a closed built-in tool list."
+    );
+  }
 }

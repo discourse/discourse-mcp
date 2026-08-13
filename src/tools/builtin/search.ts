@@ -13,6 +13,7 @@ export const searchTool = defineTool({
   description: "Search site content. Returns JSON object with results array of matching topics (id, slug, title) and meta (total, has_more).",
   schema,
   availability: "always",
+  toolsets: ["search", "topics"],
   handler: async (args, _extra, ctx, _opts) => {
     const { query, max_results = 10 } = args;
     const { client } = ctx.siteState.ensureSelectedSite();

@@ -40,6 +40,7 @@ export const getDraftTool = defineTool({
   description: 'Retrieve a specific draft by key. Returns JSON with draft_key, sequence, and parsed data (title, reply, categoryId, tags, action).',
   schema: getDraftSchema,
   availability: "always",
+  toolsets: ["drafts"],
   handler: async (input: unknown, _extra: unknown, ctx, _opts) => {
     const { draft_key, sequence } = getDraftSchema.parse(input);
 
@@ -115,6 +116,7 @@ export const saveDraftTool = defineTool({
   description: "Create or update a draft. Returns JSON with draft_key and new sequence number.",
   schema: saveDraftSchema,
   availability: "writes_enabled",
+  toolsets: ["drafts"],
   handler: async (input: unknown, _extra: unknown, ctx, opts) => {
     const { draft_key, reply, title, category_id, tags, sequence, action } = saveDraftSchema.parse(input);
 
@@ -189,6 +191,7 @@ export const deleteDraftTool = defineTool({
   description: "Delete a draft by key. Requires current sequence number to prevent conflicts.",
   schema: deleteDraftSchema,
   availability: "writes_enabled",
+  toolsets: ["drafts"],
   handler: async (input: unknown, _extra: unknown, ctx, opts) => {
     const { draft_key, sequence } = deleteDraftSchema.parse(input);
 

@@ -5,6 +5,7 @@ import { Logger } from "../util/logger.js";
 import { SiteState } from "../site/state.js";
 import { builtinTools } from "../tools/builtin/catalog.js";
 import { registerToolDefinitions } from "../tools/definition.js";
+import { BUILTIN_TOOLSETS, type BuiltinToolset } from "../tools/toolsets.js";
 import type {
   ToolContext,
   ToolRegistrar,
@@ -287,6 +288,34 @@ const EXPECTED_METADATA = [
   }
 ] as const;
 
+const EXPECTED_TOOLSETS = {
+  discourse_select_site: ["site"],
+  discourse_search: ["search", "topics"],
+  discourse_filter_topics: ["search", "topics"],
+  discourse_read_topic: ["topics"],
+  discourse_read_post: ["topics"],
+  discourse_get_user: ["users"],
+  discourse_list_user_posts: ["users", "topics"],
+  discourse_list_users: ["users"],
+  discourse_get_chat_messages: ["chat"],
+  discourse_get_draft: ["drafts"],
+  discourse_create_post: ["topics"],
+  discourse_create_user: ["users"],
+  discourse_create_category: ["topics"],
+  discourse_create_topic: ["topics"],
+  discourse_update_topic: ["topics"],
+  discourse_update_post: ["topics"],
+  discourse_update_user: ["users"],
+  discourse_upload_file: ["uploads"],
+  discourse_save_draft: ["drafts"],
+  discourse_delete_draft: ["drafts"],
+  discourse_get_query: ["data_explorer"],
+  discourse_run_query: ["data_explorer"],
+  discourse_create_query: ["data_explorer"],
+  discourse_update_query: ["data_explorer"],
+  discourse_delete_query: ["data_explorer"],
+} as const;
+
 function registeredNames(opts: ToolRegistrationOptions): string[] {
   const names: string[] = [];
   const server = {
@@ -327,6 +356,25 @@ test("builtinTools definitions satisfy scalable catalog invariants", () => {
       `${tool.name} must declare a valid availability`
     );
     assert.ok(tool.schema instanceof z.ZodObject, `${tool.name} must use a Zod object schema`);
+    assert.ok(tool.toolsets.length > 0, `${tool.name} must belong to a toolset`);
+    assert.equal(
+      new Set(tool.toolsets).size,
+      tool.toolsets.length,
+      `${tool.name} toolsets must not contain duplicates`
+    );
+    for (const toolset of tool.toolsets) {
+      assert.ok(
+        BUILTIN_TOOLSETS.includes(toolset),
+        `${tool.name} has unknown toolset ${toolset}`
+      );
+    }
+  }
+
+  for (const toolset of BUILTIN_TOOLSETS) {
+    assert.ok(
+      builtinTools.some((tool) => tool.toolsets.includes(toolset)),
+      `${toolset} must contain at least one tool`
+    );
   }
 });
 
@@ -338,6 +386,15 @@ test("builtinTools metadata and deterministic order match the compatibility snap
     inputKeys: Object.keys(tool.schema.shape),
   }));
   assert.deepEqual(actual, EXPECTED_METADATA);
+});
+
+test("builtinTools toolset memberships match the operator-facing contract", () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      builtinTools.map((tool) => [tool.name, [...tool.toolsets]])
+    ),
+    EXPECTED_TOOLSETS
+  );
 });
 
 test("builtinTools registration modes equal catalog availability filters", () => {
@@ -360,6 +417,64 @@ test("builtinTools registration modes equal catalog availability filters", () =>
     registeredNames({ ...baseOptions, hideSelectSite: true }),
     builtinTools
       .filter((tool) => tool.availability !== "site_selection")
+      .map((tool) => tool.name)
+  );
+});
+
+test("selected built-in toolsets preserve order and compose with availability", () => {
+  const baseOptions: ToolRegistrationOptions = {
+    allowWrites: true,
+    toolsMode: "discourse_api_only",
+  };
+
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: ["data_explorer"] }),
+    [
+      "discourse_select_site",
+      "discourse_get_query",
+      "discourse_run_query",
+      "discourse_create_query",
+      "discourse_update_query",
+      "discourse_delete_query",
+    ]
+  );
+  assert.deepEqual(
+    registeredNames({
+      ...baseOptions,
+      allowWrites: false,
+      toolsets: ["data_explorer"],
+    }),
+    [
+      "discourse_select_site",
+      "discourse_get_query",
+      "discourse_run_query",
+    ]
+  );
+  assert.deepEqual(
+    registeredNames({
+      ...baseOptions,
+      toolsets: ["data_explorer"],
+      hideSelectSite: true,
+    }),
+    [
+      "discourse_get_query",
+      "discourse_run_query",
+      "discourse_create_query",
+      "discourse_update_query",
+      "discourse_delete_query",
+    ]
+  );
+
+  const selectedToolsets = ["users", "topics"] as const;
+  const selected = new Set<BuiltinToolset>(selectedToolsets);
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: selectedToolsets }),
+    builtinTools
+      .filter(
+        (tool) =>
+          tool.availability === "site_selection" ||
+          tool.toolsets.some((toolset) => selected.has(toolset))
+      )
       .map((tool) => tool.name)
   );
 });

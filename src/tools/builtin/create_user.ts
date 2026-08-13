@@ -19,6 +19,7 @@ export const createUserTool = defineTool({
   description: "Create a new user account. If upload_id is provided, sets the user's avatar after creation. Returns JSON with success status and user details.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["users"],
   handler: async (input, _extra, ctx, opts) => {
     try {
       const args = schema.parse(input);

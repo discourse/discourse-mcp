@@ -46,6 +46,7 @@ export const uploadFileTool = defineTool({
   description: "Upload an image or file to Discourse. Provide either: image_data (base64 with filename), a remote HTTP(S) URL, or an absolute local file path. user_id is required for avatar/background uploads. Returns upload_id for use in avatar/profile updates. Use short_url to embed images in posts.",
   schema,
   availability: "writes_enabled",
+  toolsets: ["uploads"],
   handler: async (input, _extra, ctx, opts) => {
     try {
       const args = schema.parse(input);
