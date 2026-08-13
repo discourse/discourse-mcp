@@ -8,6 +8,12 @@
   - Filter built-in tools by operator-facing domains while preserving canonical registration order
   - Keep site selection, write enablement, and call-time authorization as independent safety controls
   - Support comma-separated CLI values and string or array profile configuration
+  - Treat omitted selection as the non-opt-in default catalog and add `--toolsets all` for every domain
+* Add the opt-in `workflows` toolset for the experimental `discourse-workflows` plugin
+  - Discover workflows, node types, templates, credentials, executions, versions, and related forum entities
+  - Create and replace complete graphs with paired graph safety and a flat connection adapter
+  - Apply mechanical MCP-side graph operations after a fresh GET, then publish, unpublish, discard, delete, or restore drafts
+  - Evaluate expressions, manage pin-data, step-run or manually run the current draft, and poll asynchronous executions
 
 ### Maintenance
 

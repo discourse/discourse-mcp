@@ -358,6 +358,36 @@ test('data_explorer toolset composes with write and tethered registration gates'
   ]);
 });
 
+test('workflows is opt-in and composes with write and tether gates', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const readOnly = createMockServer();
+  await registerAllTools(readOnly.server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', toolsets: ['workflows'] });
+  assert.deepEqual(readOnly.calls.map((call) => call.name), [
+    'discourse_select_site', 'discourse_list_workflows', 'discourse_get_workflow',
+    'discourse_list_workflow_node_types', 'discourse_resolve_workflow_entity',
+    'discourse_list_workflow_templates', 'discourse_list_workflow_executions',
+    'discourse_get_workflow_execution', 'discourse_list_workflow_versions',
+    'discourse_list_workflow_credentials', 'discourse_evaluate_workflow_expression'
+  ]);
+
+  const writes = createMockServer();
+  await registerAllTools(writes.server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only', toolsets: ['workflows'], hideSelectSite: true });
+  assert.equal(writes.calls.length, 18);
+  assert.ok(writes.calls.some((call) => call.name === 'discourse_create_workflow'));
+  assert.ok(writes.calls.some((call) => call.name === 'discourse_update_workflow_pin_data'));
+  assert.equal(writes.calls.some((call) => call.name.includes('preview')), false);
+});
+
+test('expanded all selection includes opt-in workflow tools', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, calls } = createMockServer();
+  await registerAllTools(server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only', toolsets: ['site', 'search', 'topics', 'users', 'chat', 'drafts', 'uploads', 'data_explorer', 'workflows'] });
+  assert.deepEqual(calls.slice(0, ALL_TOOLS_IN_ORDER.length).map((call) => call.name), [...ALL_TOOLS_IN_ORDER]);
+  assert.equal(calls.filter((call) => call.name.includes('workflow')).length, 18);
+});
+
 test('toolset selection reports empty domains and independent remote discovery', async () => {
   const logger = new Logger('silent');
   const messages: string[] = [];

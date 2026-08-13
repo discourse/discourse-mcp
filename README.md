@@ -94,7 +94,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
     - `silent`: No logging output
   - `--show_emails` (default: false). includes emails in user tools. Requires admin access
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
-  - `--toolsets <name[,name...]>`: Expose only the selected built-in tool domains. Omit this flag to preserve the complete built-in catalog. See [Built-in toolsets](#built-in-toolsets).
+  - `--toolsets <name[,name...]>`: Expose selected built-in domains. Omit for the default catalog (all non-opt-in domains); use `--toolsets all` to include opt-in domains such as `workflows`. See [Built-in toolsets](#built-in-toolsets).
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest`).
   - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic`. The tools prefer `raw` content by requesting `include_raw=true`.
@@ -151,7 +151,7 @@ Flags still override values from the profile.
 
 ### Built-in toolsets
 
-Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the same complete built-in catalog as before.
+Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the default catalog (all non-opt-in domains). The experimental admin-only `workflows` domain is opt-in. Use `--toolsets all` to explicitly load every domain.
 
 Pass one name or a comma-separated union:
 
@@ -164,6 +164,19 @@ npx -y @discourse/mcp@latest \
 # Search and topic tools, retaining canonical registration order
 npx -y @discourse/mcp@latest \
   --toolsets search,topics \
+  --tools_mode discourse_api_only
+
+# Every built-in domain, including opt-in workflows
+npx -y @discourse/mcp@latest \
+  --toolsets all \
+  --tools_mode discourse_api_only
+
+# Author, test, and run workflows (admin key required)
+npx -y @discourse/mcp@latest \
+  --toolsets workflows \
+  --site https://forum.example.com \
+  --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
+  --allow_writes --read_only=false \
   --tools_mode discourse_api_only
 ```
 
@@ -187,16 +200,32 @@ Available toolsets are:
 | `drafts` | Draft retrieval, save, and deletion |
 | `uploads` | File upload |
 | `data_explorer` | Query retrieval, execution, creation, update, and deletion |
+| `workflows` *(opt-in)* | Admin-only workflow discovery, graph authoring, expression evaluation, pin-data, draft runs, step runs, executions, and version management |
+| `all` *(sentinel)* | Expands to every built-in toolset, including opt-in domains; absorbs other selections |
 
 Toolset membership is intentionally separate from safety and authorization:
 
-- Selected toolsets form a union. A tool in multiple selected sets is registered once, in the canonical built-in order.
+- Selected toolsets form a union. A tool in multiple selected sets is registered once, in the canonical built-in order. `all` expands to every real domain and is never tool metadata.
+- Omitted selection excludes opt-in-only tools. Tool definitions may not mix opt-in and default memberships, which prevents accidental default exposure.
 - `discourse_select_site` is automatically retained as a bootstrap capability for every untethered subset. With `--site`, it remains hidden as usual.
 - Read-only mode still removes tools that require write enablement. For example, `--toolsets data_explorer` exposes query retrieval and execution by default; add both `--allow_writes` and `--read_only=false` to expose saved-query mutations.
 - Existing call-time authentication and admin checks are unchanged. All Data Explorer tools still require admin access when called.
 - Toolsets filter **built-in tools only; they are not an authorization or complete capability boundary**. MCP resources and prompts remain available, and all existing call-time access checks remain authoritative. Remote Tool Execution API discovery is controlled independently by `--tools_mode`; use `--tools_mode discourse_api_only` when the MCP tool list must contain only the selected built-in domains. The server logs an informational notice when selected toolsets are combined with remote discovery.
 - A selected domain can contribute no tools under the current safety configuration—for example, `uploads` in read-only mode. The server logs an informational notice when this occurs.
 - Unknown or empty toolset selections are configuration errors. Values are de-duplicated after trimming whitespace.
+
+#### Workflow authoring
+
+The `workflows` toolset targets the experimental `discourse-workflows` plugin (`enable_discourse_workflows`) and requires an admin API key. A typical loop is:
+
+1. List node types, then request a specific `identifier` for its parameter schema, output ports, and `$json` contracts.
+2. Resolve category, tag, group, user, badge, chat channel, or data-table ids.
+3. Create from a template or submit a complete small graph.
+4. GET the workflow immediately before editing. Replace with complete `nodes` **and** `connections`, or use MCP-side `operations[]` for mechanical edits. Omitting a node from a whole-graph update deletes it.
+5. Add pin-data and step-run, or manually run the current draft; poll `discourse_get_workflow_execution`.
+6. Set `published: true` after testing.
+
+Flat connections such as `[{"from":"Start","to":"Check","type":"main"}]` are accepted and converted to Discourse's nested wire format. Use the source node's catalog output key: condition/filter ports are `true` and `false`, not always `main`. MCP rejects one-sided graph updates before HTTP. Runs are not dry-runs and can create posts, send chat messages, or call external HTTP.
 
 - **Remote Tool Execution API (optional)**
 

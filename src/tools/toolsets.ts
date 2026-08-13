@@ -15,9 +15,13 @@ export const BUILTIN_TOOLSETS = [
   "drafts",
   "uploads",
   "data_explorer",
+  "workflows",
 ] as const;
 
 export type BuiltinToolset = (typeof BUILTIN_TOOLSETS)[number];
+
+/** Domains hidden unless explicitly selected or `all` is used. */
+export const OPT_IN_TOOLSETS = ["workflows"] as const satisfies readonly BuiltinToolset[];
 
 /** One or more domains assigned to a built-in tool definition or selection. */
 export type BuiltinToolsetMembership = readonly [
@@ -31,6 +35,7 @@ export const BuiltinToolsetsSchema = z
   .union([z.string(), z.array(z.string())])
   .transform((value, ctx): BuiltinToolsetMembership => {
     const values = (Array.isArray(value) ? value : value.split(","))
+      .flatMap((item) => item.split(","))
       .map((item) => item.trim())
       .filter(Boolean);
 
@@ -42,6 +47,10 @@ export const BuiltinToolsetsSchema = z
       return z.NEVER;
     }
 
+    if (values.includes("all")) {
+      return [...BUILTIN_TOOLSETS] as BuiltinToolsetMembership;
+    }
+
     const result: BuiltinToolset[] = [];
     let invalid = false;
     for (const candidate of values) {
@@ -50,7 +59,7 @@ export const BuiltinToolsetsSchema = z
         invalid = true;
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: `Unknown built-in toolset '${candidate}'. Expected one of: ${BUILTIN_TOOLSETS.join(", ")}`,
+          message: `Unknown built-in toolset '${candidate}'. Expected one of: ${BUILTIN_TOOLSETS.join(", ")}, all`,
         });
         continue;
       }
@@ -72,7 +81,7 @@ export function parseBuiltinToolsets(
     !(Array.isArray(value) && value.every((item) => typeof item === "string"))
   ) {
     throw new Error(
-      `Invalid toolsets ${source}: expected a comma-separated string or string array. Expected one of: ${BUILTIN_TOOLSETS.join(", ")}`
+      `Invalid toolsets ${source}: expected a comma-separated string or string array. Expected one of: ${BUILTIN_TOOLSETS.join(", ")}, all`
     );
   }
 

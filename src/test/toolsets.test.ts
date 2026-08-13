@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   BUILTIN_TOOLSETS,
   BuiltinToolsetsSchema,
+  OPT_IN_TOOLSETS,
   parseBuiltinToolsets,
 } from "../tools/toolsets.js";
 
@@ -15,10 +16,18 @@ const expectedToolsets = [
   "drafts",
   "uploads",
   "data_explorer",
+  "workflows",
 ];
 
 test("built-in toolset names are stable and documented", () => {
   assert.deepEqual(BUILTIN_TOOLSETS, expectedToolsets);
+  assert.deepEqual(OPT_IN_TOOLSETS, ["workflows"]);
+});
+
+test("all expands to every built-in toolset and absorbs extras", () => {
+  assert.deepEqual(parseBuiltinToolsets("all", "from CLI"), BUILTIN_TOOLSETS);
+  assert.deepEqual(parseBuiltinToolsets("search,all", "from CLI"), BUILTIN_TOOLSETS);
+  assert.deepEqual(BuiltinToolsetsSchema.parse(["all", "topics"]), BUILTIN_TOOLSETS);
 });
 
 test("toolset parser accepts a single CLI value", () => {

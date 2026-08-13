@@ -1,8 +1,9 @@
 import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z, type AnyZodObject, type ZodRawShape } from "zod";
-import type {
-  BuiltinToolset,
-  BuiltinToolsetMembership,
+import {
+  OPT_IN_TOOLSETS,
+  type BuiltinToolset,
+  type BuiltinToolsetMembership,
 } from "./toolsets.js";
 import type {
   ToolContext,
@@ -74,7 +75,12 @@ export function registerToolDefinitions(
     ? new Set<BuiltinToolset>(opts.toolsets)
     : undefined;
 
+  const optInToolsets = new Set<BuiltinToolset>(OPT_IN_TOOLSETS);
+
   for (const definition of definitions) {
+    const optInOnly = definition.toolsets.every((toolset) => optInToolsets.has(toolset));
+    if (!selectedToolsets && optInOnly) continue;
+
     // Site selection is the bootstrap capability for every untethered subset.
     if (
       selectedToolsets &&

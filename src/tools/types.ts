@@ -12,7 +12,7 @@ export type ToolsMode = "auto" | "discourse_api_only" | "tool_exec_api";
 export interface ToolRegistrationOptions {
   allowWrites: boolean;
   toolsMode: ToolsMode;
-  // Built-in domains to expose. Undefined preserves the complete catalog.
+  // Built-in domains to expose. Undefined preserves the default catalog (excluding opt-in-only domains).
   toolsets?: BuiltinToolsetMembership;
   // When true, do not register the discourse_select_site tool
   hideSelectSite?: boolean;

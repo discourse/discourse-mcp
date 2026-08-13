@@ -22,6 +22,7 @@ import { updatePostTool } from "./update_post.js";
 import { updateUserTool } from "./update_user.js";
 import { uploadFileTool } from "./upload_file.js";
 import { dataExplorerTools } from "./data_explorer/index.js";
+import { workflowTools } from "./workflows/index.js";
 
 /** Built-in tools in their stable MCP registration order. */
 export const builtinTools = [
@@ -46,4 +47,5 @@ export const builtinTools = [
   saveDraftTool,
   deleteDraftTool,
   ...dataExplorerTools,
+  ...workflowTools,
 ] as const satisfies readonly ToolDefinition[];

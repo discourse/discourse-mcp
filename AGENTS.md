@@ -24,6 +24,7 @@ pnpm clean       # Remove dist/
 | Built-in toolsets | `src/tools/toolsets.ts` |
 | Resource registry | `src/resources/registry.ts` |
 | Built-in tools | `src/tools/builtin/*` |
+| Workflow tools/adapters | `src/tools/builtin/workflows/*` |
 | Remote tools | `src/tools/remote/tool_exec_api.ts` |
 | Utilities | `src/util/*.ts` (logger, redact, json_response) |
 
@@ -35,6 +36,7 @@ pnpm clean       # Remove dist/
 - Every definition declares two independent registration dimensions:
   - `availability` is one mutually exclusive configuration gate: `always`, `writes_enabled`, or `site_selection`
   - `toolsets` is a non-empty list of operator-facing domains; selected domains form a union while preserving catalog order
+- `OPT_IN_TOOLSETS` domains are hidden when selection is omitted; `--toolsets all` expands to every real domain. Definitions must not mix opt-in and default memberships.
 - Availability is not domain metadata, and toolsets do not replace write, authentication, or admin checks
 - All tools return strict JSON (no Markdown) with `isError: true` on failure
 - Write tools use `writes_enabled` and retain a call-time access check; they require `--allow_writes` and matching `auth_pairs`

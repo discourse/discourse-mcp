@@ -5,7 +5,7 @@ import { Logger } from "../util/logger.js";
 import { SiteState } from "../site/state.js";
 import { builtinTools } from "../tools/builtin/catalog.js";
 import { registerToolDefinitions } from "../tools/definition.js";
-import { BUILTIN_TOOLSETS, type BuiltinToolset } from "../tools/toolsets.js";
+import { BUILTIN_TOOLSETS, OPT_IN_TOOLSETS, type BuiltinToolset } from "../tools/toolsets.js";
 import type {
   ToolContext,
   ToolRegistrar,
@@ -314,6 +314,24 @@ const EXPECTED_TOOLSETS = {
   discourse_create_query: ["data_explorer"],
   discourse_update_query: ["data_explorer"],
   discourse_delete_query: ["data_explorer"],
+  discourse_list_workflows: ["workflows"],
+  discourse_get_workflow: ["workflows"],
+  discourse_list_workflow_node_types: ["workflows"],
+  discourse_resolve_workflow_entity: ["workflows"],
+  discourse_list_workflow_templates: ["workflows"],
+  discourse_list_workflow_executions: ["workflows"],
+  discourse_get_workflow_execution: ["workflows"],
+  discourse_list_workflow_versions: ["workflows"],
+  discourse_list_workflow_credentials: ["workflows"],
+  discourse_evaluate_workflow_expression: ["workflows"],
+  discourse_create_workflow: ["workflows"],
+  discourse_update_workflow: ["workflows"],
+  discourse_delete_workflow: ["workflows"],
+  discourse_discard_workflow_draft: ["workflows"],
+  discourse_restore_workflow_version: ["workflows"],
+  discourse_run_workflow: ["workflows"],
+  discourse_run_workflow_step: ["workflows"],
+  discourse_update_workflow_pin_data: ["workflows"],
 } as const;
 
 function registeredNames(opts: ToolRegistrationOptions): string[] {
@@ -368,6 +386,8 @@ test("builtinTools definitions satisfy scalable catalog invariants", () => {
         `${tool.name} has unknown toolset ${toolset}`
       );
     }
+    const memberships = tool.toolsets.map((toolset) => OPT_IN_TOOLSETS.includes(toolset as "workflows"));
+    assert.ok(memberships.every(Boolean) || memberships.every((value) => !value), `${tool.name} must not mix opt-in and default toolsets`);
   }
 
   for (const toolset of BUILTIN_TOOLSETS) {
@@ -385,7 +405,11 @@ test("builtinTools metadata and deterministic order match the compatibility snap
     description: tool.description,
     inputKeys: Object.keys(tool.schema.shape),
   }));
-  assert.deepEqual(actual, EXPECTED_METADATA);
+  assert.deepEqual(actual.slice(0, EXPECTED_METADATA.length), EXPECTED_METADATA);
+  const workflowMetadata = actual.slice(EXPECTED_METADATA.length);
+  assert.equal(workflowMetadata.length, 18);
+  assert.ok(workflowMetadata.every((tool) => tool.name.includes("workflow")));
+  assert.equal(workflowMetadata.some((tool) => tool.name.includes("preview")), false);
 });
 
 test("builtinTools toolset memberships match the operator-facing contract", () => {
@@ -403,21 +427,26 @@ test("builtinTools registration modes equal catalog availability filters", () =>
     toolsMode: "discourse_api_only",
   };
 
+  const defaultTools = builtinTools.filter((tool) => !tool.toolsets.every((toolset) => OPT_IN_TOOLSETS.includes(toolset as "workflows")));
   assert.deepEqual(
     registeredNames(baseOptions),
-    builtinTools.map((tool) => tool.name)
+    defaultTools.map((tool) => tool.name)
   );
   assert.deepEqual(
     registeredNames({ ...baseOptions, allowWrites: false }),
-    builtinTools
+    defaultTools
       .filter((tool) => tool.availability !== "writes_enabled")
       .map((tool) => tool.name)
   );
   assert.deepEqual(
     registeredNames({ ...baseOptions, hideSelectSite: true }),
-    builtinTools
+    defaultTools
       .filter((tool) => tool.availability !== "site_selection")
       .map((tool) => tool.name)
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: [...BUILTIN_TOOLSETS] }),
+    builtinTools.map((tool) => tool.name)
   );
 });
 

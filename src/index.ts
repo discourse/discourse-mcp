@@ -102,7 +102,7 @@ const ProfileSchema = z
     log_level: z.enum(["silent", "error", "info", "debug"]).optional().default("info"),
     show_emails: z.boolean().optional().default(false),
     tools_mode: z.enum(["auto", "discourse_api_only", "tool_exec_api"]).optional().default("auto"),
-    toolsets: BuiltinToolsetsSchema.optional().describe("Built-in tool domains to expose (array or comma-separated string); omitted means all"),
+    toolsets: BuiltinToolsetsSchema.optional().describe("Built-in tool domains to expose (array or comma-separated string). Omit for the default catalog; use all to include opt-in domains such as workflows."),
     site: z.string().url().optional().describe("Tether MCP to a single Discourse site; hides select_site and preselects this site"),
     default_search: z.string().optional().describe("Optional search prefix added to every search query (set via --default-search)"),
     max_read_length: z
