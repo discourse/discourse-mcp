@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { generateKeyPairSync, privateDecrypt, constants } from "node:crypto";
+import { constants, generateKeyPairSync, privateDecrypt, randomBytes } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline";
 
@@ -18,6 +18,35 @@ export interface GenerateOptions {
   saveTo?: string;
 }
 
+export interface DeviceAuthorization {
+  deviceCode: string;
+  userCode: string;
+  verificationUri: string;
+  verificationUriWithRequest?: string;
+  expiresIn: number;
+  interval: number;
+}
+
+interface DecryptedPayload {
+  key: string;
+  nonce: string;
+  push?: boolean;
+  api?: number;
+  expires_at?: string;
+}
+
+type Fetch = typeof fetch;
+type Sleep = (milliseconds: number) => Promise<void>;
+
+const DEFAULT_APPLICATION_NAME = "Discourse MCP";
+const DEFAULT_CLIENT_ID = "discourse-mcp";
+const DEFAULT_SCOPES = "read,write";
+const DEVICE_AUTH_HEADER = "Auth-Api-Device-Code";
+
+function siteUrl(site: string, path: string): URL {
+  return new URL(`${site.replace(/\/+$/, "")}${path}`);
+}
+
 function generateKeyPair(): KeyPair {
   const { publicKey, privateKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
@@ -34,43 +63,164 @@ function generateKeyPair(): KeyPair {
   return { publicKey, privateKey };
 }
 
-function buildAuthorizationUrl(options: GenerateOptions, publicKey: string): string {
-  const url = new URL(`${options.site}/user-api-key/new`);
-
-  const params = new URLSearchParams({
-    application_name: options.applicationName || "Discourse MCP",
-    client_id: options.clientId || "discourse-mcp",
-    scopes: options.scopes || "read,write",
+export function buildAuthorizationUrl(
+  options: GenerateOptions,
+  publicKey: string,
+  nonce: string
+): string {
+  const url = siteUrl(options.site, "/user-api-key/new");
+  url.search = new URLSearchParams({
+    application_name: options.applicationName || DEFAULT_APPLICATION_NAME,
+    client_id: options.clientId || DEFAULT_CLIENT_ID,
+    scopes: options.scopes || DEFAULT_SCOPES,
     public_key: publicKey,
-    nonce: options.nonce || Date.now().toString(),
-  });
-
-  url.search = params.toString();
+    nonce,
+  }).toString();
   return url.toString();
 }
 
-function decryptPayload(encryptedPayload: string, privateKey: string): string {
+export function decryptPayload(
+  encryptedPayload: string,
+  privateKey: string,
+  padding: "pkcs1" | "oaep"
+): DecryptedPayload {
   try {
     const buffer = Buffer.from(encryptedPayload, "base64");
     const decrypted = privateDecrypt(
       {
         key: privateKey,
-        padding: constants.RSA_PKCS1_PADDING,
+        padding:
+          padding === "oaep" ? constants.RSA_PKCS1_OAEP_PADDING : constants.RSA_PKCS1_PADDING,
       },
       buffer
     );
-    return decrypted.toString("utf8");
+    const result = JSON.parse(decrypted.toString("utf8")) as Partial<DecryptedPayload>;
+    if (typeof result.key !== "string" || !result.key) {
+      throw new Error("missing 'key' field");
+    }
+    if (typeof result.nonce !== "string") {
+      throw new Error("missing 'nonce' field");
+    }
+    return result as DecryptedPayload;
   } catch (error: any) {
     throw new Error(`Failed to decrypt payload: ${error?.message || String(error)}`);
   }
 }
 
-async function promptForInput(question: string): Promise<string> {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+async function responseError(response: Response): Promise<Error> {
+  const body = await response.text().catch(() => "");
+  const detail = body ? `: ${body}` : "";
+  return new Error(`Request failed with HTTP ${response.status}${detail}`);
+}
 
+export async function supportsDeviceAuthorization(
+  site: string,
+  fetchImpl: Fetch = fetch
+): Promise<boolean> {
+  const response = await fetchImpl(siteUrl(site, "/user-api-key/new"), { method: "HEAD" });
+  if (response.status === 404 || response.status === 405) return false;
+  if (!response.ok) throw await responseError(response);
+  return response.headers.get(DEVICE_AUTH_HEADER)?.toLowerCase() === "true";
+}
+
+export async function createDeviceAuthorization(
+  options: GenerateOptions,
+  publicKey: string,
+  nonce: string,
+  fetchImpl: Fetch = fetch
+): Promise<DeviceAuthorization> {
+  const response = await fetchImpl(siteUrl(options.site, "/user-api-key/device.json"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      application_name: options.applicationName || DEFAULT_APPLICATION_NAME,
+      client_id: options.clientId || DEFAULT_CLIENT_ID,
+      scopes: options.scopes || DEFAULT_SCOPES,
+      public_key: publicKey,
+      nonce,
+      padding: "oaep",
+    }),
+  });
+  if (!response.ok) throw await responseError(response);
+
+  const body = (await response.json()) as Record<string, unknown>;
+  const validVerificationUri =
+    typeof body.verification_uri === "string" && URL.canParse(body.verification_uri);
+  const validRequestUri =
+    body.verification_uri_with_request === undefined ||
+    (typeof body.verification_uri_with_request === "string" &&
+      URL.canParse(body.verification_uri_with_request));
+  if (
+    typeof body.device_code !== "string" ||
+    !/^[a-f\d]{64}$/i.test(body.device_code) ||
+    typeof body.user_code !== "string" ||
+    !/^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(body.user_code) ||
+    !validVerificationUri ||
+    !validRequestUri ||
+    typeof body.expires_in !== "number" ||
+    !Number.isFinite(body.expires_in) ||
+    body.expires_in <= 0 ||
+    typeof body.interval !== "number" ||
+    !Number.isFinite(body.interval) ||
+    body.interval <= 0
+  ) {
+    throw new Error("Invalid device authorization response");
+  }
+
+  return {
+    deviceCode: body.device_code,
+    userCode: body.user_code,
+    verificationUri: body.verification_uri as string,
+    verificationUriWithRequest:
+      typeof body.verification_uri_with_request === "string"
+        ? body.verification_uri_with_request
+        : undefined,
+    expiresIn: body.expires_in,
+    interval: body.interval,
+  };
+}
+
+export async function pollDeviceAuthorization(
+  site: string,
+  authorization: DeviceAuthorization,
+  fetchImpl: Fetch = fetch,
+  sleep: Sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
+): Promise<string> {
+  const deadline = Date.now() + authorization.expiresIn * 1000;
+  const interval = Math.max(1, authorization.interval) * 1000;
+
+  while (Date.now() < deadline) {
+    const response = await fetchImpl(siteUrl(site, "/user-api-key/device/poll.json"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ device_code: authorization.deviceCode }),
+    });
+    if (!response.ok) throw await responseError(response);
+
+    const body = (await response.json()) as Record<string, unknown>;
+    switch (body.status) {
+      case "authorization_pending":
+        await sleep(interval);
+        break;
+      case "authorized":
+        if (typeof body.payload !== "string" || !body.payload) {
+          throw new Error("Invalid authorized response: missing payload");
+        }
+        return body.payload;
+      case "access_denied":
+        throw new Error("The authorization request was denied");
+      case "expired_token":
+        throw new Error("The authorization request expired");
+      default:
+        throw new Error(`Unexpected device authorization status: ${String(body.status)}`);
+    }
+  }
+
+  throw new Error("Timed out waiting for authorization");
+}
+
+async function promptForInput(question: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     rl.question(question, (answer) => {
       rl.close();
@@ -99,7 +249,7 @@ async function saveToProfile(
   }
 
   // Remove any existing entry for this site
-  profile.auth_pairs = profile.auth_pairs.filter((p: any) => p.site !== site);
+  profile.auth_pairs = profile.auth_pairs.filter((pair: any) => pair.site !== site);
 
   // Add new entry
   profile.auth_pairs.push({
@@ -109,6 +259,25 @@ async function saveToProfile(
   });
 
   await writeFile(profilePath, JSON.stringify(profile, null, 2), "utf8");
+}
+
+async function getLegacyPayload(
+  options: GenerateOptions,
+  publicKey: string,
+  nonce: string
+): Promise<string> {
+  const authUrl = buildAuthorizationUrl(options, publicKey, nonce);
+  console.error("This Discourse site does not support device authorization.");
+  console.error("Please visit this URL to authorize the application:\n");
+  console.error(authUrl);
+  console.error("");
+
+  if (options.payload) return options.payload;
+
+  console.error("After authorizing, copy the encrypted payload displayed by Discourse.\n");
+  const payload = await promptForInput("Paste the encrypted payload here: ");
+  if (!payload) throw new Error("No payload provided");
+  return payload;
 }
 
 export async function generateUserApiKey(options: GenerateOptions): Promise<void> {
@@ -121,80 +290,70 @@ Options:
   --scopes <scopes>         Comma-separated scopes (default: read,write)
   --application-name <name> Application name (default: Discourse MCP)
   --client-id <id>          Client ID (default: discourse-mcp)
-  --nonce <nonce>           Nonce for request (default: timestamp)
-  --payload <payload>       Encrypted payload (skip interactive prompt)
+  --nonce <nonce>           Nonce for request (default: random)
+  --payload <payload>       Use a legacy encrypted payload directly
   --save-to <file>          Save to profile file instead of printing
   --help, -h                Show this help message
 
 Examples:
-  # Interactive mode
   discourse-mcp generate-user-api-key --site https://discourse.example.com
-
-  # Save to profile
   discourse-mcp generate-user-api-key --site https://discourse.example.com --save-to profile.json
-
-  # Non-interactive with payload
-  discourse-mcp generate-user-api-key --site https://discourse.example.com --payload "base64..."
 `);
     process.exit(1);
   }
 
   console.error("\n🔑 Discourse User API Key Generator\n");
   console.error(`Site: ${options.site}`);
-  console.error(`Scopes: ${options.scopes || "read,write"}\n`);
-
-  // Step 1: Generate RSA keypair
+  console.error(`Scopes: ${options.scopes || DEFAULT_SCOPES}\n`);
   console.error("Generating RSA key pair...");
   const { publicKey, privateKey } = generateKeyPair();
+  const nonce = options.nonce || randomBytes(32).toString("hex");
   console.error("✓ Key pair generated\n");
 
-  // Step 2: Build authorization URL
-  const authUrl = buildAuthorizationUrl(options, publicKey);
-  console.error("Please visit this URL to authorize the application:\n");
-  console.error(authUrl);
-  console.error("");
-
-  // Step 3: Get encrypted payload
   let encryptedPayload: string;
-  if (options.payload) {
-    encryptedPayload = options.payload;
+  let padding: "pkcs1" | "oaep";
+
+  if (!options.payload && (await supportsDeviceAuthorization(options.site))) {
+    console.error("Requesting device authorization...");
+    const authorization = await createDeviceAuthorization(options, publicKey, nonce);
+    const verificationUri =
+      authorization.verificationUriWithRequest || authorization.verificationUri;
+    console.error("\nOpen this URL in your browser:\n");
+    console.error(verificationUri);
+    console.error(`\nEnter this code when prompted: ${authorization.userCode}`);
+    console.error("\nWaiting for authorization...");
+    encryptedPayload = await pollDeviceAuthorization(options.site, authorization);
+    padding = "oaep";
   } else {
-    console.error("After authorizing, you will be redirected to a URL like:");
-    console.error("  discourse://auth_redirect?payload=<encrypted_payload>");
-    console.error("\nOr you may see the encrypted payload displayed on the page.\n");
-
-    encryptedPayload = await promptForInput("Paste the encrypted payload here: ");
-
-    if (!encryptedPayload) {
-      throw new Error("No payload provided");
-    }
+    encryptedPayload = await getLegacyPayload(options, publicKey, nonce);
+    padding = "pkcs1";
   }
 
-  // Step 4: Decrypt payload
   console.error("\nDecrypting payload...");
-  const decrypted = decryptPayload(encryptedPayload, privateKey);
-  const result = JSON.parse(decrypted);
-
-  if (!result.key) {
-    throw new Error("Invalid response: missing 'key' field");
+  const result = decryptPayload(encryptedPayload, privateKey, padding);
+  if (result.nonce !== nonce) {
+    throw new Error("Invalid response: nonce did not match the authorization request");
   }
-
   console.error("✓ User API Key retrieved successfully\n");
 
-  // Step 5: Output or save
-  const clientId = options.clientId || "discourse-mcp";
-
+  const clientId = options.clientId || DEFAULT_CLIENT_ID;
   if (options.saveTo) {
     await saveToProfile(options.saveTo, options.site, result.key, clientId);
     console.error(`✓ Saved to profile: ${options.saveTo}\n`);
     console.log(JSON.stringify({ success: true, profile: options.saveTo }, null, 2));
   } else {
     console.error("Add this to your auth_pairs configuration:\n");
-    console.log(JSON.stringify({
-      site: options.site,
-      user_api_key: result.key,
-      user_api_client_id: clientId,
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          site: options.site,
+          user_api_key: result.key,
+          user_api_client_id: clientId,
+        },
+        null,
+        2
+      )
+    );
     console.error("\nOr use --save-to <profile.json> to save automatically.");
   }
 }
@@ -248,8 +407,8 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((err) => {
-    console.error(`Fatal error: ${err}`);
+  main().catch((error) => {
+    console.error(`Fatal error: ${error}`);
     process.exit(1);
   });
 }

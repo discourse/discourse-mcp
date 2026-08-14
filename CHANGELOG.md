@@ -4,6 +4,10 @@
 
 ### Features
 
+* Use Discourse's device authorization flow when generating User API Keys
+  - Show a short browser activation code and poll for approval automatically
+  - Use RSA-OAEP encryption and validate the response nonce
+  - Fall back to the legacy copy-and-paste flow on older Discourse sites
 * Add typed built-in toolsets and `--toolsets <name[,name...]>` selection
   - Filter built-in tools by operator-facing domains while preserving canonical registration order
   - Keep site selection, write enablement, and call-time authorization as independent safety controls

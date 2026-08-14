@@ -543,13 +543,15 @@ npx @discourse/mcp@latest generate-user-api-key --site https://discourse.example
 npx @discourse/mcp@latest generate-user-api-key --help
 ```
 
-The command will:
+The command uses Discourse's device authorization flow on supported sites (Discourse 2026.6.0 and newer):
 
-1. Generate an RSA key pair
-2. Display an authorization URL for you to visit
-3. Prompt you to paste the encrypted payload after authorization
-4. Decrypt and display your User API Key
-5. Optionally save it to a profile file
+1. It generates an RSA key pair and requests a short-lived authorization.
+2. It displays an activation URL and a short code such as `ABCD-2345`.
+3. You open the URL, enter the code, review the scopes, and authorize the request.
+4. The command polls Discourse and retrieves the encrypted User API Key automatically.
+5. It validates and decrypts the response, then prints the configuration or saves it to a profile.
+
+No encrypted payload needs to be copied back into the terminal. For older Discourse sites, the command automatically falls back to the legacy authorization URL and payload prompt.
 
 #### Manual Method
 
