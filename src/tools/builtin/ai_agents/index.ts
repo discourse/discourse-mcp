@@ -30,6 +30,7 @@ export function slimAgentIndex(raw: any) {
       allowed_group_ids: Array.isArray(agent.allowed_group_ids) ? agent.allowed_group_ids : [],
       tool_count: Array.isArray(agent.tools) ? agent.tools.length : 0,
       mcp_server_count: Array.isArray(agent.mcp_server_ids) ? agent.mcp_server_ids.length : 0,
+      subagent_count: Array.isArray(agent.subagent_ids) ? agent.subagent_ids.length : 0,
       features: Array.isArray(agent.features) ? agent.features.map((feature: any) => ({ id: feature.id, module_name: feature.module_name, name: feature.name })) : [],
     })),
     meta: {
@@ -75,7 +76,7 @@ export const getAiAgentTool = defineTool({
 
 export const createAiAgentTool = defineTool({
   name: "discourse_ai_create_agent", title: "Create AI Agent",
-  description: "Create a typed Discourse AI agent. Requires admin credentials and write mode. Tool entries may be names or [name, options, force] tuples.",
+  description: "Create a typed Discourse AI agent, including an optional subagent delegation allowlist of up to 20 existing agent IDs. Requires admin credentials and write mode. Tool entries may be names or [name, options, force] tuples.",
   schema: createAgentPayloadSchema,
   availability: "writes_enabled", toolsets: ["ai_agents"],
   handler: async (input, _extra, ctx, opts) => {
@@ -87,7 +88,7 @@ export const createAiAgentTool = defineTool({
 
 export const updateAiAgentTool = defineTool({
   name: "discourse_ai_update_agent", title: "Update AI Agent",
-  description: "Partially update one AI agent, including enabled state, permissions, model, prompt, tools, and RAG configuration. Only supplied fields are sent. Requires admin credentials and write mode.",
+  description: "Partially update one AI agent, including enabled state, permissions, model, prompt, tools, subagent delegation, and RAG configuration. Only supplied fields are sent. Requires admin credentials and write mode.",
   schema: updateSchema,
   availability: "writes_enabled", toolsets: ["ai_agents"],
   handler: async (input, _extra, ctx, opts) => {

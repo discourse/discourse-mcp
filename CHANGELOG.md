@@ -18,6 +18,15 @@
   - Create and replace complete graphs with paired graph safety and a flat connection adapter
   - Apply mechanical MCP-side graph operations after a fresh GET, then publish, unpublish, discard, delete, or restore drafts
   - Evaluate expressions, manage pin-data, step-run or manually run the current draft, and poll asynchronous executions
+* Add typed AI-agent subagent delegation support
+  - Accept ordered `subagent_ids` allowlists on agent creation and partial updates, including negative system-agent IDs
+  - Match Discourse's limit of 20 unique subagents and expose `subagent_count` in slim agent listings
+* Add the default `private_messages` toolset for authenticated PM lifecycle operations
+  - List personal and group inbox/archive/unread/new mailboxes, plus personal sent messages, with uncached identity-safe reads
+  - Read PM-specific metadata, direct allowed-user/group records, reply relationships, and bounded post bodies while rejecting public topics
+  - Create PMs for typed user, group, and email recipients and safely reply only after a PM-archetype preflight
+  - Invite users, groups, or email addresses with correct group notification serialization and intentionally conservative email outcome reporting
+  - Preserve Discourse authorization, write gating, API-key identity rules, recipient limits, and Guardian checks
 
 ### Maintenance
 

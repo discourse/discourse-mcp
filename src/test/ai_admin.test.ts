@@ -50,14 +50,14 @@ test("agent list is slim by default and full only when explicitly requested", as
   const original = globalThis.fetch;
   const longDescription = "D".repeat(400);
   const upstream = {
-    ai_agents: [{ id: 1, name: "Helper", description: longDescription, enabled: true, system: true, priority: true, system_prompt: "very large private prompt", tools: [["Search", null, false], ["custom-4", {}, true]], allowed_group_ids: [10], mcp_server_ids: [2], mcp_server_tool_names: { "2": ["lookup"] }, features: [{ id: 7, module_name: "bot", name: "bot" }], user: { id: 22, username: "helper" } }],
+    ai_agents: [{ id: 1, name: "Helper", description: longDescription, enabled: true, system: true, priority: true, system_prompt: "very large private prompt", tools: [["Search", null, false], ["custom-4", {}, true]], allowed_group_ids: [10], mcp_server_ids: [2], mcp_server_tool_names: { "2": ["lookup"] }, subagent_ids: [3, -14], subagent_tool_token_count: 120, features: [{ id: 7, module_name: "bot", name: "bot" }], user: { id: 22, username: "helper" } }],
     meta: { tools: [{ id: "Search", name: "Search", help: "large help text", options: { query: { description: "large schema" } }, token_count: 50 }], llms: [{ id: 3, name: "Model", vision_enabled: true, supported_native_tools: ["web_search"], extra: "omit" }], mcp_servers: [{ id: 2, name: "Server", tool_count: 8, last_health_status: "healthy", tools: ["large"] }], settings: { rag_images_enabled: true } },
   };
   globalThis.fetch = async () => Response.json(upstream);
   try {
     const { invoke } = harness(); const slim = body(await invoke("discourse_ai_list_agents", {}));
     assert.equal(slim.total, 1); assert.equal(slim.detail_tool, "discourse_ai_get_agent");
-    assert.equal(slim.ai_agents[0].system_prompt, undefined); assert.equal(slim.ai_agents[0].tools, undefined); assert.equal(slim.ai_agents[0].tool_count, 2);
+    assert.equal(slim.ai_agents[0].system_prompt, undefined); assert.equal(slim.ai_agents[0].tools, undefined); assert.equal(slim.ai_agents[0].tool_count, 2); assert.equal(slim.ai_agents[0].subagent_count, 2); assert.equal(slim.ai_agents[0].subagent_ids, undefined);
     assert.equal(slim.ai_agents[0].description.length, 180); assert.equal(slim.ai_agents[0].description_truncated, true);
     assert.equal(slim.meta.tools[0].help, undefined); assert.equal(slim.meta.tools[0].options, undefined); assert.equal(slim.meta.mcp_servers[0].tools, undefined);
     const full = body(await invoke("discourse_ai_list_agents", { view: "full" })); assert.equal(full.ai_agents[0].system_prompt, "very large private prompt"); assert.ok(full.meta.tools[0].options);
@@ -114,10 +114,26 @@ test("agent create and partial update send exact wrappers and preserve omitted R
   const original = globalThis.fetch; const requests: Array<{ url: string; method: string; body?: any }> = [];
   globalThis.fetch = async (input, init) => { const url = String(input); const method = init?.method ?? "GET"; const parsed = init?.body ? JSON.parse(String(init.body)) : undefined; requests.push({ url, method, body: parsed }); if (method === "GET") return Response.json({ ai_agent: { rag_uploads: [{ id: 9 }] } }); return Response.json({ ai_agent: { id: 4 } }, { status: method === "POST" ? 201 : 200 }); };
   try {
-    const { invoke } = harness(); await invoke("discourse_ai_create_agent", { name: "Agent", description: "Description", system_prompt: "Prompt", tools: [["custom-2", { option: true }, true]] });
-    await invoke("discourse_ai_update_agent", { id: 4, enabled: false, allowed_group_ids: [3, 11] });
-    assert.equal(requests[0].url.endsWith("/admin/plugins/discourse-ai/ai-agents.json"), true); assert.equal(requests[0].body.ai_agent.name, "Agent");
-    assert.deepEqual(requests.slice(1).map((item) => item.method), ["GET", "PUT"]); assert.deepEqual(requests[2].body, { ai_agent: { enabled: false, allowed_group_ids: [3, 11], rag_uploads: [{ id: 9 }] } });
+    const { invoke } = harness(); await invoke("discourse_ai_create_agent", { name: "Agent", description: "Description", system_prompt: "Prompt", tools: [["custom-2", { option: true }, true]], subagent_ids: [7, "-14"] });
+    await invoke("discourse_ai_update_agent", { id: 4, enabled: false, allowed_group_ids: [3, 11], subagent_ids: [8] });
+    assert.equal(requests[0].url.endsWith("/admin/plugins/discourse-ai/ai-agents.json"), true); assert.equal(requests[0].body.ai_agent.name, "Agent"); assert.deepEqual(requests[0].body.ai_agent.subagent_ids, [7, "-14"]);
+    assert.deepEqual(requests.slice(1).map((item) => item.method), ["GET", "PUT"]); assert.deepEqual(requests[2].body, { ai_agent: { enabled: false, allowed_group_ids: [3, 11], subagent_ids: [8], rag_uploads: [{ id: 9 }] } });
+  } finally { globalThis.fetch = original; }
+});
+
+test("agent subagent schema enforces nonzero IDs and upstream limit", async () => {
+  const original = globalThis.fetch; let calls = 0;
+  globalThis.fetch = async () => { calls++; return Response.json({}); };
+  try {
+    const { invoke } = harness();
+    const tooMany: any = await invoke("discourse_ai_create_agent", {
+      name: "Agent", description: "Description", system_prompt: "Prompt",
+      subagent_ids: Array.from({ length: 21 }, (_, index) => index + 1),
+    });
+    assert.equal(tooMany.isError, true); assert.match(body(tooMany).error, /Validation failed/);
+    const invalid: any = await invoke("discourse_ai_update_agent", { id: 4, subagent_ids: [0] });
+    assert.equal(invalid.isError, true); assert.match(body(invalid).error, /Validation failed/);
+    assert.equal(calls, 0);
   } finally { globalThis.fetch = original; }
 });
 

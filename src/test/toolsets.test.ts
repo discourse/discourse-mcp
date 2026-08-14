@@ -16,6 +16,7 @@ const expectedToolsets = [
   "drafts",
   "uploads",
   "data_explorer",
+  "private_messages",
   "workflows",
   "ai_agents",
   "ai_custom_tools",

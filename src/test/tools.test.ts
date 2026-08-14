@@ -254,6 +254,11 @@ const ALL_TOOLS_IN_ORDER = [
   'discourse_create_query',
   'discourse_update_query',
   'discourse_delete_query',
+  'discourse_list_private_messages',
+  'discourse_read_private_message',
+  'discourse_create_private_message',
+  'discourse_reply_private_message',
+  'discourse_invite_to_private_message',
 ] as const;
 
 const WRITE_TOOL_NAMES = new Set([
@@ -270,6 +275,9 @@ const WRITE_TOOL_NAMES = new Set([
   'discourse_create_query',
   'discourse_update_query',
   'discourse_delete_query',
+  'discourse_create_private_message',
+  'discourse_reply_private_message',
+  'discourse_invite_to_private_message',
 ]);
 
 const READ_ONLY_TOOLS_IN_ORDER = ALL_TOOLS_IN_ORDER.filter(
@@ -358,6 +366,29 @@ test('data_explorer toolset composes with write and tethered registration gates'
   ]);
 });
 
+test('private_messages toolset is isolated and composes with write and tether gates', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const readOnly = createMockServer();
+  await registerAllTools(readOnly.server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', toolsets: ['private_messages'] });
+  assert.deepEqual(readOnly.calls.map((call) => call.name), [
+    'discourse_select_site',
+    'discourse_list_private_messages',
+    'discourse_read_private_message'
+  ]);
+
+  const writes = createMockServer();
+  await registerAllTools(writes.server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only', toolsets: ['private_messages'], hideSelectSite: true });
+  assert.deepEqual(writes.calls.map((call) => call.name), [
+    'discourse_list_private_messages',
+    'discourse_read_private_message',
+    'discourse_create_private_message',
+    'discourse_reply_private_message',
+    'discourse_invite_to_private_message'
+  ]);
+  assert.equal(writes.calls.some((call) => call.name === 'discourse_create_post'), false);
+});
+
 test('workflows is opt-in and composes with write and tether gates', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
@@ -383,7 +414,7 @@ test('expanded all selection includes opt-in workflow tools', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
   const { server, calls } = createMockServer();
-  await registerAllTools(server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only', toolsets: ['site', 'search', 'topics', 'users', 'chat', 'drafts', 'uploads', 'data_explorer', 'workflows'] });
+  await registerAllTools(server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only', toolsets: ['site', 'search', 'topics', 'users', 'chat', 'drafts', 'uploads', 'data_explorer', 'private_messages', 'workflows'] });
   assert.deepEqual(calls.slice(0, ALL_TOOLS_IN_ORDER.length).map((call) => call.name), [...ALL_TOOLS_IN_ORDER]);
   assert.equal(calls.filter((call) => call.name.includes('workflow')).length, 18);
 });

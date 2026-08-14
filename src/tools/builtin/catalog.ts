@@ -22,6 +22,7 @@ import { updatePostTool } from "./update_post.js";
 import { updateUserTool } from "./update_user.js";
 import { uploadFileTool } from "./upload_file.js";
 import { dataExplorerTools } from "./data_explorer/index.js";
+import { privateMessageTools } from "./private_messages/index.js";
 import { workflowTools } from "./workflows/index.js";
 import { aiAgentTools } from "./ai_agents/index.js";
 import { aiCustomToolTools } from "./ai_custom_tools/index.js";
@@ -50,6 +51,7 @@ export const builtinTools = [
   saveDraftTool,
   deleteDraftTool,
   ...dataExplorerTools,
+  ...privateMessageTools,
   ...workflowTools,
   ...aiAgentTools,
   ...aiCustomToolTools,

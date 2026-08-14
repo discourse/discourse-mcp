@@ -37,6 +37,9 @@ export const agentPayloadShape = {
   tools: z.array(agentToolSchema),
   mcp_server_ids: z.array(z.number().int().positive()),
   mcp_server_tool_names: z.record(z.array(z.string().min(1))),
+  subagent_ids: z.array(aiAgentIdSchema)
+    .refine((ids) => new Set(ids.map(String)).size <= 20, "At most 20 unique subagent IDs are allowed")
+    .describe("Up to 20 existing AI agent IDs this agent may delegate to; IDs may include negative system-agent IDs"),
   forced_tool_count: z.number().int().min(-1).max(100_000),
   require_approval: z.boolean(),
   response_format: z.array(z.record(z.unknown())).nullable(),

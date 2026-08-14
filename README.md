@@ -76,7 +76,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
 - **Write safety**
 
   - Writes are disabled by default.
-  - Built-in write tools are only registered when `--allow_writes` is enabled **and** `--read_only=false`. This includes post, topic, category, user, upload, draft, and saved Data Explorer query mutations.
+  - Built-in write tools are only registered when `--allow_writes` is enabled **and** `--read_only=false`. This includes post, topic, private-message, category, user, upload, draft, and saved Data Explorer query mutations.
+  - Private-message listing and reading also require a matching authenticated site because PM data is never public.
   - Toolset selection does not bypass write safety. A selected write tool remains absent unless writes are enabled.
   - Write tools require a matching `auth_pairs` entry for the selected site; otherwise they return an error.
   - A ~1 req/sec rate limit is enforced for write actions.
@@ -97,7 +98,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - `--toolsets <name[,name...]>`: Expose selected built-in domains. Omit for the default catalog (all non-opt-in domains); use `--toolsets all` to include opt-in workflows and AI administration domains. See [Built-in toolsets](#built-in-toolsets).
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest`).
-  - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic`. The tools prefer `raw` content by requesting `include_raw=true`.
+  - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic` and `discourse_read_private_message`. The tools prefer `raw` content by requesting `include_raw=true`.
   - `--allowed_upload_paths <paths>`: Comma-separated list or JSON array of directories allowed for local file uploads. Required to enable local file uploads in `discourse_upload_file`. Example: `--allowed_upload_paths "/home/user/images,/tmp/uploads"` or `--allowed_upload_paths '["/home/user/images"]'`
   - `--transport <stdio|http>` (default: stdio): Transport type. Use `stdio` for standard input/output (default), or `http` for Streamable HTTP transport (stateless mode with JSON responses).
   - `--port <number>` (default: 3000): Port to listen on when using HTTP transport.
@@ -200,6 +201,7 @@ Available toolsets are:
 | `drafts` | Draft retrieval, save, and deletion |
 | `uploads` | File upload |
 | `data_explorer` | Query retrieval, execution, creation, update, and deletion |
+| `private_messages` | Authenticated personal/group PM listing and reading, plus write-gated creation, replies, and participant invitations |
 | `workflows` *(opt-in)* | Admin-only workflow discovery, graph authoring, expression evaluation, pin-data, draft runs, step runs, executions, and version management |
 | `ai_agents` *(opt-in)* | Admin-only AI agent discovery, typed lifecycle, bot-user creation, and portable import/export |
 | `ai_custom_tools` *(opt-in)* | Admin-only database-backed scripted custom-tool guide, lifecycle, actual execution testing, and import/export |
@@ -216,6 +218,16 @@ Toolset membership is intentionally separate from safety and authorization:
 - Toolsets filter **built-in tools only; they are not an authorization or complete capability boundary**. MCP resources and prompts remain available, and all existing call-time access checks remain authoritative. Remote Tool Execution API discovery is controlled independently by `--tools_mode`; use `--tools_mode discourse_api_only` when the MCP tool list must contain only the selected built-in domains. The server logs an informational notice when selected toolsets are combined with remote discovery.
 - A selected domain can contribute no tools under the current safety configuration—for example, `uploads` in read-only mode. The server logs an informational notice when this occurs.
 - Unknown or empty toolset selections are configuration errors. Values are de-duplicated after trimming whitespace.
+
+#### Private messages
+
+The default `private_messages` toolset provides a PM-aware interface rather than reusing generic public-topic mutations. Listing and reading require configured authentication. Creation, replies, and invitations additionally require both `--allow_writes` and `--read_only=false`. Discourse remains authoritative for mailbox visibility, PM membership, recipient limits, group messageability, and all Guardian/API-key checks.
+
+Personal mailboxes support `inbox`, `sent`, `archive`, `unread`, and `new`. Group mailboxes support all except `sent`; a personal inbox does not include every group inbox. If `discourse_list_private_messages` omits `username`, it resolves the authenticated user through `/session/current.json`. A supplied username selects a mailbox path—it does not impersonate that user. Discourse permits another user's inbox/sent/archive only where its authorization rules allow it, while `unread` and `new` remain owner-only even for admins.
+
+PM recipients are typed as usernames, group names, or email addresses. During creation, a messageable group wins over a same-named user in Discourse's upstream classification. A nonexistent or non-messageable `group_names` value can therefore surface as a user-not-found-style upstream error. Unknown email recipients may immediately create staged users when site settings and sender permissions allow it; use a canonical username when staged-user creation is not intended.
+
+Email invitations are intentionally opaque. A successful response does **not** confirm delivery or immediate participant access: an address belonging to an existing account may produce a successful no-op, while a new address receives access only after invitation redemption. Use `username` to add a known account immediately. Group invitation lookup is exact-case, so use the canonical group name. Optional `author_username` sends `Api-Username`; switching identities is supported only by an appropriate global API key, while User API Keys remain bound to their owner.
 
 #### Workflow authoring
 
@@ -248,7 +260,9 @@ npx -y @discourse/mcp@latest --site https://forum.example.com \
   --allow_writes --read_only=false
 ```
 
-The agent index is intentionally concise by default: `discourse_ai_list_agents` omits system prompts and per-agent configuration, returning summary counts plus slim tool/model catalogs. Use `discourse_ai_get_agent` with an ID to inspect one full configuration. `view: "full"` is available only for clients that explicitly need the complete upstream index.
+The agent index is intentionally concise by default: `discourse_ai_list_agents` omits system prompts and per-agent configuration, returning summary counts—including `subagent_count`—plus slim tool/model catalogs. Use `discourse_ai_get_agent` with an ID to inspect one full configuration. `view: "full"` is available only for clients that explicitly need the complete upstream index.
+
+Agent create/update schemas accept `subagent_ids`, an ordered allowlist of up to 20 unique existing agent IDs that the parent may delegate to. Negative IDs are valid for system agents. Discourse validates that every ID exists, rejects self-delegation, and prevents a configured tool from colliding with the generated `spawn_agent` tool; use the full agent list or detail response to resolve IDs before writing.
 
 `discourse_ai_list_custom_tools` follows the same pattern: it returns compact records and preset signatures without scripts, bindings, or verbose parameter documentation. Use `discourse_ai_get_custom_tool` for one stored tool, or call the guide with `topic: "presets"` and a `preset_id` for one complete preset example.
 
@@ -348,6 +362,26 @@ Built‑in tools (always present unless noted). All tools return **strict JSON**
 - `discourse_delete_draft` (only when writes enabled; see Write safety)
   - Input: `{ draft_key: string; sequence: number }`
   - Output: `{ draft_key, deleted }`
+- `discourse_list_private_messages` (requires authentication)
+  - Input: `{ username?: string; mailbox?: "inbox"|"sent"|"archive"|"unread"|"new"; group_name?: string; page?: number (0-based, default 0); per_page?: number (1–100, default 30) }`
+  - Output: `{ mailbox, username, group_name, messages: [{topic_id, slug, title, posts_count, reply_count, created_at, last_posted_at, bumped_at, last_read_post_number, unread_posts, unseen, topic_archived, message_archived, notification_level, recent_participants}], meta: {page, per_page, has_more} }`
+  - Omitting `username` uses the authenticated user. Group mailboxes do not support `sent`; `unread` and `new` cannot target another user.
+- `discourse_read_private_message` (requires authentication)
+  - Input: `{ topic_id: number; post_limit?: number (1–50, default 5); start_post_number?: number }`
+  - Output: `{ topic_id, slug, title, archetype, subtype, posts_count, last_read_post_number, topic_archived, message_archived, allowed_users, allowed_groups, posts, meta }`
+  - `allowed_users` and `allowed_groups` are direct records, not an expanded ACL. Public topics are rejected.
+- `discourse_create_private_message` (only when writes enabled; see Write safety)
+  - Input: `{ title: string; raw: string (<= 30k chars); usernames?: string[]; group_names?: string[]; email_addresses?: string[]; author_username?: string }` (at least one recipient required)
+  - Output: `{ id, topic_id, post_number, slug, title }`
+  - Unknown emails may create staged users. Messageable group names take precedence over same-named usernames.
+- `discourse_reply_private_message` (only when writes enabled; see Write safety)
+  - Input: `{ topic_id: number; raw: string (<= 30k chars); reply_to_post_number?: number; author_username?: string }`
+  - Output: `{ id, topic_id, post_number, reply_to_post_number, slug }`
+  - Performs an uncached PM-archetype safety check before posting, without advancing read state.
+- `discourse_invite_to_private_message` (only when writes enabled; see Write safety)
+  - Input: `{ topic_id: number; username?: string; group_name?: string; email_address?: string; notify_group_members?: boolean; custom_message?: string (<= 3000 chars); author_username?: string }` (exactly one recipient required)
+  - Output: immediate normalized user/group addition, or `{ topic_id, recipient_type: "email", status: "submitted", participant_added: false, outcome_confirmed: false }`
+  - Email submission never claims delivery or access. `custom_message` is email-only, group notifications default to enabled, and group names are exact-case.
 - `discourse_create_post` (only when writes enabled; see Write safety)
   - Input: `{ topic_id: number; raw: string (<= 30k chars); author_username?: string }`
   - Output: `{ id, topic_id, post_number }`
@@ -485,6 +519,24 @@ npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"s
 npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 # In your MCP client, call discourse_create_topic, for example:
 # { "title": "Agentic workflows", "raw": "Let's discuss agent workflows.", "category_id": 1, "tags": ["ai","agents"] }
+```
+
+- Private-message workflow with authenticated list/read and write-gated create/reply/invite:
+
+```bash
+npx -y @discourse/mcp@latest \
+  --site https://try.discourse.org \
+  --toolsets private_messages \
+  --tools_mode discourse_api_only \
+  --auth_pairs '[{"site":"https://try.discourse.org","user_api_key":"'$DISCOURSE_USER_API_KEY'"}]' \
+  --allow_writes --read_only=false
+
+# In your MCP client:
+# discourse_list_private_messages: { "mailbox": "inbox", "page": 0 }
+# discourse_read_private_message: { "topic_id": 123, "post_limit": 10 }
+# discourse_reply_private_message: { "topic_id": 123, "raw": "Here is the result.", "reply_to_post_number": 3 }
+# discourse_create_private_message: { "title": "Claim review", "raw": "Please review.", "usernames": ["alice"], "group_names": ["reviewers"], "email_addresses": ["external@example.com"] }
+# discourse_invite_to_private_message: { "topic_id": 123, "group_name": "reviewers", "notify_group_members": false }
 ```
 
 - Run with HTTP transport (on port 3000):

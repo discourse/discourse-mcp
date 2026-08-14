@@ -25,6 +25,7 @@ export async function rateLimit(key: string, intervalMs: number = 1000): Promise
 export interface PaginationMeta {
   total?: number;
   page?: number;
+  per_page?: number;
   limit?: number;
   has_more?: boolean;
   next_cursor?: string | null;
@@ -51,6 +52,7 @@ function cleanMeta(meta: PaginationMeta): PaginationMeta {
   const clean: PaginationMeta = {};
   if (meta.total !== undefined) clean.total = meta.total;
   if (meta.page !== undefined) clean.page = meta.page;
+  if (meta.per_page !== undefined) clean.per_page = meta.per_page;
   if (meta.limit !== undefined) clean.limit = meta.limit;
   if (meta.has_more !== undefined) clean.has_more = meta.has_more;
   if (meta.next_cursor !== undefined) clean.next_cursor = meta.next_cursor;

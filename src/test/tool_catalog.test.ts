@@ -285,6 +285,36 @@ const EXPECTED_METADATA = [
     "inputKeys": [
       "id"
     ]
+  },
+  {
+    "name": "discourse_list_private_messages",
+    "title": "List Private Messages",
+    "description": "List authenticated personal or group private-message mailboxes. Returns normalized JSON messages and pagination metadata.",
+    "inputKeys": ["username", "mailbox", "group_name", "page", "per_page"]
+  },
+  {
+    "name": "discourse_read_private_message",
+    "title": "Read Private Message",
+    "description": "Read an authenticated private message, its posts, and direct allowed-user and allowed-group records. Rejects public topics.",
+    "inputKeys": ["topic_id", "post_limit", "start_post_number"]
+  },
+  {
+    "name": "discourse_create_private_message",
+    "title": "Create Private Message",
+    "description": "Create a private message for typed user, group, or email recipients. Unknown emails may create staged users. Returns normalized JSON post details.",
+    "inputKeys": ["title", "raw", "usernames", "group_names", "email_addresses", "author_username"]
+  },
+  {
+    "name": "discourse_reply_private_message",
+    "title": "Reply to Private Message",
+    "description": "Safely reply to an existing private message after verifying its archetype. Returns normalized JSON post details.",
+    "inputKeys": ["topic_id", "raw", "reply_to_post_number", "author_username"]
+  },
+  {
+    "name": "discourse_invite_to_private_message",
+    "title": "Invite to Private Message",
+    "description": "Add a user or group to a private message, or submit an opaque email invitation. Email success does not confirm delivery or participant access.",
+    "inputKeys": ["topic_id", "username", "group_name", "email_address", "notify_group_members", "custom_message", "author_username"]
   }
 ] as const;
 
@@ -314,6 +344,11 @@ const EXPECTED_TOOLSETS = {
   discourse_create_query: ["data_explorer"],
   discourse_update_query: ["data_explorer"],
   discourse_delete_query: ["data_explorer"],
+  discourse_list_private_messages: ["private_messages"],
+  discourse_read_private_message: ["private_messages"],
+  discourse_create_private_message: ["private_messages"],
+  discourse_reply_private_message: ["private_messages"],
+  discourse_invite_to_private_message: ["private_messages"],
   discourse_list_workflows: ["workflows"],
   discourse_get_workflow: ["workflows"],
   discourse_list_workflow_node_types: ["workflows"],
