@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.10](https://github.com/discourse/discourse-mcp/compare/v0.2.9...v0.2.10) (2026-08-14)
+
+### Features
+
+* Add always-registered `discourse_list_categories`, `discourse_list_groups`, and `discourse_list_tag_groups` read tools as the canonical site-directory interfaces
+* Return structured content plus serialized JSON text for directory-tool compatibility across MCP clients
+* Fetch all category and group pages, deduplicate directory entries by numeric ID, and stop pagination safely if a server repeats pages
+
+### Deprecations
+
+* Deprecate `discourse://site/categories` and `discourse://site/groups` for removal in a future major release; both remain available for backward compatibility
+
 ## [0.2.9](https://github.com/discourse/discourse-mcp/compare/v0.2.8...v0.2.9) (2026-07-03)
 
 ### Security

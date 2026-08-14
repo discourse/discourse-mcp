@@ -30,9 +30,13 @@ import {
   registerUpdateQuery,
   registerDeleteQuery,
 } from "./builtin/data_explorer/index.js";
+import {
+  registerListCategories,
+  registerListGroups,
+  registerListTagGroups,
+} from "./builtin/list_directories.js";
 
 // Note: The following tools have been replaced by MCP Resources (v0.2.0):
-// - discourse_list_categories → discourse://site/categories
 // - discourse_list_tags → discourse://site/tags
 // - discourse_list_chat_channels → discourse://chat/channels
 // - discourse_list_user_chat_channels → discourse://user/chat-channels
@@ -76,6 +80,9 @@ export async function registerAllTools(
   registerGetUser(server, ctx, { allowWrites: false, showEmails: opts.showEmails });
   registerListUserPosts(server, ctx, { allowWrites: false });
   registerListUsers(server, ctx, { allowWrites: false, showEmails: opts.showEmails });
+  registerListCategories(server, ctx, { allowWrites: false });
+  registerListGroups(server, ctx, { allowWrites: false });
+  registerListTagGroups(server, ctx, { allowWrites: false });
   registerGetChatMessages(server, ctx, { allowWrites: false });
   registerGetDraft(server, ctx, { allowWrites: false });
   

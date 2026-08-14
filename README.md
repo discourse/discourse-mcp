@@ -5,7 +5,7 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 - **Entry point**: `src/index.ts` → compiled to `dist/index.js` (binary name: `discourse-mcp`)
 - **SDK**: `@modelcontextprotocol/sdk`
 - **Node**: >= 24
-- **Version**: 0.2.4 (0.2.x has breaking changes from 0.1.x - JSON-only output, resources replace list tools)
+- **Version**: 0.2.10 (0.2.x has breaking changes from 0.1.x - JSON-only output)
 
 ### Quick start (release)
 
@@ -151,12 +151,34 @@ Flags still override values from the profile.
 - **Privacy**
   - Secrets are redacted in logs. Errors are returned as human‑readable messages to MCP clients.
 
+## Site directory discovery
+
+The following parameterless read tools are the canonical interfaces for discovering the current site inventory. They are always registered, including in the default read-only profile, and use the configured API credentials. "Every" means every item visible to that Discourse API user.
+
+- `discourse_list_categories`
+  - Input: `{}`
+  - Output: `{ categories: [{id, name}], meta: {total} }`
+  - Fetches all category pages, including when Discourse category lazy-loading is enabled.
+- `discourse_list_groups`
+  - Input: `{}`
+  - Output: `{ groups: [{id, name}], meta: {total} }`
+  - Fetches all group pages and deduplicates by ID.
+- `discourse_list_tag_groups`
+  - Input: `{}`
+  - Output: `{ tag_groups: [{id, name}], meta: {total} }`
+  - Requires a staff account; insufficient access is returned as an explicit tool error.
+
+All three return both MCP `structuredContent` and serialized JSON text for client compatibility.
+
+After installing a package version that adds or changes tools, restart the MCP server or start a new Cursor chat so the client refreshes its tool catalog.
+
 ## MCP Resources
 
-Resources provide static/semi-static read-only data via URI addressing. Use these instead of tools for listing operations.
+Resources provide application-controlled, URI-addressable context. The category and group resources below are retained temporarily for backward compatibility; their directory tools are canonical, and the resources are deprecated for removal in a future major release.
 
 - **discourse://site/categories**
 
+  - **Deprecated:** use `discourse_list_categories` for directory discovery
   - List all categories with hierarchy and permissions
   - Output: `{ categories: [{id, name, slug, pid, read_restricted, topic_count, post_count, perms}], meta: {total} }`
   - `perms` is array of `{gid, perm}` where perm: 1=full, 2=create_post, 3=readonly
@@ -169,6 +191,7 @@ Resources provide static/semi-static read-only data via URI addressing. Use thes
 
 - **discourse://site/groups**
 
+  - **Deprecated:** use `discourse_list_groups` for directory discovery
   - List all groups with visibility, interaction levels, and access settings
   - Output: `{ groups: [{id, name, automatic, user_count, vis, members_vis, mention, msg, public_admission, public_exit, allow_membership_requests}], meta: {total} }`
   - **Levels** (0-4): 0=public, 1=logged_on_users, 2=members, 3=staff, 4=owners

@@ -27,44 +27,44 @@ function createMockServer(): { server: ToolRegistrar; tools: Record<string, { ha
   return { server, tools };
 }
 
-test('registers built-in tools', async () => {
+test('registers write-enabled tools when allowWrites=true', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
-  test('registers write-enabled tools when allowWrites=true', async () => {
-    const logger = new Logger('silent');
-    const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, tools } = createMockServer();
 
-    const { server, tools } = createMockServer();
+  await registerAllTools(server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
 
-    await registerAllTools(server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
+  // When writes are enabled, create and update tools should be registered
+  assert.ok('discourse_create_post' in tools);
+  assert.ok('discourse_create_category' in tools);
+  assert.ok('discourse_create_topic' in tools);
+  assert.ok('discourse_update_topic' in tools);
+  assert.ok('discourse_update_user' in tools);
+});
 
-    // When writes are enabled, create and update tools should be registered
-    assert.ok('discourse_create_post' in tools);
-    assert.ok('discourse_create_category' in tools);
-    assert.ok('discourse_create_topic' in tools);
-    assert.ok('discourse_update_topic' in tools);
-    assert.ok('discourse_update_user' in tools);
-  });
+test('does not register write tools when allowWrites=false', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
-  test('does not register write tools when allowWrites=false', async () => {
-    const logger = new Logger('silent');
-    const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, tools } = createMockServer();
 
-    const { server, tools } = createMockServer();
+  await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
 
-    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
+  // Write tools should NOT be registered
+  assert.ok(!('discourse_create_post' in tools));
+  assert.ok(!('discourse_create_topic' in tools));
+  assert.ok(!('discourse_update_topic' in tools));
+  assert.ok(!('discourse_update_user' in tools));
 
-    // Write tools should NOT be registered
-    assert.ok(!('discourse_create_post' in tools));
-    assert.ok(!('discourse_create_topic' in tools));
-    assert.ok(!('discourse_update_topic' in tools));
-    assert.ok(!('discourse_update_user' in tools));
+  // Read tools should still be registered
+  assert.ok('discourse_search' in tools);
+  assert.ok('discourse_read_topic' in tools);
+});
 
-    // Read tools should still be registered
-    assert.ok('discourse_search' in tools);
-    assert.ok('discourse_read_topic' in tools);
-  });
+test('registers built-in tools with the MCP SDK server', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
 
   const server = new McpServer({ name: 'test', version: '0.0.0' }, { capabilities: { tools: { listChanged: false } } });
 
@@ -223,6 +223,9 @@ test('default-search prefix is applied to queries', async () => {
 // Define expected tool sets for each context
 const READ_ONLY_TOOLS = [
   'discourse_select_site',
+  'discourse_list_categories',
+  'discourse_list_groups',
+  'discourse_list_tag_groups',
   'discourse_search',
   'discourse_filter_topics',
   'discourse_read_topic',

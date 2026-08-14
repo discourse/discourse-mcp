@@ -67,12 +67,43 @@ export function jsonResponse(data: unknown): { content: Array<{ type: "text"; te
 }
 
 /**
+ * Creates an MCP tool response with both structured content and serialized JSON
+ * text. The text fallback keeps the response usable in clients that do not yet
+ * surface structuredContent.
+ */
+export function structuredJsonResponse<T extends Record<string, unknown>>(
+  data: T
+): { content: Array<{ type: "text"; text: string }>; structuredContent: T } {
+  return {
+    content: [{ type: "text", text: JSON.stringify(data) }],
+    structuredContent: data,
+  };
+}
+
+/**
  * Creates a JSON error response for MCP tools.
  */
 export function jsonError(message: string, details?: Record<string, unknown>): { content: Array<{ type: "text"; text: string }>; isError: true } {
   const error = details ? { error: message, ...details } : { error: message };
   return {
     content: [{ type: "text", text: JSON.stringify(error) }],
+    isError: true,
+  };
+}
+
+/** Creates a machine-readable MCP error in both structured and text forms. */
+export function structuredJsonError(
+  message: string,
+  details?: Record<string, unknown>
+): {
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: Record<string, unknown>;
+  isError: true;
+} {
+  const error = details ? { error: message, ...details } : { error: message };
+  return {
+    content: [{ type: "text", text: JSON.stringify(error) }],
+    structuredContent: error,
     isError: true,
   };
 }

@@ -8,6 +8,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { SiteState } from "../site/state.js";
 import type { Logger } from "../util/logger.js";
+import { fetchAllGroups } from "../site/directories.js";
 import {
   paginatedResponse,
   transformCategory,
@@ -58,13 +59,13 @@ export function registerAllResources(
 
 /**
  * discourse://site/categories
- * Lists all categories with hierarchy and permissions.
+ * Deprecated compatibility resource for categories with hierarchy and permissions.
  */
 function registerCategoriesResource(server: ResourceRegistrar, ctx: ResourceContext): void {
   server.resource(
     "site_categories",
     "discourse://site/categories",
-    { description: "List all categories with hierarchy (pid), permissions (perms), and counts. Use for migration workflows." },
+    { description: "DEPRECATED: use the canonical discourse_list_categories tool for directory discovery. This compatibility resource lists categories with hierarchy (pid), permissions (perms), and counts and will be removed in a future major release." },
     async (uri) => {
       const { client } = ctx.siteState.ensureSelectedSite();
       
@@ -158,19 +159,18 @@ function registerTagsResource(server: ResourceRegistrar, ctx: ResourceContext): 
 
 /**
  * discourse://site/groups
- * Lists all groups for gid -> name resolution.
+ * Deprecated compatibility resource for detailed group data.
  */
 function registerGroupsResource(server: ResourceRegistrar, ctx: ResourceContext): void {
   server.resource(
     "site_groups",
     "discourse://site/groups",
-    { description: "List all groups with visibility, interaction levels, and access settings. Levels: 0=public, 1=logged_on_users, 2=members, 3=staff, 4=owners." },
+    { description: "DEPRECATED: use the canonical discourse_list_groups tool for directory discovery. This compatibility resource lists detailed group settings and will be removed in a future major release. Levels: 0=public, 1=logged_on_users, 2=members, 3=staff, 4=owners." },
     async (uri) => {
       const { client } = ctx.siteState.ensureSelectedSite();
 
       try {
-        const data = (await client.get("/groups.json")) as any;
-        const rawGroups: any[] = data?.groups || [];
+        const rawGroups = await fetchAllGroups(client);
 
         const groups: LeanGroup[] = rawGroups.map(transformGroup);
 
