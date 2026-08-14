@@ -16,6 +16,11 @@ const directoryEntrySchema = z.object({
   id: z.number().int(),
   name: z.string(),
 });
+const categoryEntrySchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  parent_category_id: z.number().int().nullable(),
+});
 const metaSchema = z.object({
   total: z.number().int().nonnegative(),
 });
@@ -35,9 +40,25 @@ function toDirectoryEntries(rawItems: any[]): Array<{ id: number; name: string }
   );
 }
 
+function toCategoryEntries(
+  rawItems: any[]
+): Array<{ id: number; name: string; parent_category_id: number | null }> {
+  return rawItems.flatMap((item) =>
+    typeof item?.id === "number" && Number.isInteger(item.id) && typeof item?.name === "string"
+      ? [{
+          id: item.id,
+          name: item.name,
+          parent_category_id: Number.isInteger(item.parent_category_id)
+            ? (item.parent_category_id as number)
+            : null,
+        }]
+      : []
+  );
+}
+
 export const registerListCategories: RegisterFn = (server, ctx) => {
   const outputSchema = z.object({
-    categories: z.array(directoryEntrySchema),
+    categories: z.array(categoryEntrySchema),
     meta: metaSchema,
   });
 
@@ -45,7 +66,7 @@ export const registerListCategories: RegisterFn = (server, ctx) => {
     "discourse_list_categories",
     {
       title: "List Categories",
-      description: "List every category visible to the configured Discourse API user. Returns only numeric IDs and names.",
+      description: "List every category visible to the configured Discourse API user. Returns numeric IDs, names, and parent_category_id (null for top-level) so the category hierarchy can be reconstructed.",
       inputSchema: emptyInputSchema.shape,
       outputSchema: outputSchema.shape,
       annotations: readAnnotations,
@@ -53,7 +74,7 @@ export const registerListCategories: RegisterFn = (server, ctx) => {
     async (_args, _extra) => {
       try {
         const { client } = ctx.siteState.ensureSelectedSite();
-        const categories = toDirectoryEntries(await fetchAllCategories(client));
+        const categories = toCategoryEntries(await fetchAllCategories(client));
         return structuredJsonResponse({ categories, meta: { total: categories.length } });
       } catch (e: any) {
         return structuredJsonError(`Failed to list categories: ${e?.message || String(e)}`);

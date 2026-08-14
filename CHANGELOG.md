@@ -4,7 +4,7 @@
 
 ### Features
 
-* Add always-registered `discourse_list_categories`, `discourse_list_groups`, and `discourse_list_tag_groups` read tools as the canonical site-directory interfaces
+* Add always-registered `discourse_list_categories`, `discourse_list_groups`, and `discourse_list_tag_groups` read tools as the canonical site-directory interfaces; category entries include `parent_category_id` so the hierarchy can be reconstructed
 * Return structured content plus serialized JSON text for directory-tool compatibility across MCP clients
 * Fetch all category and group pages, deduplicate directory entries by numeric ID, and stop pagination safely if a server repeats pages
 

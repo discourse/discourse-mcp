@@ -71,6 +71,11 @@ function assertLeanDirectoryResult(
   collectionName: "categories" | "groups" | "tag_groups",
   expectedTotal: number
 ) {
+  const entryKeys =
+    collectionName === "categories"
+      ? ["id", "name", "parent_category_id"]
+      : ["id", "name"];
+
   assert.equal(result.isError, undefined);
   assert.deepEqual(parsedText(result), result.structuredContent);
   assert.deepEqual(Object.keys(result.structuredContent || {}).sort(), [
@@ -81,7 +86,7 @@ function assertLeanDirectoryResult(
   const items = result.structuredContent?.[collectionName] as Array<Record<string, unknown>>;
   assert.equal(items.length, expectedTotal);
   for (const item of items) {
-    assert.deepEqual(Object.keys(item).sort(), ["id", "name"]);
+    assert.deepEqual(Object.keys(item).sort(), entryKeys.sort());
     assert.equal(typeof item.id, "number");
     assert.equal(typeof item.name, "string");
   }
@@ -209,11 +214,13 @@ test("category directory stays complete when site.json categories are lazy-loade
       return jsonResponse({ categories: firstPage, categories_count: 27 });
     }
     if (page === 2) {
+      // 26 and 27 form a three-level chain under category 1 (1 -> 26 -> 27),
+      // as produced by sites with max_category_nesting = 3.
       return jsonResponse({
         categories: [
           { id: 25, name: "Category 25", slug: "category-25" },
-          { id: 26, name: "Category 26", slug: "category-26" },
-          { id: 27, name: "Category 27", slug: "category-27" },
+          { id: 26, name: "Category 26", slug: "category-26", parent_category_id: 1 },
+          { id: 27, name: "Category 27", slug: "category-27", parent_category_id: 26 },
         ],
         categories_count: 27,
       });
@@ -225,6 +232,14 @@ test("category directory stays complete when site.json categories are lazy-loade
     const result = await tools.discourse_list_categories.handler({}, {});
     assertLeanDirectoryResult(result, "categories", 27);
     assert.deepEqual(requestedPages, [1, 2]);
+
+    const byId = new Map(
+      (result.structuredContent?.categories as Array<{ id: number; parent_category_id: number | null }>)
+        .map((c) => [c.id, c.parent_category_id])
+    );
+    assert.equal(byId.get(1), null);
+    assert.equal(byId.get(26), 1);
+    assert.equal(byId.get(27), 26);
   } finally {
     globalThis.fetch = originalFetch;
   }

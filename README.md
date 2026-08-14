@@ -157,8 +157,9 @@ The following parameterless read tools are the canonical interfaces for discover
 
 - `discourse_list_categories`
   - Input: `{}`
-  - Output: `{ categories: [{id, name}], meta: {total} }`
+  - Output: `{ categories: [{id, name, parent_category_id}], meta: {total} }`
   - Fetches all category pages, including when Discourse category lazy-loading is enabled.
+  - `parent_category_id` is `null` for top-level categories; walk it to reconstruct the hierarchy at any nesting depth (e.g. `max_category_nesting = 3`).
 - `discourse_list_groups`
   - Input: `{}`
   - Output: `{ groups: [{id, name}], meta: {total} }`
