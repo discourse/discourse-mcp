@@ -27,6 +27,8 @@ import {
   registerExplorerSchemaResource,
   registerExplorerQueriesResource,
 } from "./data_explorer.js";
+import { registerAiCustomToolsAuthoringGuideResource } from "./ai_custom_tools.js";
+import type { BuiltinToolsetMembership } from "../tools/toolsets.js";
 
 /** Narrowed interface for resource registration - only requires resource method */
 export type ResourceRegistrar = Pick<McpServer, "resource">;
@@ -40,9 +42,14 @@ export interface ResourceContext {
  * Registers all MCP resources.
  * Resources are read-only, URI-addressable data endpoints.
  */
+export interface ResourceRegistrationOptions {
+  toolsets?: BuiltinToolsetMembership;
+}
+
 export function registerAllResources(
   server: ResourceRegistrar,
-  ctx: ResourceContext
+  ctx: ResourceContext,
+  opts: ResourceRegistrationOptions = {},
 ): void {
   registerCategoriesResource(server, ctx);
   registerTagsResource(server, ctx);
@@ -54,6 +61,10 @@ export function registerAllResources(
   // Data Explorer resources are always registered; access is checked at call time
   registerExplorerSchemaResource(server, ctx);
   registerExplorerQueriesResource(server, ctx);
+
+  if (opts.toolsets?.includes("ai_custom_tools")) {
+    registerAiCustomToolsAuthoringGuideResource(server, ctx);
+  }
 }
 
 /**

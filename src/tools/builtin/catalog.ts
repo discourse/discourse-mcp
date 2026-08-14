@@ -23,6 +23,9 @@ import { updateUserTool } from "./update_user.js";
 import { uploadFileTool } from "./upload_file.js";
 import { dataExplorerTools } from "./data_explorer/index.js";
 import { workflowTools } from "./workflows/index.js";
+import { aiAgentTools } from "./ai_agents/index.js";
+import { aiCustomToolTools } from "./ai_custom_tools/index.js";
+import { aiFeatureTools } from "./ai_features/index.js";
 
 /** Built-in tools in their stable MCP registration order. */
 export const builtinTools = [
@@ -48,4 +51,7 @@ export const builtinTools = [
   deleteDraftTool,
   ...dataExplorerTools,
   ...workflowTools,
+  ...aiAgentTools,
+  ...aiCustomToolTools,
+  ...aiFeatureTools,
 ] as const satisfies readonly ToolDefinition[];

@@ -88,13 +88,13 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - `--timeout_ms <number>` (default: 15000)
   - `--concurrency <number>` (default: 4)
   - `--log_level <silent|error|info|debug>` (default: info)
-    - `debug`: Shows all HTTP requests, responses, and detailed error information
+    - `debug`: Shows HTTP request URLs, statuses, and detailed network/retry information (response bodies are never logged because admin APIs may echo sensitive content)
     - `info`: Shows retry attempts and general operational messages
     - `error`: Shows only errors
     - `silent`: No logging output
   - `--show_emails` (default: false). includes emails in user tools. Requires admin access
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
-  - `--toolsets <name[,name...]>`: Expose selected built-in domains. Omit for the default catalog (all non-opt-in domains); use `--toolsets all` to include opt-in domains such as `workflows`. See [Built-in toolsets](#built-in-toolsets).
+  - `--toolsets <name[,name...]>`: Expose selected built-in domains. Omit for the default catalog (all non-opt-in domains); use `--toolsets all` to include opt-in workflows and AI administration domains. See [Built-in toolsets](#built-in-toolsets).
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest`).
   - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic`. The tools prefer `raw` content by requesting `include_raw=true`.
@@ -151,7 +151,7 @@ Flags still override values from the profile.
 
 ### Built-in toolsets
 
-Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the default catalog (all non-opt-in domains). The experimental admin-only `workflows` domain is opt-in. Use `--toolsets all` to explicitly load every domain.
+Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the default catalog (all non-opt-in domains). The admin-only `workflows`, `ai_agents`, `ai_custom_tools`, and `ai_features` domains are opt-in. Use `--toolsets all` to explicitly load every domain.
 
 Pass one name or a comma-separated union:
 
@@ -201,6 +201,9 @@ Available toolsets are:
 | `uploads` | File upload |
 | `data_explorer` | Query retrieval, execution, creation, update, and deletion |
 | `workflows` *(opt-in)* | Admin-only workflow discovery, graph authoring, expression evaluation, pin-data, draft runs, step runs, executions, and version management |
+| `ai_agents` *(opt-in)* | Admin-only AI agent discovery, typed lifecycle, bot-user creation, and portable import/export |
+| `ai_custom_tools` *(opt-in)* | Admin-only database-backed scripted custom-tool guide, lifecycle, actual execution testing, and import/export |
+| `ai_features` *(opt-in)* | Admin-only AI feature discovery and exact-area, non-secret feature-setting updates; also includes agent discovery |
 | `all` *(sentinel)* | Expands to every built-in toolset, including opt-in domains; absorbs other selections |
 
 Toolset membership is intentionally separate from safety and authorization:
@@ -226,6 +229,32 @@ The `workflows` toolset targets the experimental `discourse-workflows` plugin (`
 6. Set `published: true` after testing.
 
 Flat connections such as `[{"from":"Start","to":"Check","type":"main"}]` are accepted and converted to Discourse's nested wire format. Use the source node's catalog output key: condition/filter ports are `true` and `false`, not always `main`. MCP rejects one-sided graph updates before HTTP. Runs are not dry-runs and can create posts, send chat messages, or call external HTTP.
+
+#### Discourse AI administration
+
+The three AI administration domains require a Discourse admin API key (or an admin user API key accepted by the selected endpoint). They are independently opt-in and default-off. Mutations—and custom-tool test execution—also require both `--allow_writes` and `--read_only=false`.
+
+```bash
+# Configure agents without exposing scripted source management
+npx -y @discourse/mcp@latest --site https://forum.example.com \
+  --toolsets ai_agents --tools_mode discourse_api_only \
+  --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
+  --allow_writes --read_only=false
+
+# Assign agents and update safe feature settings, but do not expose custom-tool code editing
+npx -y @discourse/mcp@latest --site https://forum.example.com \
+  --toolsets ai_agents,ai_features --tools_mode discourse_api_only \
+  --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
+  --allow_writes --read_only=false
+```
+
+The agent index is intentionally concise by default: `discourse_ai_list_agents` omits system prompts and per-agent configuration, returning summary counts plus slim tool/model catalogs. Use `discourse_ai_get_agent` with an ID to inspect one full configuration. `view: "full"` is available only for clients that explicitly need the complete upstream index.
+
+`discourse_ai_list_custom_tools` follows the same pattern: it returns compact records and preset signatures without scripts, bindings, or verbose parameter documentation. Use `discourse_ai_get_custom_tool` for one stored tool, or call the guide with `topic: "presets"` and a `preset_id` for one complete preset example.
+
+`ai_custom_tools` manages Discourse's database-backed `AiTool` records. It is separate from remote tools dynamically discovered at `/ai/tools`, which remain controlled by `--tools_mode`. Script authoring is synchronous MiniRacer JavaScript: define `invoke(parameters)`; do not use `async`, browser APIs, or Node modules. Call `discourse_ai_get_custom_tool_guide` with only the focused `topic` you need. `preset_id` is optional and meaningful only for `topic: "presets"`; it is ignored for other topics. Use `topic: "preamble"` for the exact selected-server contract before creating or substantially changing a script. The same exact live preamble and minimal template is exposed as the conditional `discourse://ai/custom-tools/authoring-guide` resource when this toolset is selected. Resources are application-driven; the guide tool is model-controlled, so autonomous clients should use the tool rather than assume a host attached the resource. A future optional authoring prompt would be user-controlled and would guide an explicitly initiated workflow rather than replace model-callable discovery.
+
+**Safety:** `discourse_ai_test_custom_tool` actually executes code and can issue external requests or cause site side effects. Feature updates alter production behavior immediately and are limited to non-secret settings returned from one exact `ai-features/<module>` area. Custom-tool source, prompts, bindings, exports, and test parameters should be treated as sensitive. Use the narrowest toolset combination and test on a non-production site first.
 
 - **Remote Tool Execution API (optional)**
 
@@ -277,6 +306,12 @@ Resources provide static/semi-static read-only data via URI addressing. Use thes
   - List user's drafts
   - Output: `{ drafts: [{draft_key, sequence, title, category_id, created_at, reply_preview}], meta: {total} }`
   - Requires authentication
+
+- **discourse://ai/custom-tools/authoring-guide** *(conditional)*
+  - Registered only when `ai_custom_tools` is selected (including through `all`)
+  - Returns the exact selected-site `empty_tool` JavaScript preset: Discourse's current preamble plus minimal `invoke`/`details` template
+  - MIME type: `text/javascript`; requires selected-site admin credentials
+  - Applications may attach this resource; models can retrieve the same content with `discourse_ai_get_custom_tool_guide` and `topic: "preamble"`
 
 ## Tools
 
@@ -540,7 +575,7 @@ You can also manually create User API Keys via the Discourse UI (if enabled by t
 - **Should I use Admin API Keys or User API Keys?** Use User API Keys for personal use (no admin required). Use Admin API Keys only when you need admin-level operations or are setting up a system-wide integration.
 - **Getting "fetch failed" errors?** Run with `--log_level debug` to see detailed error information including:
   - The exact URL being requested
-  - HTTP status codes and response bodies
+  - HTTP status codes (response bodies are deliberately not logged because they may contain sensitive content)
   - Network-level errors (DNS, SSL/TLS, connectivity issues)
   - Retry attempts and timing
   - Timeout diagnostics

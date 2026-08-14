@@ -136,9 +136,13 @@ export class HttpClient {
         if (!res.ok) {
           const text = await safeText(res);
           const errorBody = safeJson(text);
-          this.opts.logger.error(`HTTP ${res.status} ${res.statusText} for ${method} ${url}: ${text}`);
+          // Keep response bodies available on HttpError for structured client
+          // errors, but never write them to logs: admin endpoints can echo
+          // prompts, scripts, bindings, import bundles, or test parameters.
+          this.opts.logger.error(`HTTP ${res.status} ${res.statusText} for ${method} ${url}`);
           throw new HttpError(res.status, `HTTP ${res.status} ${res.statusText}`, errorBody);
         }
+        if (res.status === 204) return {};
         const ct = res.headers.get("content-type") || "";
         if (ct.includes("application/json")) {
           return res.json();

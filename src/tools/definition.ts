@@ -1,4 +1,5 @@
 import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z, type AnyZodObject, type ZodRawShape } from "zod";
 import {
   OPT_IN_TOOLSETS,
@@ -30,6 +31,7 @@ export interface ToolSpec<Schema extends AnyZodObject> {
   readonly availability: ToolAvailability;
   /** Operator-facing domains; membership is plural and independent of access policy. */
   readonly toolsets: BuiltinToolsetMembership;
+  readonly annotations?: ToolAnnotations;
   readonly handler: (
     input: z.output<Schema>,
     extra: ToolExtra,
@@ -46,6 +48,7 @@ export interface ToolDefinition {
   readonly schema: AnyZodObject;
   readonly availability: ToolAvailability;
   readonly toolsets: BuiltinToolsetMembership;
+  readonly annotations?: ToolAnnotations;
   readonly handler: (
     input: ErasedToolInput,
     extra: ToolExtra,
@@ -102,6 +105,7 @@ export function registerToolDefinitions(
         title: definition.title,
         description: definition.description,
         inputSchema: definition.schema.shape,
+        annotations: definition.annotations,
       },
       (input, extra) => definition.handler(input, extra, ctx, opts)
     );

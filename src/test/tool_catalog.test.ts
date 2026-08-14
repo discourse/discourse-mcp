@@ -332,6 +332,26 @@ const EXPECTED_TOOLSETS = {
   discourse_run_workflow: ["workflows"],
   discourse_run_workflow_step: ["workflows"],
   discourse_update_workflow_pin_data: ["workflows"],
+  discourse_ai_list_agents: ["ai_agents", "ai_features"],
+  discourse_ai_get_agent: ["ai_agents"],
+  discourse_ai_create_agent: ["ai_agents"],
+  discourse_ai_update_agent: ["ai_agents"],
+  discourse_ai_delete_agent: ["ai_agents"],
+  discourse_ai_create_agent_user: ["ai_agents"],
+  discourse_ai_export_agent: ["ai_agents"],
+  discourse_ai_import_agent: ["ai_agents"],
+  discourse_ai_get_custom_tool_guide: ["ai_custom_tools"],
+  discourse_ai_list_custom_tools: ["ai_custom_tools"],
+  discourse_ai_get_custom_tool: ["ai_custom_tools"],
+  discourse_ai_create_custom_tool: ["ai_custom_tools"],
+  discourse_ai_update_custom_tool: ["ai_custom_tools"],
+  discourse_ai_delete_custom_tool: ["ai_custom_tools"],
+  discourse_ai_test_custom_tool: ["ai_custom_tools"],
+  discourse_ai_export_custom_tool: ["ai_custom_tools"],
+  discourse_ai_import_custom_tool: ["ai_custom_tools"],
+  discourse_ai_list_features: ["ai_features"],
+  discourse_ai_get_feature_config: ["ai_features"],
+  discourse_ai_update_feature_config: ["ai_features"],
 } as const;
 
 function registeredNames(opts: ToolRegistrationOptions): string[] {
@@ -386,7 +406,7 @@ test("builtinTools definitions satisfy scalable catalog invariants", () => {
         `${tool.name} has unknown toolset ${toolset}`
       );
     }
-    const memberships = tool.toolsets.map((toolset) => OPT_IN_TOOLSETS.includes(toolset as "workflows"));
+    const memberships = tool.toolsets.map((toolset) => (OPT_IN_TOOLSETS as readonly BuiltinToolset[]).includes(toolset));
     assert.ok(memberships.every(Boolean) || memberships.every((value) => !value), `${tool.name} must not mix opt-in and default toolsets`);
   }
 
@@ -406,10 +426,11 @@ test("builtinTools metadata and deterministic order match the compatibility snap
     inputKeys: Object.keys(tool.schema.shape),
   }));
   assert.deepEqual(actual.slice(0, EXPECTED_METADATA.length), EXPECTED_METADATA);
-  const workflowMetadata = actual.slice(EXPECTED_METADATA.length);
-  assert.equal(workflowMetadata.length, 18);
-  assert.ok(workflowMetadata.every((tool) => tool.name.includes("workflow")));
-  assert.equal(workflowMetadata.some((tool) => tool.name.includes("preview")), false);
+  const optInMetadata = actual.slice(EXPECTED_METADATA.length);
+  assert.equal(optInMetadata.length, 38);
+  assert.equal(optInMetadata.filter((tool) => tool.name.includes("workflow")).length, 18);
+  assert.equal(optInMetadata.filter((tool) => tool.name.startsWith("discourse_ai_")).length, 20);
+  assert.equal(optInMetadata.some((tool) => tool.name.includes("preview")), false);
 });
 
 test("builtinTools toolset memberships match the operator-facing contract", () => {
@@ -427,7 +448,7 @@ test("builtinTools registration modes equal catalog availability filters", () =>
     toolsMode: "discourse_api_only",
   };
 
-  const defaultTools = builtinTools.filter((tool) => !tool.toolsets.every((toolset) => OPT_IN_TOOLSETS.includes(toolset as "workflows")));
+  const defaultTools = builtinTools.filter((tool) => !tool.toolsets.every((toolset) => (OPT_IN_TOOLSETS as readonly BuiltinToolset[]).includes(toolset)));
   assert.deepEqual(
     registeredNames(baseOptions),
     defaultTools.map((tool) => tool.name)

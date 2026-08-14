@@ -17,11 +17,16 @@ const expectedToolsets = [
   "uploads",
   "data_explorer",
   "workflows",
+  "ai_agents",
+  "ai_custom_tools",
+  "ai_features",
 ];
+
+const expectedOptInToolsets = ["workflows", "ai_agents", "ai_custom_tools", "ai_features"];
 
 test("built-in toolset names are stable and documented", () => {
   assert.deepEqual(BUILTIN_TOOLSETS, expectedToolsets);
-  assert.deepEqual(OPT_IN_TOOLSETS, ["workflows"]);
+  assert.deepEqual(OPT_IN_TOOLSETS, expectedOptInToolsets);
 });
 
 test("all expands to every built-in toolset and absorbs extras", () => {
