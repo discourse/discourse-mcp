@@ -17,13 +17,14 @@ const expectedToolsets = [
   "uploads",
   "data_explorer",
   "private_messages",
+  "groups",
   "workflows",
   "ai_agents",
   "ai_custom_tools",
   "ai_features",
 ];
 
-const expectedOptInToolsets = ["workflows", "ai_agents", "ai_custom_tools", "ai_features"];
+const expectedOptInToolsets = ["groups", "workflows", "ai_agents", "ai_custom_tools", "ai_features"];
 
 test("built-in toolset names are stable and documented", () => {
   assert.deepEqual(BUILTIN_TOOLSETS, expectedToolsets);

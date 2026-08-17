@@ -152,7 +152,7 @@ Flags still override values from the profile.
 
 ### Built-in toolsets
 
-Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the default catalog (all non-opt-in domains). The admin-only `workflows`, `ai_agents`, `ai_custom_tools`, and `ai_features` domains are opt-in. Use `--toolsets all` to explicitly load every domain.
+Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the default catalog (all non-opt-in domains). The administrative `groups`, `workflows`, `ai_agents`, `ai_custom_tools`, and `ai_features` domains are opt-in. Use `--toolsets all` to explicitly load every domain.
 
 Pass one name or a comma-separated union:
 
@@ -202,6 +202,7 @@ Available toolsets are:
 | `uploads` | File upload |
 | `data_explorer` | Query retrieval, execution, creation, update, and deletion |
 | `private_messages` | Authenticated personal/group PM listing and reading, plus write-gated creation, replies, and participant invitations |
+| `groups` *(opt-in)* | Complete group CRUD; member/owner listing; explicit username, user-ID, or account-email membership and ownership mutations; separate email invitations; membership-request decisions; self-service requests, joins, and leaves |
 | `workflows` *(opt-in)* | Admin-only workflow discovery, graph authoring, expression evaluation, pin-data, draft runs, step runs, executions, and version management |
 | `ai_agents` *(opt-in)* | Admin-only AI agent discovery, typed lifecycle, bot-user creation, and portable import/export |
 | `ai_custom_tools` *(opt-in)* | Admin-only database-backed scripted custom-tool guide, lifecycle, actual execution testing, and import/export |
@@ -214,10 +215,16 @@ Toolset membership is intentionally separate from safety and authorization:
 - Omitted selection excludes opt-in-only tools. Tool definitions may not mix opt-in and default memberships, which prevents accidental default exposure.
 - `discourse_select_site` is automatically retained as a bootstrap capability for every untethered subset. With `--site`, it remains hidden as usual.
 - Read-only mode still removes tools that require write enablement. For example, `--toolsets data_explorer` exposes query retrieval and execution by default; add both `--allow_writes` and `--read_only=false` to expose saved-query mutations.
-- Existing call-time authentication and admin checks are unchanged. All Data Explorer tools still require admin access when called.
+- Existing call-time authentication and admin checks are unchanged. Data Explorer tools still require admin access when called; group operations retain Discourse's own staff, owner, visibility, and self-service authorization rules.
 - Toolsets filter **built-in tools only; they are not an authorization or complete capability boundary**. MCP resources and prompts remain available, and all existing call-time access checks remain authoritative. Remote Tool Execution API discovery is controlled independently by `--tools_mode`; use `--tools_mode discourse_api_only` when the MCP tool list must contain only the selected built-in domains. The server logs an informational notice when selected toolsets are combined with remote discovery.
 - A selected domain can contribute no tools under the current safety configuration—for example, `uploads` in read-only mode. The server logs an informational notice when this occurs.
 - Unknown or empty toolset selections are configuration errors. Values are de-duplicated after trimming whitespace.
+
+#### Group management
+
+The opt-in `groups` toolset covers the complete custom-group lifecycle: directory listing and full detail reads; create, update, and permanent delete; paginated member and owner reads; explicit selector-specific tools for adding/removing members and promoting/demoting owners by username, numeric user ID, or existing-account email; pending-request listing and approve/deny decisions; and authenticated request, public-join, and public-leave flows. A separate invitation tool handles addresses that may not have accounts yet, avoiding confusion between account lookup and forum invitations.
+
+All mutations require both `--allow_writes` and `--read_only=false`. Creation and deletion additionally require staff/admin-style API credentials at the MCP access gate. Discourse remains authoritative for Guardian checks, group visibility, staff versus owner capabilities, automatic-group restrictions, membership settings, invitation limits, and the fields a caller may update. Core automatic groups cannot be created, deleted, or have membership/ownership changed; their permitted presentation and interaction settings can still be updated by authorized staff. Selecting the toolset does not grant any of these permissions.
 
 #### Private messages
 

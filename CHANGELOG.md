@@ -13,6 +13,12 @@
   - Keep site selection, write enablement, and call-time authorization as independent safety controls
   - Support comma-separated CLI values and string or array profile configuration
   - Treat omitted selection as the non-opt-in default catalog and add `--toolsets all` for every domain
+* Add the opt-in `groups` toolset for complete group lifecycle management
+  - List and inspect groups, members, owners, and pending membership requests with upstream visibility and pagination semantics
+  - Create, fully configure, update, and delete custom groups, including notification defaults, associations, email settings, custom fields, and plugin extensions
+  - Use separate, unambiguous mutation tools for usernames, numeric user IDs, existing-account emails, and unknown-address invitations instead of mirroring Discourse's selector precedence
+  - Bulk-add and remove members, promote and demote owners, approve or deny requests, and support request/join/leave self-service flows
+  - Preserve write gating and Discourse's staff, owner, Guardian, automatic-group, invitation, and membership-setting restrictions
 * Add the opt-in `workflows` toolset for the experimental `discourse-workflows` plugin
   - Discover workflows, node types, templates, credentials, executions, versions, and related forum entities
   - Create and replace complete graphs with paired graph safety and a flat connection adapter

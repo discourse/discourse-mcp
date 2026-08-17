@@ -4,6 +4,7 @@ import { z } from "zod";
 import { Logger } from "../util/logger.js";
 import { SiteState } from "../site/state.js";
 import { builtinTools } from "../tools/builtin/catalog.js";
+import { groupTools } from "../tools/builtin/groups/index.js";
 import { registerToolDefinitions } from "../tools/definition.js";
 import { BUILTIN_TOOLSETS, OPT_IN_TOOLSETS, type BuiltinToolset } from "../tools/toolsets.js";
 import type {
@@ -349,6 +350,30 @@ const EXPECTED_TOOLSETS = {
   discourse_create_private_message: ["private_messages"],
   discourse_reply_private_message: ["private_messages"],
   discourse_invite_to_private_message: ["private_messages"],
+  discourse_list_groups: ["groups"],
+  discourse_get_group: ["groups"],
+  discourse_list_group_members: ["groups"],
+  discourse_list_group_membership_requests: ["groups"],
+  discourse_create_group: ["groups"],
+  discourse_update_group: ["groups"],
+  discourse_delete_group: ["groups"],
+  discourse_add_group_members_by_username: ["groups"],
+  discourse_add_group_members_by_user_id: ["groups"],
+  discourse_add_group_members_by_email: ["groups"],
+  discourse_invite_group_members_by_email: ["groups"],
+  discourse_remove_group_members_by_username: ["groups"],
+  discourse_remove_group_members_by_user_id: ["groups"],
+  discourse_remove_group_members_by_email: ["groups"],
+  discourse_add_group_owners_by_username: ["groups"],
+  discourse_add_group_owners_by_user_id: ["groups"],
+  discourse_add_group_owners_by_email: ["groups"],
+  discourse_remove_group_owners_by_username: ["groups"],
+  discourse_remove_group_owners_by_user_id: ["groups"],
+  discourse_remove_group_owners_by_email: ["groups"],
+  discourse_handle_group_membership_request: ["groups"],
+  discourse_request_group_membership: ["groups"],
+  discourse_join_group: ["groups"],
+  discourse_leave_group: ["groups"],
   discourse_list_workflows: ["workflows"],
   discourse_get_workflow: ["workflows"],
   discourse_list_workflow_node_types: ["workflows"],
@@ -462,7 +487,8 @@ test("builtinTools metadata and deterministic order match the compatibility snap
   }));
   assert.deepEqual(actual.slice(0, EXPECTED_METADATA.length), EXPECTED_METADATA);
   const optInMetadata = actual.slice(EXPECTED_METADATA.length);
-  assert.equal(optInMetadata.length, 38);
+  assert.equal(optInMetadata.length, 62);
+  assert.equal(optInMetadata.filter((tool) => tool.name.includes("group")).length, 24);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("workflow")).length, 18);
   assert.equal(optInMetadata.filter((tool) => tool.name.startsWith("discourse_ai_")).length, 20);
   assert.equal(optInMetadata.some((tool) => tool.name.includes("preview")), false);
@@ -548,6 +574,21 @@ test("selected built-in toolsets preserve order and compose with availability", 
       "discourse_update_query",
       "discourse_delete_query",
     ]
+  );
+
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["groups"] }),
+    [
+      "discourse_select_site",
+      "discourse_list_groups",
+      "discourse_get_group",
+      "discourse_list_group_members",
+      "discourse_list_group_membership_requests",
+    ]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: ["groups"], hideSelectSite: true }),
+    groupTools.map((tool) => tool.name)
   );
 
   const selectedToolsets = ["users", "topics"] as const;
