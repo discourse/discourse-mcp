@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineTool } from "../definition.js";
-import { jsonResponse, jsonError } from "../../util/json_response.js";
+import { jsonResponse, jsonError, withRateLimit } from "../../util/json_response.js";
 
 const schema = z.object({
   topic_id: z.number().int().positive(),
@@ -11,13 +11,14 @@ const schema = z.object({
 export const readTopicTool = defineTool({
   name: "discourse_read_topic",
   title: "Read Topic",
-  description: "Read topic metadata and posts. Returns JSON with id, title, slug, category_id, tags, and posts array.",
+  description: "Read topic metadata and posts. Large post limits can require multiple upstream requests. For moderation queues, prefer reviewable list/detail evidence instead of fanning this tool out across flagged topics.",
   schema,
   availability: "always",
   toolsets: ["topics"],
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async ({ topic_id, post_limit = 5, start_post_number }, _extra, ctx, _opts) => {
     try {
-      const { client } = ctx.siteState.ensureSelectedSite();
+      const { base, client } = ctx.siteState.ensureSelectedSite();
       const start = start_post_number ?? 1;
 
       let current = start;
@@ -37,7 +38,11 @@ export const readTopicTool = defineTool({
         const url = current > 1
           ? `/t/${topic_id}.json?post_number=${current}&include_raw=true`
           : `/t/${topic_id}.json?include_raw=true`;
-        const data = (await client.get(url)) as any;
+        const data = await withRateLimit(
+          `discourse-api:${base}`,
+          () => client.get(url),
+          200,
+        ) as any;
 
         if (i === 0) {
           topicData = data;

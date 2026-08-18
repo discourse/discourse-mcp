@@ -17,6 +17,7 @@ export const BUILTIN_TOOLSETS = [
   "data_explorer",
   "private_messages",
   "groups",
+  "moderation",
   "workflows",
   "ai_agents",
   "ai_custom_tools",
@@ -28,6 +29,7 @@ export type BuiltinToolset = (typeof BUILTIN_TOOLSETS)[number];
 /** Domains hidden unless explicitly selected or `all` is used. */
 export const OPT_IN_TOOLSETS = [
   "groups",
+  "moderation",
   "workflows",
   "ai_agents",
   "ai_custom_tools",

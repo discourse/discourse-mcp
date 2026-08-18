@@ -5,6 +5,7 @@ import { Logger } from "../util/logger.js";
 import { SiteState } from "../site/state.js";
 import { builtinTools } from "../tools/builtin/catalog.js";
 import { groupTools } from "../tools/builtin/groups/index.js";
+import { moderationTools } from "../tools/builtin/moderation/index.js";
 import { registerToolDefinitions } from "../tools/definition.js";
 import { BUILTIN_TOOLSETS, OPT_IN_TOOLSETS, type BuiltinToolset } from "../tools/toolsets.js";
 import type {
@@ -34,9 +35,11 @@ const EXPECTED_METADATA = [
   {
     "name": "discourse_filter_topics",
     "title": "Filter Topics",
-    "description": "Filter topics with a concise query language. Returns JSON object with results array (id, slug, title) and meta (page, limit, has_more). Query syntax: category/categories (comma=OR, '=category'=without subcats, '-'=exclude), tag/tags (comma=OR, '+'=AND), status:(open|closed|archived|listed|unlisted|public), in:(bookmarked|watching|tracking|muted|pinned), dates: created/activity-(before|after) YYYY-MM-DD or N days, order: activity|created|latest-post|likes|views with optional -asc.",
+    "description": "Discover topics through a filtered, top, or hot view. Filtered uses Discourse TopicsFilter syntax; top uses Discourse's authoritative top score and defaults to weekly; hot is defined exactly as daily top (not sentiment, controversy, or real-time velocity). Returns a uniform rich topic projection and truthful pagination metadata.",
     "inputKeys": [
       "filter",
+      "view",
+      "top_period",
       "page",
       "per_page"
     ]
@@ -44,7 +47,7 @@ const EXPECTED_METADATA = [
   {
     "name": "discourse_read_topic",
     "title": "Read Topic",
-    "description": "Read topic metadata and posts. Returns JSON with id, title, slug, category_id, tags, and posts array.",
+    "description": "Read topic metadata and posts. Large post limits can require multiple upstream requests. For moderation queues, prefer reviewable list/detail evidence instead of fanning this tool out across flagged topics.",
     "inputKeys": [
       "topic_id",
       "post_limit",
@@ -374,6 +377,11 @@ const EXPECTED_TOOLSETS = {
   discourse_request_group_membership: ["groups"],
   discourse_join_group: ["groups"],
   discourse_leave_group: ["groups"],
+  discourse_get_review_queue_count: ["moderation"],
+  discourse_list_reviewables: ["moderation"],
+  discourse_list_reviewable_topics: ["moderation"],
+  discourse_get_reviewable: ["moderation"],
+  discourse_perform_reviewable_action: ["moderation"],
   discourse_list_workflows: ["workflows"],
   discourse_get_workflow: ["workflows"],
   discourse_list_workflow_node_types: ["workflows"],
@@ -487,8 +495,9 @@ test("builtinTools metadata and deterministic order match the compatibility snap
   }));
   assert.deepEqual(actual.slice(0, EXPECTED_METADATA.length), EXPECTED_METADATA);
   const optInMetadata = actual.slice(EXPECTED_METADATA.length);
-  assert.equal(optInMetadata.length, 62);
+  assert.equal(optInMetadata.length, 67);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("group")).length, 24);
+  assert.equal(optInMetadata.filter((tool) => tool.name.includes("review")).length, 5);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("workflow")).length, 18);
   assert.equal(optInMetadata.filter((tool) => tool.name.startsWith("discourse_ai_")).length, 20);
   assert.equal(optInMetadata.some((tool) => tool.name.includes("preview")), false);
@@ -514,8 +523,12 @@ test("builtinTools registration modes equal catalog availability filters", () =>
     registeredNames(baseOptions),
     defaultTools.map((tool) => tool.name)
   );
+  const defaultNames = registeredNames({ ...baseOptions, allowWrites: false });
+  assert.ok(defaultNames.includes("discourse_search"));
+  assert.ok(defaultNames.includes("discourse_filter_topics"));
+  assert.equal(defaultNames.some((name) => name.includes("reviewable") || name === "discourse_get_review_queue_count"), false);
   assert.deepEqual(
-    registeredNames({ ...baseOptions, allowWrites: false }),
+    defaultNames,
     defaultTools
       .filter((tool) => tool.availability !== "writes_enabled")
       .map((tool) => tool.name)
@@ -589,6 +602,15 @@ test("selected built-in toolsets preserve order and compose with availability", 
   assert.deepEqual(
     registeredNames({ ...baseOptions, toolsets: ["groups"], hideSelectSite: true }),
     groupTools.map((tool) => tool.name)
+  );
+
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["moderation"] }),
+    ["discourse_select_site", ...moderationTools.slice(0, 4).map((tool) => tool.name)]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: ["moderation"], hideSelectSite: true }),
+    moderationTools.map((tool) => tool.name)
   );
 
   const selectedToolsets = ["users", "topics"] as const;

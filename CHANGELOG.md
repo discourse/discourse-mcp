@@ -4,6 +4,18 @@
 
 ### Features
 
+* Enrich topic discovery and add authoritative top/hot views to `discourse_filter_topics`
+  - Preserve existing filtered calls while adding top periods and defining hot exactly as Discourse's daily top score
+  - Return uniform rich topic metadata with null-safe fields and pagination totals/continuation only when authoritative
+  - Keep `search` default-on and both search tools available in read-only mode
+* Add the opt-in `moderation` toolset for Discourse's review queue
+  - Inspect queue count, reviewables, high-priority reviewable-topic aggregation, full bounded context, score explanations, and dynamic available actions
+  - Distinguish pending reviewable totals from individual score/flag records and mark the topic aggregation as non-exhaustive
+  - Support staff and category moderators through authenticated reads while leaving Guardian permissions authoritative
+  - Add one write-gated action tool with fresh-action preflight, optimistic-version checks, explicit confirmation, contracted fields, and structured moderation errors
+  - Mark reads and destructive actions accurately in MCP metadata, make strict-schema numeric placeholders safe, and normalize statuses/count units
+  - Serialize concurrent moderation mutations, pace high-volume reads, route prefixed UI action IDs through their authoritative `server_action`, and report ambiguous post-PUT failures without encouraging blind retries
+
 * Use Discourse's device authorization flow when generating User API Keys
   - Show a short browser activation code and poll for approval automatically
   - Use RSA-OAEP encryption and validate the response nonce

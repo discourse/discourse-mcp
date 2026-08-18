@@ -95,7 +95,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
     - `silent`: No logging output
   - `--show_emails` (default: false). includes emails in user tools. Requires admin access
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
-  - `--toolsets <name[,name...]>`: Expose selected built-in domains. Omit for the default catalog (all non-opt-in domains); use `--toolsets all` to include opt-in workflows and AI administration domains. See [Built-in toolsets](#built-in-toolsets).
+  - `--toolsets <name[,name...]>`: Expose selected built-in domains. Omit for the default catalog (all non-opt-in domains); use `--toolsets all` to include opt-in moderation, workflows, and AI administration domains. See [Built-in toolsets](#built-in-toolsets).
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest`).
   - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic` and `discourse_read_private_message`. The tools prefer `raw` content by requesting `include_raw=true`.
@@ -152,7 +152,7 @@ Flags still override values from the profile.
 
 ### Built-in toolsets
 
-Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the default catalog (all non-opt-in domains). The administrative `groups`, `workflows`, `ai_agents`, `ai_custom_tools`, and `ai_features` domains are opt-in. Use `--toolsets all` to explicitly load every domain.
+Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the default catalog (including `search`, `discourse_search`, and `discourse_filter_topics`). The `groups`, `moderation`, `workflows`, `ai_agents`, `ai_custom_tools`, and `ai_features` domains are opt-in. Use `--toolsets all` to explicitly load every domain.
 
 Pass one name or a comma-separated union:
 
@@ -203,6 +203,7 @@ Available toolsets are:
 | `data_explorer` | Query retrieval, execution, creation, update, and deletion |
 | `private_messages` | Authenticated personal/group PM listing and reading, plus write-gated creation, replies, and participant invitations |
 | `groups` *(opt-in)* | Complete group CRUD; member/owner listing; explicit username, user-ID, or account-email membership and ownership mutations; separate email invitations; membership-request decisions; self-service requests, joins, and leaves |
+| `moderation` *(opt-in)* | Authenticated review queue count/list/topic/detail triage, plus one write-gated, freshly preflighted dynamic reviewable action tool |
 | `workflows` *(opt-in)* | Admin-only workflow discovery, graph authoring, expression evaluation, pin-data, draft runs, step runs, executions, and version management |
 | `ai_agents` *(opt-in)* | Admin-only AI agent discovery, typed lifecycle, bot-user creation, and portable import/export |
 | `ai_custom_tools` *(opt-in)* | Admin-only database-backed scripted custom-tool guide, lifecycle, actual execution testing, and import/export |
@@ -225,6 +226,14 @@ Toolset membership is intentionally separate from safety and authorization:
 The opt-in `groups` toolset covers the complete custom-group lifecycle: directory listing and full detail reads; create, update, and permanent delete; paginated member and owner reads; explicit selector-specific tools for adding/removing members and promoting/demoting owners by username, numeric user ID, or existing-account email; pending-request listing and approve/deny decisions; and authenticated request, public-join, and public-leave flows. A separate invitation tool handles addresses that may not have accounts yet, avoiding confusion between account lookup and forum invitations.
 
 All mutations require both `--allow_writes` and `--read_only=false`. Creation and deletion additionally require staff/admin-style API credentials at the MCP access gate. Discourse remains authoritative for Guardian checks, group visibility, staff versus owner capabilities, automatic-group restrictions, membership settings, invitation limits, and the fields a caller may update. Core automatic groups cannot be created, deleted, or have membership/ownership changed; their permitted presentation and interaction settings can still be updated by authorized staff. Selecting the toolset does not grant any of these permissions.
+
+#### Moderation queue
+
+The opt-in `moderation` toolset exposes `discourse_get_review_queue_count`, `discourse_list_reviewables`, `discourse_list_reviewable_topics`, and `discourse_get_reviewable` in read-only mode. These tools require configured authentication, but intentionally do not impose an MCP admin-only gate: Discourse Guardian remains authoritative for staff and category-moderator visibility. Selecting the toolset grants no moderation permission.
+
+For queue totals, use `discourse_get_review_queue_count`; its `count` is the number of pending **reviewable records** visible to the caller, not the number of individual flags. Use `discourse_list_reviewables` with only `status: "pending"` and `offset: 0` for ordinary triage—do not invent topic, category, type, or user filters—and follow `next_offset` until `has_more` is false. Numeric topic/category placeholders of `0` and optional text placeholders of blank/`all`/`any` are treated as omitted, so strict-schema clients cannot accidentally filter to ID 1 or send invalid universal sentinels. List results already contain bounded evidence and dynamic actions; avoid fanning out `discourse_read_topic` or detail calls across the queue. `discourse_list_reviewable_topics` is only a convenience aggregation: upstream includes pending topics at or above its minimum review-priority threshold, omits queue items without topics, and reports `score_count` as the number of review score/flag records—not reviewable items. It must not be used to infer the complete queue size.
+
+When both `--allow_writes` and `--read_only=false` are set, `discourse_perform_reviewable_action` is also registered. Call list/detail first and submit one exact `available_actions[].id` with `confirm: true`; choose from the full action description, not a repeated label such as “Delete post.” Discourse UI action IDs can be prefixed (`post-…` or `user-…`), while the route requires the associated `server_action`; the MCP validates and maps this automatically. Moderation mutations are serialized and paced across the complete fresh-GET/PUT operation, so a concurrent model batch cannot bypass the write throttle. The tool checks an optional expected version, rejects unadvertised fields, and returns normalized success/count fields. A failure after the PUT is marked as an unknown outcome with identifiers and must be verified rather than blindly retried. Discourse still enforces claims, optimistic conflicts, action validity, and Guardian permissions. The tools expose evidence and explicit operations; they do not recommend moderation decisions.
 
 #### Private messages
 
@@ -354,9 +363,16 @@ Built‑in tools (always present unless noted). All tools return **strict JSON**
   - Input: `{ username: string; page?: number (0-based); limit?: number (1–50, default 30) }`
   - Output: `{ posts: [{id, topic_id, post_number, slug, title, created_at, excerpt, category_id}], meta: {page, limit, has_more} }`
 - `discourse_filter_topics`
-  - Input: `{ filter: string; page?: number; per_page?: number (1–50) }`
-  - Output: `{ results: [{id, slug, title}], meta: {page, limit, has_more} }`
-  - Query language (succinct): key:value tokens separated by spaces; category/categories (comma = OR, `=category` = without subcats, `-` prefix = exclude); tag/tags (comma = OR, `+` = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public); personal `in:` (bookmarked|watching|tracking|muted|pinned); dates: created/activity/latest-post-(before|after) with `YYYY-MM-DD` or relative days `N`; numeric: likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); order: activity|created|latest-post|likes|likes-op|posters|title|views|category with optional `-asc`; free text terms are matched.
+  - Input: `{ filter?: string; view?: "filtered"|"top"|"hot" (default "filtered"); top_period?: "daily"|"weekly"|"monthly"|"quarterly"|"yearly"|"all"; page?: number (0-based); per_page?: number (1–50) }`
+  - Filtered requires a nonblank `filter` and uses `/filter.json`. Top rejects `filter`, uses `/top.json`, and defaults to weekly. Hot rejects `filter`/`top_period` and is defined exactly as Discourse's **daily top score**—not semantic controversy, toxicity, or real-time velocity.
+  - Output: `{ results: [{id, slug, title, category_id, tags, created_at, last_posted_at, bumped_at, posts_count, reply_count, views, like_count, posters_count, closed, archived, pinned, visible, last_poster_username, posters}], meta: {view, top_period, page, per_page, returned, has_more, total?} }`. Missing optional values remain `null`; `total` and continuation are never fabricated.
+  - Filter query language (succinct): key:value tokens separated by spaces; category/categories (comma = OR, `=category` = without subcats, `-` prefix = exclude); tag/tags (comma = OR, `+` = AND) and tag_group; status:(open|closed|archived|listed|unlisted|public); personal `in:` (bookmarked|watching|tracking|muted|pinned); dates: created/activity/latest-post-(before|after) with `YYYY-MM-DD` or relative days `N`; numeric: likes[-op]-(min|max), posts-(min|max), posters-(min|max), views-(min|max); order: activity|created|latest-post|likes|likes-op|posters|title|views|category with optional `-asc`; free text terms are matched.
+- Moderation tools *(only with `--toolsets moderation`; all require authentication)*
+  - `discourse_get_review_queue_count`: `{}` → `{ count, unit: "pending_reviewable_queue_items", status: "pending", scope }`, where `count` is the authoritative number of pending reviewable records visible to the caller, not individual flags.
+  - `discourse_list_reviewables`: stable review filters and offset pagination → normalized reviewables with named status plus numeric `status_id`, current versions, bounded evidence, scores, targets, and dynamic actions. For normal triage send only `status` and `offset`; use `meta.total` and follow `next_offset`. Upstream page size is fixed at 10.
+  - `discourse_list_reviewable_topics`: `{}` → a non-exhaustive aggregation of pending topics at or above Discourse's minimum review priority. `score_count` counts review score/flag records, not reviewable queue items; queue items without topics are absent.
+  - `discourse_get_reviewable`: `{ reviewable_id; include_explanation? }` → refreshed bounded context, side-loaded references, editable fields, score evidence, and exact available actions; no recommendation is generated. Avoid bulk fan-out because list results already contain triage evidence.
+  - `discourse_perform_reviewable_action` *(only when writes enabled)*: `{ reviewable_id; action_id; expected_version?; additional_fields?; confirm: true }` → serialized, freshly preflighted action with normalized success and remaining-count fields. Submit the displayed dynamic action ID; MCP maps its `server_action` to the Discourse route.
 - `discourse_get_chat_messages`
   - Input: `{ channel_id: number; page_size?: number (1–50, default 50); target_message_id?: number; direction?: "past" | "future"; target_date?: string (ISO 8601) }`
   - Output: `{ channel_id, messages: [{id, username, created_at, message, edited, thread_id, in_reply_to_id}], meta }`
