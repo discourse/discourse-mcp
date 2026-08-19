@@ -3,6 +3,8 @@ import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
 import { requireWriteAccess } from "../../util/access.js";
 
+import { readAnnotations } from "./common/helpers.js";
+
 /**
  * Discourse Draft Tools
  *
@@ -41,6 +43,7 @@ export const getDraftTool = defineTool({
   schema: getDraftSchema,
   availability: "always",
   toolsets: ["drafts"],
+  annotations: readAnnotations(),
   handler: async (input: unknown, _extra: unknown, ctx, _opts) => {
     const { draft_key, sequence } = getDraftSchema.parse(input);
 

@@ -16,24 +16,32 @@ export const BUILTIN_TOOLSETS = [
   "uploads",
   "data_explorer",
   "private_messages",
+  "activity",
+  "administration",
   "groups",
   "moderation",
   "workflows",
   "ai_agents",
   "ai_custom_tools",
   "ai_features",
+  "analytics",
+  "ai_insights",
 ] as const;
 
 export type BuiltinToolset = (typeof BUILTIN_TOOLSETS)[number];
 
 /** Domains hidden unless explicitly selected or `all` is used. */
 export const OPT_IN_TOOLSETS = [
+  "activity",
+  "administration",
   "groups",
   "moderation",
   "workflows",
   "ai_agents",
   "ai_custom_tools",
   "ai_features",
+  "analytics",
+  "ai_insights",
 ] as const satisfies readonly BuiltinToolset[];
 
 /** One or more domains assigned to a built-in tool definition or selection. */

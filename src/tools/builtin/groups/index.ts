@@ -1,4 +1,5 @@
 import type { ToolDefinition } from "../../definition.js";
+import { listGroupPostsTool } from "./activity.js";
 import {
   listGroupsTool,
   getGroupTool,
@@ -55,11 +56,13 @@ export {
   requestGroupMembershipTool,
   joinGroupTool,
   leaveGroupTool,
+  listGroupPostsTool,
 };
 
 export const groupTools = [
   listGroupsTool,
   getGroupTool,
+  listGroupPostsTool,
   listGroupMembersTool,
   listGroupMembershipRequestsTool,
   createGroupTool,

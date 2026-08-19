@@ -48,11 +48,11 @@ function recordFetch(responder: (request: RequestRecord, index: number) => Respo
 }
 
 test("moderation annotations accurately distinguish reads from destructive writes", () => {
-  for (const tool of moderationTools.slice(0, 4)) {
+  for (const tool of moderationTools.slice(0, -1)) {
     assert.equal(tool.annotations?.readOnlyHint, true, `${tool.name} should be read-only`);
     assert.equal(tool.annotations?.idempotentHint, true, `${tool.name} should be idempotent`);
   }
-  const perform = moderationTools[4];
+  const perform = moderationTools.at(-1)!;
   assert.equal(perform.annotations?.readOnlyHint, false);
   assert.equal(perform.annotations?.destructiveHint, true);
   assert.equal(perform.annotations?.idempotentHint, false);

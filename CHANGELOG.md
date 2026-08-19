@@ -4,6 +4,18 @@
 
 ### Features
 
+* Add a cohesive Discourse evidence and analytics layer
+  - Add bounded topic-stream selection, reply relationships, latest-post feeds, post-level search, and daily topic view statistics with truthful upstream cursor and limit semantics
+  - Keep only topic-stream selection and post-level search default-on; expose deeper reply, feed, view, user-summary, action-timeline, and directory reads through the opt-in `activity` toolset
+  - Add opt-in `administration` discovery for categories and site settings plus explicitly confirmed user activation/approval actions
+  - Make acting-user writes require a global API key and report actual attribution; treat signup anti-enumeration responses as unconfirmed instead of inventing created users
+  - Preserve conditional Discourse Solved topic/post fields and keep accepted answers explicitly framed as a resolution proxy
+  - Add profile-visible user summaries, named action timelines, directory/cohort metrics, group-authored post evidence, staff moderation counters, and bounded post revisions
+  - Add opt-in `analytics` report discovery/execution and the Discourse Solved support dashboard without arbitrary SQL or customer-specific rules
+  - Add opt-in `ai_insights` cached summaries, semantic search, and staff sentiment reads while labeling AI output as upstream classification rather than objective judgment
+  - Share bounded, privacy-conscious post/topic/user projections; pace fan-out reads per selected site; and return structured status/plugin diagnostics without leaking upstream bodies
+  - Keep existing tool names and response contracts compatible, retain write gates, and update catalog/toolset contract coverage
+
 * Enrich topic discovery and add authoritative top/hot views to `discourse_filter_topics`
   - Preserve existing filtered calls while adding top periods and defining hot exactly as Discourse's daily top score
   - Return uniform rich topic metadata with null-safe fields and pagination totals/continuation only when authoritative

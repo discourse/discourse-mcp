@@ -2,6 +2,8 @@ import { z } from "zod";
 import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError } from "../../util/json_response.js";
 
+import { readAnnotations } from "./common/helpers.js";
+
 const schema = z.object({
   post_id: z.number().int().positive(),
 });
@@ -13,6 +15,7 @@ export const readPostTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["topics"],
+  annotations: readAnnotations(),
   handler: async ({ post_id }, _extra, ctx, _opts) => {
     try {
       const { client } = ctx.siteState.ensureSelectedSite();
@@ -29,6 +32,8 @@ export const readPostTool = defineTool({
         created_at: data?.created_at || null,
         raw: raw.slice(0, limit),
         truncated: raw.length > limit,
+        ...(data && "accepted_answer" in data ? { accepted_answer: data.accepted_answer } : {}),
+        ...(data && "topic_accepted_answer" in data ? { topic_accepted_answer: data.topic_accepted_answer } : {}),
       });
     } catch (e: any) {
       return jsonError(`Failed to read post ${post_id}: ${e?.message || String(e)}`);

@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, withRateLimit } from "../../util/json_response.js";
+import { projectPost } from "./common/post_projection.js";
+
+import { readAnnotations } from "./common/helpers.js";
 
 const schema = z.object({
   topic_id: z.number().int().positive(),
@@ -15,7 +18,7 @@ export const readTopicTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["topics"],
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: readAnnotations(),
   handler: async ({ topic_id, post_limit = 5, start_post_number }, _extra, ctx, _opts) => {
     try {
       const { base, client } = ctx.siteState.ensureSelectedSite();
@@ -28,6 +31,8 @@ export const readTopicTool = defineTool({
         username: string;
         created_at: string;
         raw: string;
+        accepted_answer?: boolean;
+        topic_accepted_answer?: boolean;
       }> = [];
       let topicData: any = null;
 
@@ -60,6 +65,8 @@ export const readTopicTool = defineTool({
             username: p.username,
             created_at: p.created_at,
             raw: (p.raw || p.cooked || p.excerpt || "").toString().slice(0, limit),
+            ...("accepted_answer" in p ? { accepted_answer: p.accepted_answer } : {}),
+            ...("topic_accepted_answer" in p ? { topic_accepted_answer: p.topic_accepted_answer } : {}),
           });
         }
 
@@ -74,6 +81,8 @@ export const readTopicTool = defineTool({
         category_id: topicData?.category_id || null,
         tags: Array.isArray(topicData?.tags) ? topicData.tags : [],
         posts_count: topicData?.posts_count || fetchedPosts.length,
+        ...(topicData && "has_accepted_answer" in topicData ? { has_accepted_answer: topicData.has_accepted_answer } : {}),
+        ...(topicData && "accepted_answers" in topicData ? { accepted_answers: Array.isArray(topicData.accepted_answers) ? topicData.accepted_answers.map((post: any) => projectPost(post, limit, { includeRaw: true })) : topicData.accepted_answers } : {}),
         posts: fetchedPosts,
         meta: {
           start_post: start,

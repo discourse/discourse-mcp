@@ -234,6 +234,8 @@ const ALL_TOOLS_IN_ORDER = [
   'discourse_filter_topics',
   'discourse_read_topic',
   'discourse_read_post',
+  'discourse_read_topic_posts',
+  'discourse_search_posts',
   'discourse_get_user',
   'discourse_list_user_posts',
   'discourse_list_users',

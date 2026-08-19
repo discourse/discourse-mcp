@@ -2,6 +2,8 @@ import { z } from "zod";
 import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, zodError } from "../../util/json_response.js";
 
+import { readAnnotations } from "./common/helpers.js";
+
 const topPeriodSchema = z.enum(["daily", "weekly", "monthly", "quarterly", "yearly", "all"]);
 
 const schema = z
@@ -71,6 +73,7 @@ export const filterTopicsTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["search", "topics"],
+  annotations: readAnnotations(),
   handler: async (input, _extra, ctx, _opts) => {
     const parsed = schema.safeParse(input);
     if (!parsed.success) return zodError(parsed.error);

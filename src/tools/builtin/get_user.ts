@@ -3,6 +3,8 @@ import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError } from "../../util/json_response.js";
 import { requireAdminAccess } from "../../util/access.js";
 
+import { readAnnotations } from "./common/helpers.js";
+
 const schema = z.object({
   username: z.string().min(1),
 });
@@ -14,6 +16,7 @@ export const getUserTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["users"],
+  annotations: readAnnotations(),
   handler: async ({ username }, _extra, ctx, opts) => {
     try {
       const { client } = ctx.siteState.ensureSelectedSite();

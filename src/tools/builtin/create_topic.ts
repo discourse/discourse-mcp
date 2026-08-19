@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { defineTool } from "../definition.js";
-import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
-import { requireWriteAccess } from "../../util/access.js";
+import { jsonResponse, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireActingUserAccess, requireWriteAccess } from "../../util/access.js";
+import { mutationError } from "./common/helpers.js";
 
 const schema = z.object({
   title: z.string().min(1).max(300),
@@ -14,7 +15,7 @@ const schema = z.object({
 export const createTopicTool = defineTool({
   name: "discourse_create_topic",
   title: "Create Topic",
-  description: "Create a new topic. Returns JSON with id, topic_id, slug, and title.",
+  description: "Create a new topic. author_username requires a global API key. Returns the actual upstream author so callers can verify attribution.",
   schema,
   availability: "writes_enabled",
   toolsets: ["topics"],
@@ -24,6 +25,8 @@ export const createTopicTool = defineTool({
 
       const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
       if (accessError) return accessError;
+      const actingUserError = requireActingUserAccess(ctx.siteState, author_username);
+      if (actingUserError) return actingUserError;
 
       await rateLimit("topic");
 
@@ -38,16 +41,20 @@ export const createTopicTool = defineTool({
 
       const data: any = await client.post(`/posts.json`, payload, { headers });
 
+      const actualAuthor = data?.username ?? data?.post?.username ?? null;
+      const requestedAuthor = author_username || null;
       return jsonResponse({
         id: data?.id || data?.post?.id,
         topic_id: data?.topic_id || data?.topicId || data?.topic?.id,
         slug: data?.topic_slug || data?.topic?.slug || null,
         title: data?.topic_title || data?.title || title,
+        username: actualAuthor,
+        requested_author: requestedAuthor,
+        author_applied: requestedAuthor ? (actualAuthor ? actualAuthor.toLowerCase() === requestedAuthor.toLowerCase() : null) : null,
       });
     } catch (e: unknown) {
       if (isZodError(e)) return zodError(e);
-      const err = e as any;
-      return jsonError(`Failed to create topic: ${err?.message || String(e)}`);
+      return mutationError("Failed to create topic", e);
     }
   },
 });

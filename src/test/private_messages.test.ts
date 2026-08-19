@@ -145,7 +145,7 @@ test("read returns PM metadata, truncates posts, and rejects public topics", asy
 });
 
 test("create sends typed deduplicated recipients and acting-user header", async () => {
-  const mock = recordFetch(() => Response.json({ id: 5, topic_id: 42, post_number: 1, topic_slug: "claim-review", topic_title: "Claim review" }));
+  const mock = recordFetch(() => Response.json({ id: 5, topic_id: 42, post_number: 1, topic_slug: "claim-review", topic_title: "Claim review", username: "admin" }));
   try {
     const result = await invoke("discourse_create_private_message", {
       title: "Claim review", raw: "Please review", usernames: [" Alice "],
@@ -158,7 +158,7 @@ test("create sends typed deduplicated recipients and acting-user header", async 
       title: "Claim review", raw: "Please review", archetype: "private_message",
       target_recipients: "Alice,reviewers,EXTERNAL@example.com",
     });
-    assert.deepEqual(body(result), { id: 5, topic_id: 42, post_number: 1, slug: "claim-review", title: "Claim review" });
+    assert.deepEqual(body(result), { id: 5, topic_id: 42, post_number: 1, slug: "claim-review", username: "admin", title: "Claim review", requested_author: "admin", author_applied: true });
   } finally {
     mock.restore();
   }
@@ -179,14 +179,14 @@ test("create validates typed recipients and write access before HTTP", async () 
 test("reply preflights with the acting user and never posts to a public topic", async () => {
   const mock = recordFetch((_request, index) => Response.json(index === 0
     ? { archetype: "private_message" }
-    : { id: 8, topic_id: 42, post_number: 3, reply_to_post_number: 2, topic_slug: "secret" }));
+    : { id: 8, topic_id: 42, post_number: 3, reply_to_post_number: 2, topic_slug: "secret", username: "alice" }));
   try {
     const result = await invoke("discourse_reply_private_message", { topic_id: 42, raw: "reply", reply_to_post_number: 2, author_username: "alice" });
     assert.equal(mock.requests[0]?.url, "https://example.com/t/42.json?track_visit=false");
     assert.equal(mock.requests[0]?.headers.get("Api-Username"), "alice");
     assert.deepEqual(mock.requests[1]?.body, { topic_id: 42, raw: "reply", reply_to_post_number: 2 });
     assert.equal("archetype" in mock.requests[1]!.body, false);
-    assert.deepEqual(body(result), { id: 8, topic_id: 42, post_number: 3, slug: "secret", reply_to_post_number: 2 });
+    assert.deepEqual(body(result), { id: 8, topic_id: 42, post_number: 3, slug: "secret", username: "alice", reply_to_post_number: 2, requested_author: "alice", author_applied: true });
   } finally {
     mock.restore();
   }

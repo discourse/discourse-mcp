@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { defineTool } from "../definition.js";
-import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
-import { requireWriteAccess } from "../../util/access.js";
+import { jsonResponse, rateLimit, isZodError, zodError } from "../../util/json_response.js";
+import { requireActingUserAccess, requireWriteAccess } from "../../util/access.js";
+import { mutationError } from "./common/helpers.js";
 
 const schema = z.object({
   topic_id: z.number().int().positive(),
@@ -12,7 +13,7 @@ const schema = z.object({
 export const createPostTool = defineTool({
   name: "discourse_create_post",
   title: "Create Post",
-  description: "Create a post in a topic. Returns JSON with id, topic_id, and post_number.",
+  description: "Create a post in a topic. author_username requires a global API key. Returns the actual upstream author so callers can verify attribution.",
   schema,
   availability: "writes_enabled",
   toolsets: ["topics"],
@@ -22,6 +23,8 @@ export const createPostTool = defineTool({
 
       const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
       if (accessError) return accessError;
+      const actingUserError = requireActingUserAccess(ctx.siteState, author_username);
+      if (actingUserError) return actingUserError;
 
       await rateLimit("post");
 
@@ -33,15 +36,19 @@ export const createPostTool = defineTool({
 
       const data = (await client.post(`/posts.json`, payload, { headers })) as any;
 
+      const actualAuthor = data?.username ?? data?.post?.username ?? null;
+      const requestedAuthor = author_username || null;
       return jsonResponse({
         id: data?.id || data?.post?.id,
         topic_id: data?.topic_id || topic_id,
         post_number: data?.post_number || data?.post?.post_number,
+        username: actualAuthor,
+        requested_author: requestedAuthor,
+        author_applied: requestedAuthor ? (actualAuthor ? actualAuthor.toLowerCase() === requestedAuthor.toLowerCase() : null) : null,
       });
     } catch (e: unknown) {
       if (isZodError(e)) return zodError(e);
-      const err = e as any;
-      return jsonError(`Failed to create post: ${err?.message || String(e)}`);
+      return mutationError("Failed to create post", e);
     }
   },
 });

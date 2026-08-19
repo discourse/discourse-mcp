@@ -2,6 +2,8 @@ import { defineTool } from "../definition.js";
 import { z } from "zod";
 import { jsonResponse, jsonError } from "../../util/json_response.js";
 
+import { readAnnotations } from "./common/helpers.js";
+
 const schema = z.object({
   channel_id: z.number().int().positive().describe("The chat channel ID"),
   page_size: z.number().int().min(1).max(50).optional().describe("Number of messages to return (default: 50, max: 50)"),
@@ -17,6 +19,7 @@ export const getChatMessagesTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["chat"],
+  annotations: readAnnotations(),
   handler: async ({
     channel_id,
     page_size = 50,

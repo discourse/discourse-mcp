@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
-import { requireWriteAccess } from "../../util/access.js";
+import { requireGlobalApiKeyAccess, requireWriteAccess } from "../../util/access.js";
+import { mutationError } from "./common/helpers.js";
 
 const schema = z.object({
   username: z.string().min(1).max(20),
@@ -16,7 +17,7 @@ const schema = z.object({
 export const createUserTool = defineTool({
   name: "discourse_create_user",
   title: "Create User",
-  description: "Create a new user account. If upload_id is provided, sets the user's avatar after creation. Returns JSON with success status and user details.",
+  description: "Create a user through Discourse's signup API using a global admin API key. Reports whether upstream confirmed creation; anti-enumeration responses without user_id remain indeterminate. Optional avatar assignment runs only after confirmed creation.",
   schema,
   availability: "writes_enabled",
   toolsets: ["users"],
@@ -26,6 +27,8 @@ export const createUserTool = defineTool({
 
       const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
       if (accessError) return accessError;
+      const apiKeyError = requireGlobalApiKeyAccess(ctx.siteState, "User creation");
+      if (apiKeyError) return apiKeyError;
 
       await rateLimit("user");
       const { client } = ctx.siteState.ensureSelectedSite();
@@ -42,39 +45,45 @@ export const createUserTool = defineTool({
       const response = await client.post("/users.json", userData) as any;
 
       if (response.success) {
-        // Use canonical username from response (Discourse may normalize it)
-        const createdUsername = response.username || args.username;
+        const userId = typeof response.user_id === "number" ? response.user_id : null;
+        const creationConfirmed = userId !== null;
+        const createdUsername = creationConfirmed ? (response.username || args.username) : null;
         let avatarUpdated = false;
         let avatarError: string | undefined;
 
-        // Set avatar if upload_id was provided
-        if (args.upload_id !== undefined) {
+        if (args.upload_id !== undefined && creationConfirmed && createdUsername) {
           try {
             await rateLimit("user");
             await client.put(
               `/u/${encodeURIComponent(createdUsername)}/preferences/avatar/pick.json`,
-              { upload_id: args.upload_id, type: "uploaded" }
+              { upload_id: args.upload_id, type: "uploaded" },
+              { headers: { "Api-Username": createdUsername } },
             );
             avatarUpdated = true;
           } catch (e: any) {
-            // Log but don't fail the whole operation
             avatarError = e?.message || String(e);
             ctx.logger.error(`Failed to set avatar for new user ${createdUsername}: ${avatarError}`);
           }
+        } else if (args.upload_id !== undefined && !creationConfirmed) {
+          avatarError = "Avatar assignment skipped because Discourse did not confirm account creation";
         }
 
         const result: Record<string, unknown> = {
-          success: true,
+          request_accepted: true,
+          created: creationConfirmed ? true : null,
+          user_id: userId,
           username: createdUsername,
+          requested_username: args.username,
           name: args.name,
           email: args.email,
-          active: response.active ?? args.active,
+          active: response.active ?? null,
           avatar_updated: avatarUpdated,
-          message: response.message || "Account created",
+          message: response.message || "Account request accepted",
         };
-        if (avatarError) {
-          result.avatar_error = avatarError;
+        if (!creationConfirmed) {
+          result.warning = "Discourse did not return user_id, so account creation is unconfirmed and may be an anti-enumeration response.";
         }
+        if (avatarError) result.avatar_error = avatarError;
         return jsonResponse(result);
       } else {
         const details: Record<string, unknown> = {};
@@ -84,11 +93,7 @@ export const createUserTool = defineTool({
       }
     } catch (e: unknown) {
       if (isZodError(e)) return zodError(e);
-      const err = e as any;
-      const details: Record<string, unknown> = {};
-      if (err?.body) details.body = err.body;
-      if (err?.status) details.status = err.status;
-      return jsonError(`Failed to create user: ${err?.message || String(e)}`, Object.keys(details).length > 0 ? details : undefined);
+      return mutationError("Failed to create user", e);
     }
   },
 });

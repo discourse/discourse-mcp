@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineTool } from "../../definition.js";
-import { requireWriteAccess } from "../../../util/access.js";
+import { requireActingUserAccess, requireWriteAccess } from "../../../util/access.js";
 import { isZodError, jsonError, jsonResponse, rateLimit, zodError } from "../../../util/json_response.js";
 import { actingUserHeaders, deduplicateRecipients, emailAddressSchema, groupNameSchema, normalizePostResult, optionalAuthorUsernameSchema, usernameSchema } from "./common.js";
 
@@ -16,7 +16,7 @@ const schema = z.object({
 export const createPrivateMessageTool = defineTool({
   name: "discourse_create_private_message",
   title: "Create Private Message",
-  description: "Create a private message for typed user, group, or email recipients. Unknown emails may create staged users. Returns normalized JSON post details.",
+  description: "Create a private message for typed user, group, or email recipients. Unknown emails may create staged users. author_username requires a global API key; the response reports actual attribution.",
   schema,
   availability: "writes_enabled",
   toolsets: ["private_messages"],
@@ -30,6 +30,8 @@ export const createPrivateMessageTool = defineTool({
       }
       const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
       if (accessError) return accessError;
+      const actingUserError = requireActingUserAccess(ctx.siteState, author_username);
+      if (actingUserError) return actingUserError;
       const recipients = deduplicateRecipients([usernames, group_names, email_addresses]);
       await rateLimit("post");
       const { client } = ctx.siteState.ensureSelectedSite();
@@ -39,9 +41,12 @@ export const createPrivateMessageTool = defineTool({
         archetype: "private_message",
         target_recipients: recipients.join(","),
       }, { headers: actingUserHeaders(author_username) })) as any;
+      const normalized = normalizePostResult(data);
       return jsonResponse({
-        ...normalizePostResult(data),
+        ...normalized,
         title: data?.topic_title ?? data?.title ?? title,
+        requested_author: author_username ?? null,
+        author_applied: author_username ? (normalized.username ? normalized.username.toLowerCase() === author_username.toLowerCase() : null) : null,
       });
     } catch (e: unknown) {
       if (isZodError(e)) return zodError(e);

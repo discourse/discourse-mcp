@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { HttpError } from "../../../http/client.js";
 import { defineTool } from "../../definition.js";
-import { requireWriteAccess } from "../../../util/access.js";
+import { requireActingUserAccess, requireWriteAccess } from "../../../util/access.js";
 import { isZodError, jsonError, jsonResponse, rateLimit, zodError } from "../../../util/json_response.js";
 import { actingUserHeaders, emailAddressSchema, groupNameSchema, normalizeGroup, normalizeUser, optionalAuthorUsernameSchema, usernameSchema } from "./common.js";
 
@@ -18,7 +18,7 @@ const schema = z.object({
 export const inviteToPrivateMessageTool = defineTool({
   name: "discourse_invite_to_private_message",
   title: "Invite to Private Message",
-  description: "Add a user or group to a private message, or submit an opaque email invitation. Email success does not confirm delivery or participant access.",
+  description: "Add a user or group to a private message, or submit an opaque email invitation. Email success does not confirm delivery or participant access. author_username requires a global API key.",
   schema,
   availability: "writes_enabled",
   toolsets: ["private_messages"],
@@ -41,6 +41,8 @@ export const inviteToPrivateMessageTool = defineTool({
       groupName = parsed.group_name;
       const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
       if (accessError) return accessError;
+      const actingUserError = requireActingUserAccess(ctx.siteState, parsed.author_username);
+      if (actingUserError) return actingUserError;
       await rateLimit("post");
       const { client } = ctx.siteState.ensureSelectedSite();
       const headers = actingUserHeaders(parsed.author_username);

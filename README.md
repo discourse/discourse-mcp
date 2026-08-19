@@ -194,20 +194,24 @@ Available toolsets are:
 | Toolset | Built-in tools |
 |---|---|
 | `site` | `discourse_select_site` (also retained implicitly as bootstrap for any untethered subset) |
-| `search` | Search and topic filtering |
-| `topics` | Search/filter, topic and post reads, user-post activity, and topic/post/category mutations |
-| `users` | User lookup/list/activity and user mutations |
+| `search` | Topic-level search/filtering plus post-level keyword evidence |
+| `topics` | Core topic/post reads, exact stream selection, post search, user-post activity, and mutations |
+| `users` | User lookup/listing, user-post activity, and user mutations |
 | `chat` | Chat message retrieval |
 | `drafts` | Draft retrieval, save, and deletion |
 | `uploads` | File upload |
 | `data_explorer` | Query retrieval, execution, creation, update, and deletion |
 | `private_messages` | Authenticated personal/group PM listing and reading, plus write-gated creation, replies, and participant invitations |
-| `groups` *(opt-in)* | Complete group CRUD; member/owner listing; explicit username, user-ID, or account-email membership and ownership mutations; separate email invitations; membership-request decisions; self-service requests, joins, and leaves |
-| `moderation` *(opt-in)* | Authenticated review queue count/list/topic/detail triage, plus one write-gated, freshly preflighted dynamic reviewable action tool |
+| `activity` *(opt-in)* | Reply relationships, site-wide post activity, topic view history, user activity summaries and timelines, and directory/cohort metrics |
+| `administration` *(opt-in)* | Category discovery, admin-visible site settings, and explicitly confirmed user activation/approval state changes |
+| `groups` *(opt-in)* | Complete group CRUD and membership operations plus fixed-page, cursor-based group-authored post evidence |
+| `moderation` *(opt-in)* | Authenticated review queue triage, user behavioral counters, bounded post revisions, and one freshly preflighted reviewable action |
 | `workflows` *(opt-in)* | Admin-only workflow discovery, graph authoring, expression evaluation, pin-data, draft runs, step runs, executions, and version management |
 | `ai_agents` *(opt-in)* | Admin-only AI agent discovery, typed lifecycle, bot-user creation, and portable import/export |
 | `ai_custom_tools` *(opt-in)* | Admin-only database-backed scripted custom-tool guide, lifecycle, actual execution testing, and import/export |
 | `ai_features` *(opt-in)* | Admin-only AI feature discovery and exact-area, non-secret feature-setting updates; also includes agent discovery |
+| `analytics` *(opt-in)* | Staff-visible Discourse report discovery/execution and the Discourse Solved support dashboard |
+| `ai_insights` *(opt-in)* | Read-oriented Discourse AI cached summaries, semantic search, and staff sentiment classifications |
 | `all` *(sentinel)* | Expands to every built-in toolset, including opt-in domains; absorbs other selections |
 
 Toolset membership is intentionally separate from safety and authorization:
@@ -342,6 +346,28 @@ Resources provide static/semi-static read-only data via URI addressing. Use thes
   - Returns the exact selected-site `empty_tool` JavaScript preset: Discourse's current preamble plus minimal `invoke`/`details` template
   - MIME type: `text/javascript`; requires selected-site admin credentials
   - Applications may attach this resource; models can retrieve the same content with `discourse_ai_get_custom_tool_guide` and `topic: "preamble"`
+
+## Evidence and analytics capabilities
+
+The expanded read catalog exposes upstream evidence rather than MCP-authored judgments:
+
+- `discourse_search` returns matching **topics**; the default `discourse_search_posts` preserves matched **posts**, highlighted blurbs, authors, likes, and bounded search continuation. `discourse_ai_semantic_search` is a separate opt-in Discourse AI embedding search. The opt-in `activity` tool `discourse_list_latest_posts` is a fixed 50-row chronological feed with a post-ID cursor, not search.
+- The default `discourse_read_topic_posts` selects exact IDs, earliest/latest posts, an around-post window, or username-filtered posts. Latest/earliest selections use at most two upstream requests and cap the selected set at 50. The opt-in `activity` tool `discourse_get_post_replies` distinguishes recursive descendant IDs, 20-row direct replies, and the site-bounded ancestor history.
+- Topic and post reads preserve Discourse Solved fields when the plugin supplies them. An accepted answer is a resolution proxy, not proof that the original poster is satisfied.
+- The opt-in `activity` domain contains `discourse_get_user_summary` for profile-visible aggregates, `discourse_list_user_actions` for a paginated named event timeline, and `discourse_list_directory_items` for visible directory/cohort metrics. The existing default `discourse_list_user_posts` remains the compatible post/reply view.
+- The opt-in `administration` domain makes categories and admin-visible site settings model-callable and provides confirmed activation/approval state changes. User creation requires a global admin API key; responses without an upstream `user_id` remain explicitly unconfirmed.
+- Topic/post `author_username` requires a global API key, and creation responses report both requested and actual attribution so ignored impersonation cannot be mistaken for success.
+- The opt-in `analytics` domain discovers the staff-visible report catalog before executing a report and exposes the Solved support dashboard. Dashboard “unanswered” means unsolved with no qualifying regular reply—not no response from a designated team.
+- The opt-in `ai_insights` domain requires Discourse AI. Cached summaries report staleness, semantic search remains Guardian-filtered, and sentiment values are upstream model classifications rather than objective argument, satisfaction, or risk labels.
+
+Plugin-specific 404 responses are intentionally reported as `capability_or_resource_unavailable`: the same upstream response can mean a disabled plugin/setting, a hidden resource, or a nonexistent resource. Toolset selection does not grant visibility or staff access.
+
+Example compositions:
+
+1. Catch up on a thread with `discourse_read_topic_posts` in `latest`/`replies_only` mode, then let the calling model summarize the ordered evidence.
+2. Assess answer state by combining Solved topic filters, accepted-answer fields, and the support dashboard while disclosing that “solved” is only a proxy.
+3. Check for group participation with `discourse_list_group_posts` and topic IDs; group authorship is evidence, not proof of organizational responsibility.
+4. Review possible conflict by retrieving exact posts/reply chains and, optionally, upstream sentiment classifications; the calling model makes and explains any semantic judgment.
 
 ## Tools
 

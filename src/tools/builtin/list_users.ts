@@ -3,6 +3,8 @@ import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, paginatedResponse } from "../../util/json_response.js";
 import { requireAdminAccess } from "../../util/access.js";
 
+import { readAnnotations } from "./common/helpers.js";
+
 // Discourse admin API returns ~100 users per page (fixed by the API)
 const DISCOURSE_PAGE_SIZE = 100;
 
@@ -26,6 +28,7 @@ export const listUsersTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["users"],
+  annotations: readAnnotations(),
   handler: async (args, _extra, ctx, opts) => {
     try {
       const accessError = requireAdminAccess(ctx.siteState);

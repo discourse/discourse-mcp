@@ -29,6 +29,17 @@ import { workflowTools } from "./workflows/index.js";
 import { aiAgentTools } from "./ai_agents/index.js";
 import { aiCustomToolTools } from "./ai_custom_tools/index.js";
 import { aiFeatureTools } from "./ai_features/index.js";
+import { readTopicPostsTool } from "./topics/read_topic_posts.js";
+import { getPostRepliesTool } from "./topics/get_post_replies.js";
+import { listLatestPostsTool } from "./topics/list_latest_posts.js";
+import { getTopicViewStatsTool } from "./topics/get_topic_view_stats.js";
+import { searchPostsTool } from "./search/search_posts.js";
+import { getUserSummaryTool } from "./users/get_user_summary.js";
+import { listUserActionsTool } from "./users/list_user_actions.js";
+import { listDirectoryItemsTool } from "./users/list_directory_items.js";
+import { analyticsTools } from "./analytics/index.js";
+import { aiInsightTools } from "./ai_insights/index.js";
+import { administrationTools } from "./administration/index.js";
 
 /** Built-in tools in their stable MCP registration order. */
 export const builtinTools = [
@@ -37,8 +48,16 @@ export const builtinTools = [
   filterTopicsTool,
   readTopicTool,
   readPostTool,
+  readTopicPostsTool,
+  getPostRepliesTool,
+  listLatestPostsTool,
+  getTopicViewStatsTool,
+  searchPostsTool,
   getUserTool,
   listUserPostsTool,
+  getUserSummaryTool,
+  listUserActionsTool,
+  listDirectoryItemsTool,
   listUsersTool,
   getChatMessagesTool,
   getDraftTool,
@@ -60,4 +79,7 @@ export const builtinTools = [
   ...aiAgentTools,
   ...aiCustomToolTools,
   ...aiFeatureTools,
+  ...administrationTools,
+  ...analyticsTools,
+  ...aiInsightTools,
 ] as const satisfies readonly ToolDefinition[];

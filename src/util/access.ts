@@ -37,3 +37,20 @@ export function requireWriteAccess(siteState: SiteState, allowWrites: boolean) {
 export function requireAdminAccess(siteState: SiteState) {
   return requireSiteAuth(siteState, "admin");
 }
+
+/** Require a global Discourse API key rather than a user-scoped API key. */
+export function requireGlobalApiKeyAccess(siteState: SiteState, capability: string) {
+  const authError = requireSiteAuth(siteState, "admin");
+  if (authError) return authError;
+  const base = siteState.getSiteBase()!;
+  if (siteState.getAuthType(base) !== "api_key") {
+    return jsonError(`${capability} requires a global Discourse API key; a User API Key cannot provide this authority.`);
+  }
+  return null;
+}
+
+/** Acting-user headers are meaningful only with a global Discourse API key. */
+export function requireActingUserAccess(siteState: SiteState, authorUsername?: string) {
+  if (!authorUsername) return null;
+  return requireGlobalApiKeyAccess(siteState, "author_username");
+}

@@ -113,6 +113,8 @@ export function normalizeReviewable(reviewable: any, root?: any) {
         ? score
         : rootScores.find((candidate: any) => String(candidate?.id) === String(score))).filter(Boolean)
     : rootScores.filter((score: any) => String(score?.reviewable_id) === String(reviewable?.id));
+  const histories = (Array.isArray(reviewable?.history) ? reviewable.history : Array.isArray(root?.reviewable_histories) ? root.reviewable_histories.filter((item: any) => String(item?.reviewable_id) === String(reviewable?.id)) : []).slice(0, 100).map((item: any) => ({ id: item?.id ?? null, created_at: item?.created_at ?? null, status: item?.status ?? null, created_by_id: item?.created_by_id ?? item?.user_id ?? null, details: boundedRecord(item?.details) }));
+  const notes = (Array.isArray(reviewable?.notes) ? reviewable.notes : Array.isArray(root?.reviewable_notes) ? root.reviewable_notes.filter((item: any) => String(item?.reviewable_id) === String(reviewable?.id)) : []).slice(0, 100).map((item: any) => ({ id: item?.id ?? null, created_at: item?.created_at ?? null, user_id: item?.user_id ?? null, text: bounded(item?.text ?? item?.note ?? item?.raw) }));
   return {
     id: value(reviewable, "id"),
     type: value(reviewable, "type", "reviewable_type"),
@@ -141,6 +143,9 @@ export function normalizeReviewable(reviewable: any, root?: any) {
     claimed_by: reviewable?.claimed_by ?? null,
     version: value(reviewable, "version"),
     editable_fields: reviewable?.editable_fields ?? [],
+    histories,
+    notes,
+    plugin_fields: boundedRecord(reviewable?.plugin_fields),
     scores,
     available_actions: availableActions(reviewable, root),
   };

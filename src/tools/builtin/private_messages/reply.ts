@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineTool } from "../../definition.js";
-import { requireWriteAccess } from "../../../util/access.js";
+import { requireActingUserAccess, requireWriteAccess } from "../../../util/access.js";
 import { isZodError, jsonError, jsonResponse, rateLimit, zodError } from "../../../util/json_response.js";
 import { actingUserHeaders, assertPrivateMessage, normalizePostResult, optionalAuthorUsernameSchema } from "./common.js";
 
@@ -14,7 +14,7 @@ const schema = z.object({
 export const replyPrivateMessageTool = defineTool({
   name: "discourse_reply_private_message",
   title: "Reply to Private Message",
-  description: "Safely reply to an existing private message after verifying its archetype. Returns normalized JSON post details.",
+  description: "Safely reply to an existing private message after verifying its archetype. author_username requires a global API key; the response reports actual attribution.",
   schema,
   availability: "writes_enabled",
   toolsets: ["private_messages"],
@@ -25,6 +25,8 @@ export const replyPrivateMessageTool = defineTool({
       topicId = topic_id;
       const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
       if (accessError) return accessError;
+      const actingUserError = requireActingUserAccess(ctx.siteState, author_username);
+      if (actingUserError) return actingUserError;
       const { client } = ctx.siteState.ensureSelectedSite();
       const headers = actingUserHeaders(author_username);
       assertPrivateMessage(await client.get(`/t/${topic_id}.json?track_visit=false`, { headers }));
@@ -36,6 +38,8 @@ export const replyPrivateMessageTool = defineTool({
       return jsonResponse({
         ...normalized,
         reply_to_post_number: data?.reply_to_post_number ?? data?.post?.reply_to_post_number ?? reply_to_post_number ?? null,
+        requested_author: author_username ?? null,
+        author_applied: author_username ? (normalized.username ? normalized.username.toLowerCase() === author_username.toLowerCase() : null) : null,
       });
     } catch (e: unknown) {
       if (isZodError(e)) return zodError(e);

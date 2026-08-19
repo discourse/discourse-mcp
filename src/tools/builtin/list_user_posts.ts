@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, paginatedResponse } from "../../util/json_response.js";
+import { projectLegacyUserPost } from "./users/list_user_actions.js";
+
+import { readAnnotations } from "./common/helpers.js";
 
 const schema = z.object({
   username: z.string().min(1),
@@ -15,6 +18,7 @@ export const listUserPostsTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["users", "topics"],
+  annotations: readAnnotations(),
   handler: async ({ username, page = 0, limit = 30 }, _extra, ctx, _opts) => {
     try {
       const { client } = ctx.siteState.ensureSelectedSite();
@@ -27,19 +31,7 @@ export const listUserPostsTool = defineTool({
 
       const userActions = data?.user_actions || [];
 
-      const posts = userActions.slice(0, limit).map((action: any) => {
-        const postId = action.post_id ?? action.id ?? null;
-        return {
-          id: postId,
-          topic_id: action.topic_id,
-          post_number: action.post_number,
-          slug: action.slug,
-          title: action.title,
-          created_at: action.created_at,
-          excerpt: action.excerpt || null,
-          category_id: action.category_id || null,
-        };
-      });
+      const posts = userActions.slice(0, limit).map(projectLegacyUserPost);
 
       return jsonResponse(paginatedResponse("posts", posts, {
         page,

@@ -86,5 +86,6 @@ export function normalizePostResult(data: any, fallbackTopicId?: number) {
     topic_id: post?.topic_id ?? data?.topic_id ?? fallbackTopicId,
     post_number: post?.post_number ?? data?.post_number,
     slug: post?.topic_slug ?? data?.topic_slug ?? data?.slug ?? null,
+    username: post?.username ?? data?.username ?? null,
   };
 }

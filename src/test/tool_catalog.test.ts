@@ -63,6 +63,29 @@ const EXPECTED_METADATA = [
     ]
   },
   {
+    "name": "discourse_read_topic_posts",
+    "title": "Read Selected Topic Posts",
+    "description": "Read exact, earliest, latest, around-post, or username-filtered topic evidence. Selection is bounded to 50 posts and reports the visible stream size without claiming the entire topic was loaded.",
+    "inputKeys": [
+      "topic_id",
+      "selection_mode",
+      "limit",
+      "post_ids",
+      "post_number",
+      "usernames",
+      "replies_only"
+    ]
+  },
+  {
+    "name": "discourse_search_posts",
+    "title": "Search Posts",
+    "description": "Search post-level evidence with Discourse query syntax. Unlike discourse_search, this preserves matched posts, highlighted blurbs, authors, topics, categories, and truthful bounded continuation. This is keyword search, not Discourse AI semantic search.",
+    "inputKeys": [
+      "query",
+      "page"
+    ]
+  },
+  {
     "name": "discourse_get_user",
     "title": "Get User",
     "description": "Get user info. Returns JSON with id, username, name, trust_level, created_at, bio, admin, and moderator.",
@@ -116,7 +139,7 @@ const EXPECTED_METADATA = [
   {
     "name": "discourse_create_post",
     "title": "Create Post",
-    "description": "Create a post in a topic. Returns JSON with id, topic_id, and post_number.",
+    "description": "Create a post in a topic. author_username requires a global API key. Returns the actual upstream author so callers can verify attribution.",
     "inputKeys": [
       "topic_id",
       "raw",
@@ -126,7 +149,7 @@ const EXPECTED_METADATA = [
   {
     "name": "discourse_create_user",
     "title": "Create User",
-    "description": "Create a new user account. If upload_id is provided, sets the user's avatar after creation. Returns JSON with success status and user details.",
+    "description": "Create a user through Discourse's signup API using a global admin API key. Reports whether upstream confirmed creation; anti-enumeration responses without user_id remain indeterminate. Optional avatar assignment runs only after confirmed creation.",
     "inputKeys": [
       "username",
       "email",
@@ -154,7 +177,7 @@ const EXPECTED_METADATA = [
   {
     "name": "discourse_create_topic",
     "title": "Create Topic",
-    "description": "Create a new topic. Returns JSON with id, topic_id, slug, and title.",
+    "description": "Create a new topic. author_username requires a global API key. Returns the actual upstream author so callers can verify attribution.",
     "inputKeys": [
       "title",
       "raw",
@@ -294,42 +317,80 @@ const EXPECTED_METADATA = [
     "name": "discourse_list_private_messages",
     "title": "List Private Messages",
     "description": "List authenticated personal or group private-message mailboxes. Returns normalized JSON messages and pagination metadata.",
-    "inputKeys": ["username", "mailbox", "group_name", "page", "per_page"]
+    "inputKeys": [
+      "username",
+      "mailbox",
+      "group_name",
+      "page",
+      "per_page"
+    ]
   },
   {
     "name": "discourse_read_private_message",
     "title": "Read Private Message",
     "description": "Read an authenticated private message, its posts, and direct allowed-user and allowed-group records. Rejects public topics.",
-    "inputKeys": ["topic_id", "post_limit", "start_post_number"]
+    "inputKeys": [
+      "topic_id",
+      "post_limit",
+      "start_post_number"
+    ]
   },
   {
     "name": "discourse_create_private_message",
     "title": "Create Private Message",
-    "description": "Create a private message for typed user, group, or email recipients. Unknown emails may create staged users. Returns normalized JSON post details.",
-    "inputKeys": ["title", "raw", "usernames", "group_names", "email_addresses", "author_username"]
+    "description": "Create a private message for typed user, group, or email recipients. Unknown emails may create staged users. author_username requires a global API key; the response reports actual attribution.",
+    "inputKeys": [
+      "title",
+      "raw",
+      "usernames",
+      "group_names",
+      "email_addresses",
+      "author_username"
+    ]
   },
   {
     "name": "discourse_reply_private_message",
     "title": "Reply to Private Message",
-    "description": "Safely reply to an existing private message after verifying its archetype. Returns normalized JSON post details.",
-    "inputKeys": ["topic_id", "raw", "reply_to_post_number", "author_username"]
+    "description": "Safely reply to an existing private message after verifying its archetype. author_username requires a global API key; the response reports actual attribution.",
+    "inputKeys": [
+      "topic_id",
+      "raw",
+      "reply_to_post_number",
+      "author_username"
+    ]
   },
   {
     "name": "discourse_invite_to_private_message",
     "title": "Invite to Private Message",
-    "description": "Add a user or group to a private message, or submit an opaque email invitation. Email success does not confirm delivery or participant access.",
-    "inputKeys": ["topic_id", "username", "group_name", "email_address", "notify_group_members", "custom_message", "author_username"]
+    "description": "Add a user or group to a private message, or submit an opaque email invitation. Email success does not confirm delivery or participant access. author_username requires a global API key.",
+    "inputKeys": [
+      "topic_id",
+      "username",
+      "group_name",
+      "email_address",
+      "notify_group_members",
+      "custom_message",
+      "author_username"
+    ]
   }
 ] as const;
 
 const EXPECTED_TOOLSETS = {
   discourse_select_site: ["site"],
-  discourse_search: ["search", "topics"],
-  discourse_filter_topics: ["search", "topics"],
+  discourse_search: ["search","topics"],
+  discourse_filter_topics: ["search","topics"],
   discourse_read_topic: ["topics"],
   discourse_read_post: ["topics"],
+  discourse_read_topic_posts: ["topics"],
+  discourse_get_post_replies: ["activity"],
+  discourse_list_latest_posts: ["activity"],
+  discourse_get_topic_view_stats: ["activity"],
+  discourse_search_posts: ["search","topics"],
   discourse_get_user: ["users"],
-  discourse_list_user_posts: ["users", "topics"],
+  discourse_list_user_posts: ["users","topics"],
+  discourse_get_user_summary: ["activity"],
+  discourse_list_user_actions: ["activity"],
+  discourse_list_directory_items: ["activity"],
   discourse_list_users: ["users"],
   discourse_get_chat_messages: ["chat"],
   discourse_get_draft: ["drafts"],
@@ -355,6 +416,7 @@ const EXPECTED_TOOLSETS = {
   discourse_invite_to_private_message: ["private_messages"],
   discourse_list_groups: ["groups"],
   discourse_get_group: ["groups"],
+  discourse_list_group_posts: ["groups"],
   discourse_list_group_members: ["groups"],
   discourse_list_group_membership_requests: ["groups"],
   discourse_create_group: ["groups"],
@@ -381,6 +443,8 @@ const EXPECTED_TOOLSETS = {
   discourse_list_reviewables: ["moderation"],
   discourse_list_reviewable_topics: ["moderation"],
   discourse_get_reviewable: ["moderation"],
+  discourse_get_user_moderation_summary: ["moderation"],
+  discourse_get_post_revision: ["moderation"],
   discourse_perform_reviewable_action: ["moderation"],
   discourse_list_workflows: ["workflows"],
   discourse_get_workflow: ["workflows"],
@@ -400,7 +464,7 @@ const EXPECTED_TOOLSETS = {
   discourse_run_workflow: ["workflows"],
   discourse_run_workflow_step: ["workflows"],
   discourse_update_workflow_pin_data: ["workflows"],
-  discourse_ai_list_agents: ["ai_agents", "ai_features"],
+  discourse_ai_list_agents: ["ai_agents","ai_features"],
   discourse_ai_get_agent: ["ai_agents"],
   discourse_ai_create_agent: ["ai_agents"],
   discourse_ai_update_agent: ["ai_agents"],
@@ -420,6 +484,15 @@ const EXPECTED_TOOLSETS = {
   discourse_ai_list_features: ["ai_features"],
   discourse_ai_get_feature_config: ["ai_features"],
   discourse_ai_update_feature_config: ["ai_features"],
+  discourse_list_categories: ["administration"],
+  discourse_list_site_settings: ["administration"],
+  discourse_manage_user_activation: ["administration"],
+  discourse_list_reports: ["analytics"],
+  discourse_get_report: ["analytics"],
+  discourse_get_support_dashboard: ["analytics"],
+  discourse_ai_get_topic_summary: ["ai_insights"],
+  discourse_ai_semantic_search: ["ai_insights"],
+  discourse_ai_list_sentiment_posts: ["ai_insights"],
 } as const;
 
 function registeredNames(opts: ToolRegistrationOptions): string[] {
@@ -493,13 +566,22 @@ test("builtinTools metadata and deterministic order match the compatibility snap
     description: tool.description,
     inputKeys: Object.keys(tool.schema.shape),
   }));
-  assert.deepEqual(actual.slice(0, EXPECTED_METADATA.length), EXPECTED_METADATA);
-  const optInMetadata = actual.slice(EXPECTED_METADATA.length);
-  assert.equal(optInMetadata.length, 67);
-  assert.equal(optInMetadata.filter((tool) => tool.name.includes("group")).length, 24);
+  const defaultMetadata = actual.filter((_tool, index) =>
+    !builtinTools[index]!.toolsets.every((toolset) =>
+      (OPT_IN_TOOLSETS as readonly BuiltinToolset[]).includes(toolset)
+    )
+  );
+  assert.deepEqual(defaultMetadata, EXPECTED_METADATA);
+  const optInMetadata = actual.filter((_tool, index) =>
+    builtinTools[index]!.toolsets.every((toolset) =>
+      (OPT_IN_TOOLSETS as readonly BuiltinToolset[]).includes(toolset)
+    )
+  );
+  assert.equal(optInMetadata.length, 85);
+  assert.equal(optInMetadata.filter((tool) => tool.name.includes("group")).length, 25);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("review")).length, 5);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("workflow")).length, 18);
-  assert.equal(optInMetadata.filter((tool) => tool.name.startsWith("discourse_ai_")).length, 20);
+  assert.equal(optInMetadata.filter((tool) => tool.name.startsWith("discourse_ai_")).length, 23);
   assert.equal(optInMetadata.some((tool) => tool.name.includes("preview")), false);
 });
 
@@ -527,6 +609,8 @@ test("builtinTools registration modes equal catalog availability filters", () =>
   assert.ok(defaultNames.includes("discourse_search"));
   assert.ok(defaultNames.includes("discourse_filter_topics"));
   assert.equal(defaultNames.some((name) => name.includes("reviewable") || name === "discourse_get_review_queue_count"), false);
+  assert.equal(defaultNames.includes("discourse_get_post_replies"), false);
+  assert.equal(defaultNames.includes("discourse_get_user_summary"), false);
   assert.deepEqual(
     defaultNames,
     defaultTools
@@ -590,11 +674,34 @@ test("selected built-in toolsets preserve order and compose with availability", 
   );
 
   assert.deepEqual(
+    registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["administration"] }),
+    ["discourse_select_site", "discourse_list_categories", "discourse_list_site_settings"]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: ["administration"], hideSelectSite: true }),
+    ["discourse_list_categories", "discourse_list_site_settings", "discourse_manage_user_activation"]
+  );
+
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["activity"] }),
+    [
+      "discourse_select_site",
+      "discourse_get_post_replies",
+      "discourse_list_latest_posts",
+      "discourse_get_topic_view_stats",
+      "discourse_get_user_summary",
+      "discourse_list_user_actions",
+      "discourse_list_directory_items",
+    ]
+  );
+
+  assert.deepEqual(
     registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["groups"] }),
     [
       "discourse_select_site",
       "discourse_list_groups",
       "discourse_get_group",
+      "discourse_list_group_posts",
       "discourse_list_group_members",
       "discourse_list_group_membership_requests",
     ]
@@ -606,7 +713,7 @@ test("selected built-in toolsets preserve order and compose with availability", 
 
   assert.deepEqual(
     registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["moderation"] }),
-    ["discourse_select_site", ...moderationTools.slice(0, 4).map((tool) => tool.name)]
+    ["discourse_select_site", ...moderationTools.slice(0, -1).map((tool) => tool.name)]
   );
   assert.deepEqual(
     registeredNames({ ...baseOptions, toolsets: ["moderation"], hideSelectSite: true }),

@@ -4,6 +4,8 @@ import { requireAuthenticatedAccess } from "../../../util/access.js";
 import { jsonError, jsonResponse } from "../../../util/json_response.js";
 import { assertPrivateMessage, normalizeGroup, normalizeUser } from "./common.js";
 
+import { readAnnotations } from "../common/helpers.js";
+
 const schema = z.object({
   topic_id: z.number().int().positive(),
   post_limit: z.number().int().min(1).max(50).optional().describe("Max posts to return (default 5, max 50)"),
@@ -17,6 +19,7 @@ export const readPrivateMessageTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["private_messages"],
+  annotations: readAnnotations(),
   handler: async ({ topic_id, post_limit = 5, start_post_number }, _extra, ctx, _opts) => {
     try {
       const accessError = requireAuthenticatedAccess(ctx.siteState);

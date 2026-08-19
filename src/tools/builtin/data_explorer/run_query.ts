@@ -9,6 +9,8 @@ import {
 } from "../../../util/json_response.js";
 import { requireAdminAccess } from "../../../util/access.js";
 
+import { readAnnotations } from "../common/helpers.js";
+
 const schema = z.object({
   id: z.number().int().describe("Query ID to run"),
   params: z
@@ -34,6 +36,7 @@ export const runQueryTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["data_explorer"],
+  annotations: readAnnotations(),
   handler: async (input: unknown, _extra: unknown, ctx, _opts) => {
     try {
       const { id, params, limit, explain } = schema.parse(input);

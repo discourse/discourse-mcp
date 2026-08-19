@@ -2,6 +2,8 @@ import { z } from "zod";
 import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, paginatedResponse } from "../../util/json_response.js";
 
+import { readAnnotations } from "./common/helpers.js";
+
 const schema = z.object({
   query: z.string().min(1).describe("Search query"),
   max_results: z.number().int().min(1).max(50).optional(),
@@ -14,6 +16,7 @@ export const searchTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["search", "topics"],
+  annotations: readAnnotations(),
   handler: async (args, _extra, ctx, _opts) => {
     const { query, max_results = 10 } = args;
     const { client } = ctx.siteState.ensureSelectedSite();

@@ -4,6 +4,8 @@ import { requireAuthenticatedAccess } from "../../../util/access.js";
 import { isZodError, jsonError, jsonResponse, paginatedResponse, zodError } from "../../../util/json_response.js";
 import { groupNameSchema, normalizeRecentParticipants, resolveCurrentUsername, usernameSchema } from "./common.js";
 
+import { readAnnotations } from "../common/helpers.js";
+
 const mailboxSchema = z.enum(["inbox", "sent", "archive", "unread", "new"]);
 
 const schema = z.object({
@@ -32,6 +34,7 @@ export const listPrivateMessagesTool = defineTool({
   schema,
   availability: "always",
   toolsets: ["private_messages"],
+  annotations: readAnnotations(),
   handler: async (input, _extra, ctx, _opts) => {
     try {
       const { username: requestedUsername, mailbox = "inbox", group_name, page = 0, per_page = 30 } = schema.parse(input);
