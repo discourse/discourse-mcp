@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -319,9 +320,10 @@ async function main() {
 
   // Create transport based on configuration
   if (config.transport === "http") {
-    // HTTP transport using Streamable HTTP (stateless mode)
+    // Keep one stateful transport so MCP lifecycle and dynamic tool registrations
+    // persist across requests from the connected local client.
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // Stateless mode
+      sessionIdGenerator: randomUUID,
       enableJsonResponse: true,
       enableDnsRebindingProtection: true,
       allowedHosts: allowedHttpHosts(config.port),

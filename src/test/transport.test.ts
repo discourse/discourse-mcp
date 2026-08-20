@@ -33,7 +33,7 @@ async function postMcpRequest(
   port: number,
   payload: Record<string, unknown>,
   headers: Record<string, string>
-): Promise<{ statusCode: number | undefined; body: string }> {
+): Promise<{ statusCode: number | undefined; body: string; sessionId: string | undefined }> {
   const requestBody = JSON.stringify(payload);
 
   return new Promise((resolve, reject) => {
@@ -56,7 +56,13 @@ async function postMcpRequest(
         res.on('data', (chunk) => {
           body += chunk;
         });
-        res.on('end', () => resolve({ statusCode: res.statusCode, body }));
+        res.on('end', () => resolve({
+          statusCode: res.statusCode,
+          body,
+          sessionId: typeof res.headers['mcp-session-id'] === 'string'
+            ? res.headers['mcp-session-id']
+            : undefined,
+        }));
       }
     );
 
@@ -68,7 +74,7 @@ async function postMcpRequest(
 async function postMcp(
   port: number,
   headers: Record<string, string>
-): Promise<{ statusCode: number | undefined; body: string }> {
+): Promise<{ statusCode: number | undefined; body: string; sessionId: string | undefined }> {
   return postMcpRequest(port, {
     jsonrpc: '2.0',
     id: 1,
@@ -195,14 +201,16 @@ test('CLI toolsets override profile toolsets and are reflected by MCP tools/list
   try {
     const ready = await waitForServer(port);
     assert.ok(ready, 'Server should start with selected toolsets');
-    assert.equal((await postMcp(port, headers)).statusCode, 200);
+    const initialization = await postMcp(port, headers);
+    assert.equal(initialization.statusCode, 200);
+    assert.ok(initialization.sessionId);
 
     const response = await postMcpRequest(port, {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/list',
       params: {},
-    }, headers);
+    }, { ...headers, 'Mcp-Session-Id': initialization.sessionId });
     assert.equal(response.statusCode, 200);
     const body = JSON.parse(response.body) as {
       result?: { tools?: Array<{ name: string }> };
@@ -242,14 +250,16 @@ test('profile toolsets apply when the CLI does not override them', async () => {
   try {
     const ready = await waitForServer(port);
     assert.ok(ready, 'Server should start with profile toolsets');
-    assert.equal((await postMcp(port, headers)).statusCode, 200);
+    const initialization = await postMcp(port, headers);
+    assert.equal(initialization.statusCode, 200);
+    assert.ok(initialization.sessionId);
 
     const response = await postMcpRequest(port, {
       jsonrpc: '2.0',
       id: 2,
       method: 'tools/list',
       params: {},
-    }, headers);
+    }, { ...headers, 'Mcp-Session-Id': initialization.sessionId });
     const body = JSON.parse(response.body) as {
       result?: { tools?: Array<{ name: string }> };
     };

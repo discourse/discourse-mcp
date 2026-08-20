@@ -107,7 +107,8 @@ export function registerToolDefinitions(
         inputSchema: definition.schema.shape,
         annotations: definition.annotations,
       },
-      (input, extra) => definition.handler(input, extra, ctx, opts)
+      (input: ErasedToolInput, extra: ToolExtra) =>
+        definition.handler(input, extra, ctx, opts)
     );
     registeredNames.push(definition.name);
   }

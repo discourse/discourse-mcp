@@ -33,7 +33,8 @@ async function invoke(name: string, input: Record<string, unknown>, authenticate
 }
 
 function body(result: Awaited<ReturnType<typeof invoke>>): any {
-  return JSON.parse(String(result.content[0]?.text ?? "{}"));
+  const content = result.content[0];
+  return JSON.parse(content?.type === "text" ? content.text : "{}");
 }
 
 function recordFetch(responder: (request: RequestRecord, index: number) => Response) {
