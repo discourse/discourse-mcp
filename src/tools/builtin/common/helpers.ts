@@ -78,5 +78,5 @@ export function pluginError(action: string, plugin: string, error: unknown) {
 }
 
 export function readAnnotations() {
-  return { readOnlyHint: true, idempotentHint: true, openWorldHint: true } as const;
+  return { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true } as const;
 }

@@ -19,6 +19,8 @@ const expectedToolsets = [
   "private_messages",
   "activity",
   "administration",
+  "site_settings",
+  "webhooks",
   "themes",
   "groups",
   "moderation",
@@ -30,7 +32,7 @@ const expectedToolsets = [
   "ai_insights",
 ];
 
-const expectedOptInToolsets = ["activity", "administration", "themes", "groups", "moderation", "workflows", "ai_agents", "ai_custom_tools", "ai_features", "analytics", "ai_insights"];
+const expectedOptInToolsets = ["activity", "administration", "site_settings", "webhooks", "themes", "groups", "moderation", "workflows", "ai_agents", "ai_custom_tools", "ai_features", "analytics", "ai_insights"];
 
 test("built-in toolset names are stable and documented", () => {
   assert.deepEqual(BUILTIN_TOOLSETS, expectedToolsets);

@@ -18,6 +18,8 @@ export const BUILTIN_TOOLSETS = [
   "private_messages",
   "activity",
   "administration",
+  "site_settings",
+  "webhooks",
   "themes",
   "groups",
   "moderation",
@@ -35,6 +37,8 @@ export type BuiltinToolset = (typeof BUILTIN_TOOLSETS)[number];
 export const OPT_IN_TOOLSETS = [
   "activity",
   "administration",
+  "site_settings",
+  "webhooks",
   "themes",
   "groups",
   "moderation",

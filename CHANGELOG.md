@@ -4,6 +4,11 @@
 
 ### Features
 
+* Add opt-in, admin-sensitive `webhooks` and `site_settings` toolsets
+  - Add secret-safe webhook inspection, bounded/redacted delivery diagnostics, guarded lifecycle operations, ping, and exact single-event redelivery with fresh destination preconditions and no automatic mutation retries
+  - Harden site-setting reads against upstream-secret and credential-like values, support directly listing only currently overridden settings, and add one-setting-at-a-time updates with live metadata validation, expected-value conflict checks, no-retry writes, and exact verification reads
+  - Keep external delivery, bulk operations, secret/structured setting mutation, user backfills, and generic admin-route passthrough outside the supported surface
+
 * Add the opt-in, admin-sensitive `themes` toolset
   - Add bounded list/detail reads and write-gated local creation, metadata/composition changes, field/setting/translation editing, Git/archive installation, remote synchronization, asset upload, and guarded single deletion
   - Require explicit confirmations for executable code, migrations, default and component-graph changes, source replacement, archive replacement, forced placeholders, reverts, uploads, and deletion

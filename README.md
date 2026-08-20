@@ -204,6 +204,8 @@ Available toolsets are:
 | `private_messages` | Authenticated personal/group PM listing and reading, plus write-gated creation, replies, and participant invitations |
 | `activity` *(opt-in)* | Reply relationships, site-wide post activity, topic view history, user activity summaries and timelines, and directory/cohort metrics |
 | `administration` *(opt-in)* | Category discovery, admin-visible site settings, and explicitly confirmed user activation/approval state changes |
+| `site_settings` *(opt-in, admin-sensitive)* | Masked site-setting inspection plus write-gated, preflighted updates of ordinary non-secret settings |
+| `webhooks` *(opt-in, admin-sensitive)* | Safe webhook and delivery-history inspection plus write-gated lifecycle, ping, and single-event redelivery operations |
 | `themes` *(opt-in, admin-sensitive)* | Theme/component inspection plus write-gated local creation, editing, installation, remote synchronization, asset upload, and guarded deletion |
 | `groups` *(opt-in)* | Complete group CRUD and membership operations plus fixed-page, cursor-based group-authored post evidence |
 | `moderation` *(opt-in)* | Authenticated review queue triage, user behavioral counters, bounded post revisions, and one freshly preflighted reviewable action |
@@ -225,6 +227,27 @@ Toolset membership is intentionally separate from safety and authorization:
 - Toolsets filter **built-in tools only; they are not an authorization or complete capability boundary**. MCP resources and prompts remain available, and all existing call-time access checks remain authoritative. Remote Tool Execution API discovery is controlled independently by `--tools_mode`; use `--tools_mode discourse_api_only` when the MCP tool list must contain only the selected built-in domains. The server logs an informational notice when selected toolsets are combined with remote discovery.
 - A selected domain can contribute no tools under the current safety configuration—for example, `uploads` in read-only mode. The server logs an informational notice when this occurs.
 - Unknown or empty toolset selections are configuration errors. Values are de-duplicated after trimming whitespace.
+
+#### Webhooks and site settings
+
+The `webhooks` and `site_settings` toolsets are opt-in and admin-sensitive. Selecting either toolset controls discovery only—it is **not authorization**. Every call requires matching selected-site admin-style authentication, Discourse remains the final authorization and validation authority, and mutations additionally require `--allow_writes --read_only=false`. The existing site-setting read remains available through `administration`, but site-setting mutation is discoverable only through an explicit `site_settings` selection.
+
+```bash
+# Inspect safe webhook summaries and bounded delivery diagnostics
+npx -y @discourse/mcp@latest --site https://forum.example.com \
+  --toolsets webhooks --tools_mode discourse_api_only \
+  --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]'
+
+# Deliberately enable guarded site-wide setting changes
+npx -y @discourse/mcp@latest --site https://forum.example.com \
+  --toolsets site_settings --tools_mode discourse_api_only \
+  --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
+  --allow_writes --read_only=false
+```
+
+Webhook delivery, ping, and redelivery make requests to external systems; enqueue or HTTP success does not prove that the destination processed an event correctly. Webhook secrets are never returned, URL userinfo is removed, query values are masked, and raw event headers are never passed through. Event payload/body previews require explicit sensitive-content confirmation and are bounded and credential-redacted. Bulk redelivery is intentionally unsupported.
+
+Site settings affect the entire forum. Reads mask both upstream-secret and credential-like names; pass `overridden_only: true` to list only settings whose current value differs from the default. Updates support only one freshly visible ordinary setting at a time, require an expected current value and confirmation, and verify the result with an exact re-read. Secret/credential, upload, uploaded-image-list, and structured object settings, bulk updates, and existing-user backfills are intentionally unsupported.
 
 #### Theme administration
 

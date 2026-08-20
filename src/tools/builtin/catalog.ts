@@ -40,6 +40,8 @@ import { listDirectoryItemsTool } from "./users/list_directory_items.js";
 import { analyticsTools } from "./analytics/index.js";
 import { aiInsightTools } from "./ai_insights/index.js";
 import { administrationTools } from "./administration/index.js";
+import { siteSettingTools } from "./site_settings/index.js";
+import { webhookTools } from "./webhooks/index.js";
 import { themeTools } from "./themes/index.js";
 
 /** Built-in tools in their stable MCP registration order. */
@@ -81,6 +83,8 @@ export const builtinTools = [
   ...aiCustomToolTools,
   ...aiFeatureTools,
   ...administrationTools,
+  ...siteSettingTools,
+  ...webhookTools,
   ...themeTools,
   ...analyticsTools,
   ...aiInsightTools,

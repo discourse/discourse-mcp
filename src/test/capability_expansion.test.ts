@@ -44,6 +44,7 @@ test("new capability reads carry accurate annotations and specialized domains re
     "discourse_get_user_summary", "discourse_list_user_actions", "discourse_list_directory_items", "discourse_list_categories", "discourse_list_site_settings", "discourse_list_group_posts",
     "discourse_get_user_moderation_summary", "discourse_get_post_revision", "discourse_list_reports", "discourse_get_report", "discourse_get_support_dashboard",
     "discourse_ai_get_topic_summary", "discourse_ai_semantic_search", "discourse_ai_list_sentiment_posts", "discourse_list_themes", "discourse_get_theme",
+    "discourse_list_webhooks", "discourse_get_webhook", "discourse_list_webhook_events",
   ];
   for (const name of names) {
     const tool = builtinTools.find((candidate) => candidate.name === name);
@@ -54,6 +55,11 @@ test("new capability reads carry accurate annotations and specialized domains re
   }
   assert.deepEqual(builtinTools.filter((tool) => tool.toolsets.includes("activity")).map((tool) => tool.name), ["discourse_get_post_replies", "discourse_list_latest_posts", "discourse_get_topic_view_stats", "discourse_get_user_summary", "discourse_list_user_actions", "discourse_list_directory_items"]);
   assert.deepEqual(builtinTools.filter((tool) => tool.toolsets.includes("administration")).map((tool) => tool.name), ["discourse_list_categories", "discourse_list_site_settings", "discourse_manage_user_activation"]);
+  assert.deepEqual(builtinTools.filter((tool) => tool.toolsets.includes("site_settings")).map((tool) => tool.name), ["discourse_list_site_settings", "discourse_update_site_setting"]);
+  assert.deepEqual(builtinTools.filter((tool) => tool.toolsets.includes("webhooks")).map((tool) => tool.name), ["discourse_list_webhooks", "discourse_get_webhook", "discourse_create_webhook", "discourse_update_webhook", "discourse_delete_webhook", "discourse_list_webhook_events", "discourse_ping_webhook", "discourse_redeliver_webhook_event"]);
+  for (const name of ["discourse_update_site_setting", "discourse_update_webhook", "discourse_delete_webhook", "discourse_redeliver_webhook_event"]) {
+    const tool = builtinTools.find((candidate) => candidate.name === name)!; assert.equal(tool.annotations?.readOnlyHint, false); assert.equal(tool.annotations?.destructiveHint, true); assert.equal(tool.annotations?.openWorldHint, true);
+  }
   assert.deepEqual(builtinTools.filter((tool) => tool.toolsets.includes("themes")).map((tool) => tool.name), ["discourse_list_themes", "discourse_get_theme", "discourse_create_theme", "discourse_install_theme", "discourse_update_theme", "discourse_update_theme_fields", "discourse_update_theme_setting", "discourse_update_theme_translations", "discourse_sync_remote_theme", "discourse_upload_theme_asset", "discourse_delete_theme"]);
   assert.deepEqual(builtinTools.filter((tool) => tool.toolsets.includes("analytics")).map((tool) => tool.name), ["discourse_list_reports", "discourse_get_report", "discourse_get_support_dashboard"]);
   assert.deepEqual(builtinTools.filter((tool) => tool.toolsets.includes("ai_insights")).map((tool) => tool.name), ["discourse_ai_get_topic_summary", "discourse_ai_semantic_search", "discourse_ai_list_sentiment_posts"]);

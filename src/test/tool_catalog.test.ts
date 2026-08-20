@@ -486,8 +486,17 @@ const EXPECTED_TOOLSETS = {
   discourse_ai_get_feature_config: ["ai_features"],
   discourse_ai_update_feature_config: ["ai_features"],
   discourse_list_categories: ["administration"],
-  discourse_list_site_settings: ["administration"],
+  discourse_list_site_settings: ["administration", "site_settings"],
   discourse_manage_user_activation: ["administration"],
+  discourse_update_site_setting: ["site_settings"],
+  discourse_list_webhooks: ["webhooks"],
+  discourse_get_webhook: ["webhooks"],
+  discourse_create_webhook: ["webhooks"],
+  discourse_update_webhook: ["webhooks"],
+  discourse_delete_webhook: ["webhooks"],
+  discourse_list_webhook_events: ["webhooks"],
+  discourse_ping_webhook: ["webhooks"],
+  discourse_redeliver_webhook_event: ["webhooks"],
   discourse_list_themes: ["themes"],
   discourse_get_theme: ["themes"],
   discourse_create_theme: ["themes"],
@@ -589,7 +598,7 @@ test("builtinTools metadata and deterministic order match the compatibility snap
       (OPT_IN_TOOLSETS as readonly BuiltinToolset[]).includes(toolset)
     )
   );
-  assert.equal(optInMetadata.length, 96);
+  assert.equal(optInMetadata.length, 105);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("group")).length, 25);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("review")).length, 5);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("workflow")).length, 18);
@@ -692,6 +701,22 @@ test("selected built-in toolsets preserve order and compose with availability", 
   assert.deepEqual(
     registeredNames({ ...baseOptions, toolsets: ["administration"], hideSelectSite: true }),
     ["discourse_list_categories", "discourse_list_site_settings", "discourse_manage_user_activation"]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["site_settings"] }),
+    ["discourse_select_site", "discourse_list_site_settings"]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: ["site_settings"], hideSelectSite: true }),
+    ["discourse_list_site_settings", "discourse_update_site_setting"]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["webhooks"] }),
+    ["discourse_select_site", "discourse_list_webhooks", "discourse_get_webhook", "discourse_list_webhook_events"]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: ["webhooks"], hideSelectSite: true }),
+    ["discourse_list_webhooks", "discourse_get_webhook", "discourse_create_webhook", "discourse_update_webhook", "discourse_delete_webhook", "discourse_list_webhook_events", "discourse_ping_webhook", "discourse_redeliver_webhook_event"]
   );
   assert.deepEqual(
     registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["themes"] }),
