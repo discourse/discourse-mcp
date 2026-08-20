@@ -1,10 +1,10 @@
 import { z } from "zod";
-import { readFile, realpath } from "node:fs/promises";
-import { basename, isAbsolute, normalize } from "node:path";
+import { basename, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, rateLimit, isZodError, zodError } from "../../util/json_response.js";
 import { requireWriteAccess } from "../../util/access.js";
+import { decodeBase64, readAllowedLocalFile } from "../../util/safe_local_file.js";
 
 // Upload types that require user_id
 const USER_REQUIRED_TYPES = ["avatar", "profile_background", "card_background"];
@@ -103,43 +103,12 @@ export const uploadFileTool = defineTool({
           localFilePath = args.url;
         }
 
-        // Validate local file paths against allowlist
         if (localFilePath) {
-          if (!isAbsolute(localFilePath)) {
-            return jsonError("Local file path must be absolute");
-          }
-
-          // Check against allowlist
-          const allowedPaths = ctx.allowedUploadPaths || [];
-          if (allowedPaths.length === 0) {
-            return jsonError("Local file uploads are disabled. Configure --allowed_upload_paths to enable.");
-          }
-
-          // Resolve symlinks to get the real path (prevents symlink escapes)
-          let resolvedPath: string;
+          // Validate and resolve now. The file is revalidated immediately before reading below.
           try {
-            resolvedPath = await realpath(localFilePath);
-          } catch (e: any) {
-            return jsonError(`Cannot access file: ${e?.message || String(e)}`);
-          }
-
-          // Resolve allowed directories too (they might contain symlinks)
-          const resolvedAllowedPaths: string[] = [];
-          for (const allowedDir of allowedPaths) {
-            try {
-              resolvedAllowedPaths.push(await realpath(allowedDir));
-            } catch {
-              // Skip non-existent allowed paths
-              resolvedAllowedPaths.push(normalize(allowedDir));
-            }
-          }
-
-          const isAllowed = resolvedAllowedPaths.some(allowedDir => {
-            return resolvedPath === allowedDir || resolvedPath.startsWith(allowedDir + "/");
-          });
-
-          if (!isAllowed) {
-            return jsonError(`File path not in allowed directories. Allowed: ${allowedPaths.join(", ")}`);
+            localFilePath = (await readAllowedLocalFile(localFilePath, ctx.allowedUploadPaths, 25 * 1024 * 1024)).path;
+          } catch (error) {
+            return jsonError(error instanceof Error ? error.message : String(error));
           }
         }
       }
@@ -159,7 +128,8 @@ export const uploadFileTool = defineTool({
         formData.set("url", args.url);
       } else if (localFilePath) {
         // Local file - read and upload
-        const fileData = await readFile(localFilePath);
+        const safeFile = await readAllowedLocalFile(localFilePath, ctx.allowedUploadPaths, 25 * 1024 * 1024);
+        const fileData = safeFile.data;
         const filename = args.filename || basename(localFilePath);
         const mimeType = inferMimeType(filename);
 
@@ -178,8 +148,8 @@ export const uploadFileTool = defineTool({
         }
 
         const mimeType = inferMimeType(args.filename, dataUriMime);
-        const binaryData = Buffer.from(base64Data, "base64");
-        const blob = new Blob([binaryData], { type: mimeType });
+        const binaryData = decodeBase64(base64Data, 25 * 1024 * 1024);
+        const blob = new Blob([new Uint8Array(binaryData)], { type: mimeType });
         formData.set("file", blob, args.filename);
       }
 

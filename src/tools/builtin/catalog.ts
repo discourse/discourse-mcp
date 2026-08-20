@@ -40,6 +40,7 @@ import { listDirectoryItemsTool } from "./users/list_directory_items.js";
 import { analyticsTools } from "./analytics/index.js";
 import { aiInsightTools } from "./ai_insights/index.js";
 import { administrationTools } from "./administration/index.js";
+import { themeTools } from "./themes/index.js";
 
 /** Built-in tools in their stable MCP registration order. */
 export const builtinTools = [
@@ -80,6 +81,7 @@ export const builtinTools = [
   ...aiCustomToolTools,
   ...aiFeatureTools,
   ...administrationTools,
+  ...themeTools,
   ...analyticsTools,
   ...aiInsightTools,
 ] as const satisfies readonly ToolDefinition[];

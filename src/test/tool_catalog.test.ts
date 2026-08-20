@@ -5,6 +5,7 @@ import { Logger } from "../util/logger.js";
 import { SiteState } from "../site/state.js";
 import { builtinTools } from "../tools/builtin/catalog.js";
 import { groupTools } from "../tools/builtin/groups/index.js";
+import { themeTools } from "../tools/builtin/themes/index.js";
 import { moderationTools } from "../tools/builtin/moderation/index.js";
 import { registerToolDefinitions } from "../tools/definition.js";
 import { BUILTIN_TOOLSETS, OPT_IN_TOOLSETS, type BuiltinToolset } from "../tools/toolsets.js";
@@ -487,6 +488,17 @@ const EXPECTED_TOOLSETS = {
   discourse_list_categories: ["administration"],
   discourse_list_site_settings: ["administration"],
   discourse_manage_user_activation: ["administration"],
+  discourse_list_themes: ["themes"],
+  discourse_get_theme: ["themes"],
+  discourse_create_theme: ["themes"],
+  discourse_install_theme: ["themes"],
+  discourse_update_theme: ["themes"],
+  discourse_update_theme_fields: ["themes"],
+  discourse_update_theme_setting: ["themes"],
+  discourse_update_theme_translations: ["themes"],
+  discourse_sync_remote_theme: ["themes"],
+  discourse_upload_theme_asset: ["themes"],
+  discourse_delete_theme: ["themes"],
   discourse_list_reports: ["analytics"],
   discourse_get_report: ["analytics"],
   discourse_get_support_dashboard: ["analytics"],
@@ -577,7 +589,7 @@ test("builtinTools metadata and deterministic order match the compatibility snap
       (OPT_IN_TOOLSETS as readonly BuiltinToolset[]).includes(toolset)
     )
   );
-  assert.equal(optInMetadata.length, 85);
+  assert.equal(optInMetadata.length, 96);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("group")).length, 25);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("review")).length, 5);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("workflow")).length, 18);
@@ -680,6 +692,14 @@ test("selected built-in toolsets preserve order and compose with availability", 
   assert.deepEqual(
     registeredNames({ ...baseOptions, toolsets: ["administration"], hideSelectSite: true }),
     ["discourse_list_categories", "discourse_list_site_settings", "discourse_manage_user_activation"]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["themes"] }),
+    ["discourse_select_site", "discourse_list_themes", "discourse_get_theme"]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: ["themes"], hideSelectSite: true }),
+    themeTools.map((tool) => tool.name)
   );
 
   assert.deepEqual(

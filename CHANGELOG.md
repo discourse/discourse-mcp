@@ -4,6 +4,13 @@
 
 ### Features
 
+* Add the opt-in, admin-sensitive `themes` toolset
+  - Add bounded list/detail reads and write-gated local creation, metadata/composition changes, field/setting/translation editing, Git/archive installation, remote synchronization, asset upload, and guarded single deletion
+  - Require explicit confirmations for executable code, migrations, default and component-graph changes, source replacement, archive replacement, forced placeholders, reverts, uploads, and deletion
+  - Keep local files beneath symlink-resolved `allowed_upload_paths`, bound source/archive/asset responses, redact credentials and private-key-like data, and avoid retries for multipart and non-idempotent create/delete requests
+  - Advertise mutually exclusive text/upload/delete field variants and nested repository/base64-archive/path-archive variants so clients do not invent placeholder `upload_id` or archive values
+  - Intentionally exclude private-repository keys, source repointing, export, bulk deletion, arbitrary themeable site-setting mutation, and generic controller pass-through
+
 * Add a cohesive Discourse evidence and analytics layer
   - Add bounded topic-stream selection, reply relationships, latest-post feeds, post-level search, and daily topic view statistics with truthful upstream cursor and limit semantics
   - Keep only topic-stream selection and post-level search default-on; expose deeper reply, feed, view, user-summary, action-timeline, and directory reads through the opt-in `activity` toolset

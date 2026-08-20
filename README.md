@@ -152,7 +152,7 @@ Flags still override values from the profile.
 
 ### Built-in toolsets
 
-Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the default catalog (including `search`, `discourse_search`, and `discourse_filter_topics`). The `groups`, `moderation`, `workflows`, `ai_agents`, `ai_custom_tools`, and `ai_features` domains are opt-in. Use `--toolsets all` to explicitly load every domain.
+Toolsets let an operator expose only the built-in domains needed by an MCP client. They are optional: when `--toolsets` and the profile field are both omitted, the server registers the default catalog (including `search`, `discourse_search`, and `discourse_filter_topics`). Administrative and specialized domains marked *(opt-in)* below—including `themes`—must be selected explicitly. Use `--toolsets all` only when every built-in domain is deliberately required.
 
 Pass one name or a comma-separated union:
 
@@ -204,6 +204,7 @@ Available toolsets are:
 | `private_messages` | Authenticated personal/group PM listing and reading, plus write-gated creation, replies, and participant invitations |
 | `activity` *(opt-in)* | Reply relationships, site-wide post activity, topic view history, user activity summaries and timelines, and directory/cohort metrics |
 | `administration` *(opt-in)* | Category discovery, admin-visible site settings, and explicitly confirmed user activation/approval state changes |
+| `themes` *(opt-in, admin-sensitive)* | Theme/component inspection plus write-gated local creation, editing, installation, remote synchronization, asset upload, and guarded deletion |
 | `groups` *(opt-in)* | Complete group CRUD and membership operations plus fixed-page, cursor-based group-authored post evidence |
 | `moderation` *(opt-in)* | Authenticated review queue triage, user behavioral counters, bounded post revisions, and one freshly preflighted reviewable action |
 | `workflows` *(opt-in)* | Admin-only workflow discovery, graph authoring, expression evaluation, pin-data, draft runs, step runs, executions, and version management |
@@ -224,6 +225,53 @@ Toolset membership is intentionally separate from safety and authorization:
 - Toolsets filter **built-in tools only; they are not an authorization or complete capability boundary**. MCP resources and prompts remain available, and all existing call-time access checks remain authoritative. Remote Tool Execution API discovery is controlled independently by `--tools_mode`; use `--tools_mode discourse_api_only` when the MCP tool list must contain only the selected built-in domains. The server logs an informational notice when selected toolsets are combined with remote discovery.
 - A selected domain can contribute no tools under the current safety configuration—for example, `uploads` in read-only mode. The server logs an informational notice when this occurs.
 - Unknown or empty toolset selections are configuration errors. Values are de-duplicated after trimming whitespace.
+
+#### Theme administration
+
+The opt-in `themes` toolset is admin-sensitive and is never included in the default catalog. Read-only selection registers only `discourse_list_themes` and `discourse_get_theme`; every mutation additionally requires `--allow_writes --read_only=false`. Toolset selection does not grant admin access: configure matching site authentication and Discourse remains authoritative for admin, repository-allowlist, dependency, compiler, import, and migration checks.
+
+Theme HTML, JavaScript, SCSS, settings migrations, assets, and third-party repositories can execute or deploy code for every visitor. The tools require operation-specific confirmations, but they do not sandbox, validate, or declare third-party code safe. Local archives and assets are accepted only from bounded base64 input or regular files beneath symlink-resolved `--allowed_upload_paths` roots.
+
+Use deliberate operator configuration rather than enabling every toolset:
+
+```bash
+discourse-mcp \
+  --toolsets themes \
+  --site https://forum.example.com \
+  --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
+  --allow_writes \
+  --read_only=false \
+  --allowed_upload_paths /srv/discourse-theme-inputs
+```
+
+Local themes and ZIP-imported themes can be edited directly (although ZIP source values are omitted by Discourse's detail serializer); Git-backed themes must be changed in their repository and synchronized. Components cannot be default/user-selectable or own color schemes. Text fields and upload fields are separate schema variants—never send placeholder upload IDs with SCSS/HTML/JavaScript:
+
+```json
+{
+  "fields": [{
+    "name": "scss",
+    "target": "common",
+    "operation": "replace",
+    "type": "scss",
+    "value": "body { background: #241914; }"
+  }]
+}
+```
+
+Installation likewise uses one nested source variant. A repository install needs no archive placeholders:
+
+```json
+{
+  "source": {
+    "kind": "repository",
+    "remote_url": "https://github.com/example/discourse-theme.git",
+    "branch": "main"
+  },
+  "confirm_external_code": true
+}
+```
+
+This release intentionally excludes private-repository key management, repository repointing, export, bulk deletion, arbitrary themeable site-setting mutation, and generic controller parameter pass-through.
 
 #### Group management
 
