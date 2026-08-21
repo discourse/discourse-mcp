@@ -16,8 +16,10 @@ export type {
 /** @deprecated Import ToolRegistrationOptions from ./types.js instead. */
 export type RegistryOptions = ToolRegistrationOptions;
 
-// Note: The following tools have been replaced by MCP Resources (v0.2.0):
-// - discourse_list_categories → discourse://site/categories
+// Compatibility resources remain for application-addressable reads. Category
+// discovery is canonical through discourse_list_categories; other historical
+// list tools below remain resource-only compatibility decisions from v0.2.0:
+// - discourse://site/categories (deprecated compatibility resource)
 // - discourse_list_tags → discourse://site/tags
 // - discourse_list_chat_channels → discourse://chat/channels
 // - discourse_list_user_chat_channels → discourse://user/chat-channels

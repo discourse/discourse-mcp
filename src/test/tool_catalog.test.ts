@@ -5,6 +5,7 @@ import { Logger } from "../util/logger.js";
 import { SiteState } from "../site/state.js";
 import { builtinTools } from "../tools/builtin/catalog.js";
 import { groupTools } from "../tools/builtin/groups/index.js";
+import { tagGroupTools } from "../tools/builtin/tag_groups/index.js";
 import { themeTools } from "../tools/builtin/themes/index.js";
 import { moderationTools } from "../tools/builtin/moderation/index.js";
 import { registerToolDefinitions } from "../tools/definition.js";
@@ -440,6 +441,12 @@ const EXPECTED_TOOLSETS = {
   discourse_request_group_membership: ["groups"],
   discourse_join_group: ["groups"],
   discourse_leave_group: ["groups"],
+  discourse_search_tag_groups: ["tag_groups"],
+  discourse_list_tag_groups: ["tag_groups"],
+  discourse_get_tag_group: ["tag_groups"],
+  discourse_create_tag_group: ["tag_groups"],
+  discourse_update_tag_group: ["tag_groups"],
+  discourse_delete_tag_group: ["tag_groups"],
   discourse_get_review_queue_count: ["moderation"],
   discourse_list_reviewables: ["moderation"],
   discourse_list_reviewable_topics: ["moderation"],
@@ -598,8 +605,9 @@ test("builtinTools metadata and deterministic order match the compatibility snap
       (OPT_IN_TOOLSETS as readonly BuiltinToolset[]).includes(toolset)
     )
   );
-  assert.equal(optInMetadata.length, 105);
-  assert.equal(optInMetadata.filter((tool) => tool.name.includes("group")).length, 25);
+  assert.equal(optInMetadata.length, 111);
+  assert.equal(builtinTools.filter((tool) => tool.toolsets.includes("groups")).length, 25);
+  assert.equal(builtinTools.filter((tool) => tool.toolsets.includes("tag_groups")).length, 6);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("review")).length, 5);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("workflow")).length, 18);
   assert.equal(optInMetadata.filter((tool) => tool.name.startsWith("discourse_ai_")).length, 23);
@@ -754,6 +762,20 @@ test("selected built-in toolsets preserve order and compose with availability", 
   assert.deepEqual(
     registeredNames({ ...baseOptions, toolsets: ["groups"], hideSelectSite: true }),
     groupTools.map((tool) => tool.name)
+  );
+
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["tag_groups"] }),
+    [
+      "discourse_select_site",
+      "discourse_search_tag_groups",
+      "discourse_list_tag_groups",
+      "discourse_get_tag_group",
+    ]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: ["tag_groups"], hideSelectSite: true }),
+    tagGroupTools.map((tool) => tool.name)
   );
 
   assert.deepEqual(

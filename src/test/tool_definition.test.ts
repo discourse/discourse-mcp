@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { z } from "zod";
 import { Logger } from "../util/logger.js";
 import { SiteState } from "../site/state.js";
-import { jsonResponse } from "../util/json_response.js";
+import { jsonResponse, structuredJsonResponse } from "../util/json_response.js";
 import {
   defineTool,
   registerToolDefinitions,
@@ -56,6 +56,32 @@ const heterogeneousDefinitions = [
 ] as const satisfies readonly ToolDefinition[];
 void heterogeneousDefinitions;
 
+const structuredOutputSchema = z.object({ count: z.number() });
+const structuredTool = defineTool({
+  name: "fixture_structured",
+  title: "Structured Fixture",
+  description: "Checks schema-linked structured output typing.",
+  schema: z.object({ label: z.string() }),
+  outputSchema: structuredOutputSchema,
+  availability: "always",
+  toolsets: ["search"],
+  handler: ({ label }) => structuredJsonResponse({ count: label.length }),
+});
+void structuredTool;
+
+const invalidStructuredTool = defineTool({
+  name: "fixture_invalid_structured",
+  title: "Invalid Structured Fixture",
+  description: "Proves incorrect structured output fails project typecheck.",
+  schema: z.object({}),
+  outputSchema: structuredOutputSchema,
+  availability: "always",
+  toolsets: ["search"],
+  // @ts-expect-error count must conform to the declared numeric output schema.
+  handler: () => structuredJsonResponse({ count: "wrong" }),
+});
+void invalidStructuredTool;
+
 const invalidToolsetTool = defineTool({
   name: "fixture_invalid_toolset",
   title: "Invalid Toolset Fixture",
@@ -85,7 +111,8 @@ interface CapturedRegistration {
   metadata: {
     title?: string;
     description?: string;
-    inputSchema?: Record<string, z.ZodTypeAny>;
+    inputSchema?: z.ZodTypeAny;
+    outputSchema?: z.ZodTypeAny;
   };
   handler: (input: Record<string, unknown>, extra: ToolExtra) => ToolResult | Promise<ToolResult>;
 }
@@ -272,7 +299,7 @@ test("registerToolDefinitions forwards metadata, schema shape, handler arguments
   assert.equal(calls[0].name, definition.name);
   assert.equal(calls[0].metadata.title, definition.title);
   assert.equal(calls[0].metadata.description, definition.description);
-  assert.deepEqual(calls[0].metadata.inputSchema, schema.shape);
+  assert.equal(calls[0].metadata.inputSchema, schema);
 
   const result = await calls[0].handler(input, extra);
   assert.deepEqual(result, jsonResponse({ value: "unchanged" }));
@@ -281,4 +308,33 @@ test("registerToolDefinitions forwards metadata, schema shape, handler arguments
   assert.equal(received?.ctx, ctx);
   assert.equal(received?.opts, opts);
   assert.equal(received?.server, server);
+});
+
+test("registerToolDefinitions forwards optional output schemas without affecting unstructured tools", () => {
+  const { server, calls } = createRegistrar();
+  const ctx = createContext(server);
+  const outputSchema = z.object({ ok: z.boolean() });
+  const structured = defineTool({
+    name: "structured_registration_fixture",
+    title: "Structured Registration Fixture",
+    description: "Advertises an output schema.",
+    schema: z.object({}),
+    outputSchema,
+    availability: "always",
+    toolsets: ["search"],
+    handler: () => structuredJsonResponse({ ok: true }),
+  });
+  const plain = defineTool({
+    name: "plain_registration_fixture",
+    title: "Plain Registration Fixture",
+    description: "Does not advertise an output schema.",
+    schema: z.object({}),
+    availability: "always",
+    toolsets: ["search"],
+    handler: () => jsonResponse({ ok: true }),
+  });
+
+  registerToolDefinitions([structured, plain], ctx, baseOptions);
+  assert.equal(calls[0].metadata.outputSchema, outputSchema);
+  assert.equal("outputSchema" in calls[1].metadata, false);
 });

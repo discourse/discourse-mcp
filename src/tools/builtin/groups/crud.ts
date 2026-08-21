@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { defineTool } from "../../definition.js";
-import { isZodError, jsonResponse, rateLimit, zodError } from "../../../util/json_response.js";
+import { isZodError, jsonError, jsonResponse, rateLimit, structuredJsonResponse, zodError } from "../../../util/json_response.js";
+import { fetchAllGroups } from "../../../site/directories.js";
+import { readAnnotations } from "../common/helpers.js";
+import { groupDirectoryOutputSchema, groupRecordSchema } from "../common/directory_schemas.js";
 import {
   accessLevelSchema,
   groupError,
@@ -14,6 +17,8 @@ import {
   usernameSchema,
 } from "./common.js";
 
+const GROUP_DIRECTORY_PAGE_SIZE = 36; // Current non-mobile server page size; MCP uses a desktop User-Agent.
+
 const listSchema = z.object({
   page: z.number().int().nonnegative().optional(),
   order: z.enum(["name", "user_count"]).optional(),
@@ -21,20 +26,64 @@ const listSchema = z.object({
   filter: optionalString(z.string().trim().min(1)),
   username: optionalString(usernameSchema),
   type: z.enum(["my", "owner", "public", "close", "automatic", "non_automatic"]).optional(),
-});
+}).strict();
 
 export const listGroupsTool = defineTool({
   name: "discourse_list_groups",
   title: "List Groups",
-  description: "List visible groups with directory filters and pagination. Returns the upstream groups, total count, filters, and continuation URL.",
+  description: "List visible groups. Empty input exhaustively traverses the bounded directory; any explicit page or filter field preserves the existing single-page query behavior. Both modes return one structured envelope with truthful completion metadata and JSON text fallback. Opt in with the groups toolset.",
   schema: listSchema,
+  outputSchema: groupDirectoryOutputSchema,
   availability: "always",
   toolsets: ["groups"],
-  handler: async (input, _extra, ctx) => {
+  annotations: readAnnotations(),
+  handler: async (input, extra, ctx) => {
     try {
+      // Presence is checked before parsing so explicit false/zero values select
+      // compatibility mode while unknown keys still fail strict validation.
+      const singlePage = Object.keys(input).length > 0;
       const values = listSchema.parse(input);
       const { client } = ctx.siteState.ensureSelectedSite();
-      return jsonResponse(await client.get(`/groups.json${queryString(values)}`));
+
+      if (!singlePage) {
+        const result = await fetchAllGroups(client, { signal: extra.signal });
+        if (result.meta.truncated_reason === "upstream_error" && result.meta.error?.startsWith("Malformed")) {
+          return jsonError("Failed to list groups: malformed upstream group record", {
+            code: "malformed_upstream_response",
+          });
+        }
+        return structuredJsonResponse(groupDirectoryOutputSchema.parse(result));
+      }
+
+      const raw = await client.get(`/groups.json${queryString(values)}`, { signal: extra.signal }) as any;
+      const parsedGroups = z.array(groupRecordSchema).safeParse(raw?.groups);
+      if (!parsedGroups.success) {
+        return jsonError("Failed to list groups: malformed upstream group record", {
+          code: "malformed_upstream_response",
+        });
+      }
+      const reportedTotal = Number.isInteger(raw?.total_rows_groups) && raw.total_rows_groups >= 0
+        ? raw.total_rows_groups as number
+        : null;
+      const loadMore = typeof raw?.load_more_groups === "string" ? raw.load_more_groups : null;
+      const page = values.page ?? 0;
+      const hasMore = reportedTotal !== null
+        ? page * GROUP_DIRECTORY_PAGE_SIZE + parsedGroups.data.length < reportedTotal
+        : parsedGroups.data.length > 0 && Boolean(loadMore);
+      const result = groupDirectoryOutputSchema.parse({
+        groups: parsedGroups.data,
+        meta: {
+          total: parsedGroups.data.length,
+          reported_total: reportedTotal,
+          pages_fetched: 1,
+          complete: false,
+          has_more: hasMore,
+        },
+        ...(raw?.extras !== undefined ? { extras: raw.extras } : {}),
+        ...(reportedTotal !== null ? { total_rows_groups: reportedTotal } : {}),
+        ...(raw?.load_more_groups !== undefined ? { load_more_groups: loadMore } : {}),
+      });
+      return structuredJsonResponse(result);
     } catch (error) {
       if (isZodError(error)) return zodError(error);
       return groupError("list groups", error);

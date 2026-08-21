@@ -90,7 +90,7 @@ test("topic creation preserves safe upstream validation details", async () => {
 test("administration tools expose discovery reads and confirmed activation routes", async () => {
   const { ctx, opts } = setup({ type: "api_key", key: "global", username: "admin" });
   const mock = mockFetch((request) => {
-    if (request.url.endsWith("/site.json")) return Response.json({ categories: [{ id: 4, name: "General", slug: "general", topic_count: 2 }] });
+    if (request.url.endsWith("/categories/search.json")) return Response.json({ categories_count: 1, categories: [{ id: 4, name: "General", slug: "general", topic_count: 2 }] });
     if (request.url.includes("/admin/site_settings.json")) return Response.json({ site_settings: [{ setting: "title", value: "Forum", default: "Discourse", category: "required" }] });
     return new Response(null, { status: 204 });
   });

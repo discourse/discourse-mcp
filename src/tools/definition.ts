@@ -22,12 +22,27 @@ export type ToolExtra = Parameters<SdkToolCallback>[1];
 export type ToolResult = Awaited<ReturnType<SdkToolCallback>>;
 type ErasedToolInput = Parameters<SdkToolCallback>[0];
 
-/** Authoring-time type that infers a handler's input from its Zod schema. */
-export interface ToolSpec<Schema extends AnyZodObject> {
+/** A structured tool either returns schema-conforming success data or a plain MCP error. */
+export type StructuredToolResult<Output extends Record<string, unknown>> = ToolResult & (
+  | { readonly structuredContent: Output; readonly isError?: false }
+  | { readonly isError: true; readonly structuredContent?: never }
+);
+
+type HandlerResult<OutputSchema extends AnyZodObject | undefined> =
+  OutputSchema extends AnyZodObject
+    ? StructuredToolResult<z.output<OutputSchema>>
+    : ToolResult;
+
+/** Authoring-time type that infers a handler's input and structured output from Zod schemas. */
+export interface ToolSpec<
+  Schema extends AnyZodObject,
+  OutputSchema extends AnyZodObject | undefined = undefined,
+> {
   readonly name: string;
   readonly title: string;
   readonly description: string;
   readonly schema: Schema;
+  readonly outputSchema?: OutputSchema;
   readonly availability: ToolAvailability;
   /** Operator-facing domains; membership is plural and independent of access policy. */
   readonly toolsets: BuiltinToolsetMembership;
@@ -37,7 +52,7 @@ export interface ToolSpec<Schema extends AnyZodObject> {
     extra: ToolExtra,
     ctx: ToolContext,
     opts: ToolRegistrationOptions
-  ) => ToolResult | Promise<ToolResult>;
+  ) => HandlerResult<OutputSchema> | Promise<HandlerResult<OutputSchema>>;
 }
 
 /** Erased type used to store heterogeneous tool definitions in one collection. */
@@ -46,6 +61,7 @@ export interface ToolDefinition {
   readonly title: string;
   readonly description: string;
   readonly schema: AnyZodObject;
+  readonly outputSchema?: AnyZodObject;
   readonly availability: ToolAvailability;
   readonly toolsets: BuiltinToolsetMembership;
   readonly annotations?: ToolAnnotations;
@@ -61,9 +77,14 @@ export interface ToolDefinition {
  * Preserve schema-derived input inference while authoring, then erase the
  * schema/handler association only at the heterogeneous collection boundary.
  */
-export function defineTool<Schema extends AnyZodObject>(
-  spec: ToolSpec<Schema>
+export function defineTool<
+  Schema extends AnyZodObject,
+  OutputSchema extends AnyZodObject | undefined = undefined,
+>(
+  spec: ToolSpec<Schema, OutputSchema>
 ): ToolDefinition {
+  // This is the sole erasure cast: heterogeneous catalogs intentionally forget
+  // each schema/handler association after it has been checked at authoring time.
   return spec as unknown as ToolDefinition;
 }
 
@@ -99,12 +120,15 @@ export function registerToolDefinitions(
       continue;
     }
 
-    ctx.server.registerTool(
+    ctx.server.registerTool<AnyZodObject, AnyZodObject>(
       definition.name,
       {
         title: definition.title,
         description: definition.description,
-        inputSchema: definition.schema.shape,
+        inputSchema: definition.schema,
+        ...(definition.outputSchema
+          ? { outputSchema: definition.outputSchema }
+          : {}),
         annotations: definition.annotations,
       },
       (input: ErasedToolInput, extra: ToolExtra) =>

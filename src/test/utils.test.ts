@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { z } from 'zod';
-import { parseArgs } from '../util/cli.js';
-import { zodError, isZodError } from '../util/json_response.js';
+import { homedir } from 'node:os';
+import { expandCurrentUserHome, parseArgs } from '../util/cli.js';
+import { paginatedResponse, structuredJsonResponse, zodError, isZodError } from '../util/json_response.js';
 
 // parseArgs tests
 
@@ -79,6 +80,38 @@ test('parseArgs preserves comma-separated toolsets for domain validation', () =>
   const equals = parseArgs(['--toolsets=users,uploads']);
   assert.equal(spaced.toolsets, 'topics,data_explorer');
   assert.equal(equals.toolsets, 'users,uploads');
+});
+
+test('current-user home expansion supports slash and backslash but not ~otheruser', () => {
+  assert.equal(expandCurrentUserHome('~'), homedir());
+  assert.equal(expandCurrentUserHome('~/profile.json'), `${homedir()}/profile.json`);
+  assert.equal(expandCurrentUserHome('~\\profile.json'), `${homedir()}\\profile.json`);
+  assert.equal(expandCurrentUserHome('~other/profile.json'), '~other/profile.json');
+  assert.equal(expandCurrentUserHome('relative/profile.json'), 'relative/profile.json');
+  assert.equal(expandCurrentUserHome('/absolute/profile.json'), '/absolute/profile.json');
+});
+
+test('structured JSON text and structuredContent stay identical and pagination truth survives cleaning', () => {
+  const payload = paginatedResponse('items', [{ id: 1 }], {
+    total: 1,
+    reported_total: null,
+    pages_fetched: 2,
+    complete: false,
+    has_more: true,
+    truncated: true,
+    truncated_reason: 'page_limit',
+  });
+  const response = structuredJsonResponse(payload);
+  assert.deepEqual(JSON.parse(response.content[0].text), response.structuredContent);
+  assert.deepEqual((response.structuredContent as any).meta, {
+    total: 1,
+    reported_total: null,
+    pages_fetched: 2,
+    has_more: true,
+    complete: false,
+    truncated: true,
+    truncated_reason: 'page_limit',
+  });
 });
 
 // zodError tests

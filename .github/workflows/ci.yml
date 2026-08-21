@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  lint:
+  pnpm:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,14 +17,45 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm build
+      - name: Assert compiled test inventory
+        run: test "$(find dist/test -name '*.test.js' | wc -l)" -ge 20
       - run: pnpm test
+      - run: pnpm lint
+      - run: pnpm audit --prod --audit-level=high
+      - run: npm pack --dry-run
+      - name: Smoke-test CLI metadata
+        run: |
+          node dist/index.js --version
+          node dist/index.js --help >/dev/null
+
+  npm-compatibility:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Assert compiled test inventory
+        run: test "$(find dist/test -name '*.test.js' | wc -l)" -ge 20
+      - run: npm test
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm pack --dry-run
+      - name: Smoke-test CLI metadata
+        run: |
+          node dist/index.js --version
+          node dist/index.js --help >/dev/null
 
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: lint
+    needs: [pnpm, npm-compatibility]
     runs-on: ubuntu-latest
 
     permissions:
@@ -38,7 +69,7 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
       - name: Create and push git tag
         run: |
           VERSION=$(node -p "require('./package.json').version")

@@ -4,6 +4,26 @@
 
 ### Features
 
+* Complete bounded category and group directories with structured MCP output
+  - Paginate lazy-loaded category/group endpoints with stable ID deduplication, cancellation/deadline/page budgets, short-lived site/auth/option-isolated caching, and truthful completeness/truncation metadata
+  - Keep `discourse_list_categories` isolated to opt-in `administration`; make empty-input `discourse_list_groups` exhaustive under opt-in `groups` while preserving explicit page/filter one-request behavior
+  - Add `parent_category_id` while retaining legacy `pid`, and keep deprecated category/group resources correct through shared fetchers and bounded permission enrichment
+  - Advertise output schemas and identical JSON-text fallbacks; malformed upstream records now produce normal tool errors
+
+* Add the dedicated opt-in `tag_groups` lifecycle toolset
+  - Add public Guardian-filtered search, authoritative staff list/detail, deterministic optimistic state hashes, and exact numeric permission contracts
+  - Add guarded create, complete-state update, and hard delete with local ID/name/hash preflights, tag-creation/replacement/cascade confirmations, non-retried writes, and authoritative post-state/absence verification
+  - Report uncertain post-dispatch outcomes without structured success or blind-retry advice; document scoped-key, plugin-dependency, tagging-setting, and deletion-cascade limits
+
+* Add top-level CLI metadata and cross-platform profile home expansion
+  - `--help`/`-h`/`help` and `--version`/`-v`/`version` exit successfully before profile/site/transport startup
+  - Expand only a leading current-user `~`, `~/`, or `~\` in profile paths; do not expand `~otheruser` or upload allowlists
+
+* Make the loopback HTTP transport contract explicitly one stateful client per process
+  - Retain random session IDs, reject missing/unknown sessions and second initialization, bound pre-read request bodies to 4 MiB, and close active transports during shutdown
+  - After DELETE, expose a clear restart-required MCP/health response instead of leaving a closed transport behind a healthy endpoint
+
+
 * Add opt-in, admin-sensitive `webhooks` and `site_settings` toolsets
   - Add secret-safe webhook inspection, bounded/redacted delivery diagnostics, guarded lifecycle operations, ping, and exact single-event redelivery with fresh destination preconditions and no automatic mutation retries
   - Harden site-setting reads against upstream-secret and credential-like values, support directly listing only currently overridden settings, and add one-setting-at-a-time updates with live metadata validation, expected-value conflict checks, no-retry writes, and exact verification reads
@@ -71,6 +91,15 @@
   - Preserve Discourse authorization, write gating, API-key identity rules, recipient limits, and Guardian checks
 
 ### Maintenance
+
+* Pin `@modelcontextprotocol/sdk` exactly to reviewed version 1.30.0 and harden dual-lockfile packaging
+  - Keep pnpm authoritative while regenerating/tracking `package-lock.json`; CI now verifies frozen pnpm and clean npm installs, typecheck/build/tests, production audits, package contents, and CLI metadata smoke tests
+  - Preserve the modern remote-tool callback/content compatibility fixes and reject the vulnerable 1.17.x downgrade
+
+* Close out overlapping open PR proposals on the `features` branch
+  - #52, #48, and #39 are superseded after their directory, CLI metadata, and profile-path behavior lands through the current architecture
+  - #17 is superseded by bounded rich `discourse_search_posts`; topic search remains unchanged rather than gaining unbounded bare post IDs
+  - #49's lockfile/build concern is adopted while its vulnerable SDK downgrade is rejected; #41 and #43 are obsoleted by the reviewed 1.30.0 pin and transport compatibility tests; #51 remains this branch
 
 * Simplify built-in tool registration with typed `defineTool()` definitions and one ordered catalog
   - Preserve existing MCP names, metadata, schemas, handlers, registration order, and availability
@@ -303,7 +332,7 @@
 #### Features
 
 * add optional HTTP transport support via --transport flag
-* implement Streamable HTTP transport (stateless mode) as alternative to stdio
+* implement Streamable HTTP transport (initially stateless; superseded in Unreleased by the one-stateful-session security contract) as alternative to stdio
 * add --port flag for configuring HTTP server port (default: 3000)
 * include health check endpoint at /health for HTTP mode
 

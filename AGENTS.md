@@ -19,11 +19,13 @@ pnpm clean       # Remove dist/
 |------|-------|
 | Entry/CLI | `src/index.ts` |
 | HTTP client | `src/http/client.ts` |
+| Bounded directories | `src/site/directories.ts` |
 | Tool registry | `src/tools/registry.ts` |
 | Tool definitions/catalog | `src/tools/definition.ts`, `src/tools/builtin/catalog.ts` |
 | Built-in toolsets | `src/tools/toolsets.ts` |
 | Resource registry | `src/resources/registry.ts` |
 | Built-in tools | `src/tools/builtin/*` |
+| Tag-group lifecycle | `src/tools/builtin/tag_groups/*` |
 | Workflow tools/adapters | `src/tools/builtin/workflows/*` |
 | Remote tools | `src/tools/remote/tool_exec_api.ts` |
 | Utilities | `src/util/*.ts` (logger, redact, json_response) |
@@ -39,16 +41,19 @@ pnpm clean       # Remove dist/
 - `OPT_IN_TOOLSETS` domains are hidden when selection is omitted; `--toolsets all` expands to every real domain. Definitions must not mix opt-in and default memberships.
 - Availability is not domain metadata, and toolsets do not replace write, authentication, or admin checks
 - All tools return strict JSON (no Markdown) with `isError: true` on failure
+- Tools with `outputSchema` must validate normalized upstream data in the handler and use `structuredJsonResponse()` so `structuredContent` equals the JSON text fallback. Keep malformed/error results unstructured and `isError: true`.
 - Write tools use `writes_enabled` and retain a call-time access check; they require `--allow_writes` and matching `auth_pairs`
 
 **Resources**
 - URI-addressable read-only data (categories, tags, groups, channels, drafts)
 - Registered in `src/resources/registry.ts`
+- Category/group resources are deprecated compatibility surfaces backed by shared exhaustive fetchers; canonical model-callable discovery uses `discourse_list_categories` and `discourse_list_groups`. Do not claim resources universally replace list tools.
 
 **HTTP Layer**
 - Client in `src/http/client.ts` handles auth, retries (429/5xx), caching
 - User-Agent: `Discourse-MCP/0.x`
 - Write tools enforce ~1 req/sec rate limit
+- Streamable HTTP is loopback-only and supports exactly one stateful client/session per process. A closed session requires process restart; request bodies are capped at 4 MiB. Stdio remains the default.
 
 **Configuration**
 - CLI flags validated via Zod in `src/index.ts`
@@ -58,6 +63,10 @@ pnpm clean       # Remove dist/
 **Testing**
 - Tests in `src/test/` use Node's built-in test runner
 - Build before running tests: `pnpm build && pnpm test`
+
+**Dependencies and packaging**
+- pnpm is authoritative, but both `pnpm-lock.yaml` and `package-lock.json` are tracked. Regenerate both whenever dependencies change; use `pnpm install --frozen-lockfile` and `npm ci --ignore-scripts` to verify them.
+- `@modelcontextprotocol/sdk` is intentionally exact-pinned to reviewed version `1.30.0`. Upgrade deliberately only after typecheck, real MCP transport/output-schema tests, both production audits, and package smoke tests.
 
 ## Adding a New Tool
 
@@ -138,7 +147,8 @@ export const createThingTool = defineTool({
 ```
 
 **Key helpers:**
-- `jsonResponse(data)` — success response
+- `jsonResponse(data)` — unstructured JSON-text success response
+- `structuredJsonResponse(data)` — identical normalized `structuredContent` and JSON text for tools with `outputSchema`
 - `jsonError(msg)` — error with `isError: true`
 - `paginatedResponse(name, items, meta)` — for lists
 - `rateLimit(key)` — throttle writes (call before mutations)

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { request } from 'node:http';
+import { createServer, request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -10,9 +10,22 @@ import path from 'node:path';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Helper to get a free port
+// Ask the OS for an available loopback port instead of guessing a range.
 async function getFreePort(): Promise<number> {
-  return 3000 + Math.floor(Math.random() * 1000);
+  return new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      if (!address || typeof address === 'string') {
+        probe.close();
+        reject(new Error('Unable to allocate a test port'));
+        return;
+      }
+      const { port } = address;
+      probe.close((error) => error ? reject(error) : resolve(port));
+    });
+  });
 }
 
 // Helper to wait for server to be ready
@@ -130,7 +143,7 @@ test('HTTP transport health endpoint returns ok', async () => {
     assert.equal(response.status, 200);
 
     const data = await response.json();
-    assert.deepEqual(data, { status: 'ok' });
+    assert.deepEqual(data, { status: 'ok', session_model: 'single_client' });
   } finally {
     serverProcess.kill('SIGTERM');
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -365,6 +378,104 @@ test('stdio transport is the default', async () => {
   }
 });
 
+test('HTTP transport enforces one stateful client and requires the initialized session', async () => {
+  const port = await getFreePort();
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const serverProcess = spawn('node', [indexPath, '--transport', 'http', '--port', String(port), '--log_level', 'silent'], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  const headers = { Host: `127.0.0.1:${port}` };
+  try {
+    assert.ok(await waitForServer(port));
+    const initialized = await postMcp(port, headers);
+    assert.equal(initialized.statusCode, 200);
+    assert.ok(initialized.sessionId);
+
+    const missing = await postMcpRequest(port, { jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }, headers);
+    assert.equal(missing.statusCode, 400);
+    assert.match(missing.body, /session/i);
+
+    const unknown = await postMcpRequest(port, { jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} }, {
+      ...headers, 'Mcp-Session-Id': 'different-client-session'
+    });
+    assert.equal(unknown.statusCode, 404);
+    assert.match(unknown.body, /Session not found/);
+    assert.doesNotMatch(unknown.body, /discourse_search/);
+
+    const secondInitialize = await postMcp(port, headers);
+    assert.equal(secondInitialize.statusCode, 400);
+    assert.match(secondInitialize.body, /already initialized/);
+    assert.doesNotMatch(secondInitialize.body, /discourse_search/);
+
+    const originalClient = await postMcpRequest(port, { jsonrpc: '2.0', id: 4, method: 'tools/list', params: {} }, {
+      ...headers, 'Mcp-Session-Id': initialized.sessionId!
+    });
+    assert.equal(originalClient.statusCode, 200);
+    assert.match(originalClient.body, /discourse_search/);
+  } finally {
+    serverProcess.kill('SIGTERM');
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+});
+
+test('HTTP DELETE closes the sole session and makes restart-required state explicit', async () => {
+  const port = await getFreePort();
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const serverProcess = spawn('node', [indexPath, '--transport', 'http', '--port', String(port), '--log_level', 'silent'], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  const headers = { Host: `127.0.0.1:${port}` };
+  try {
+    assert.ok(await waitForServer(port));
+    const initialized = await postMcp(port, headers);
+    assert.ok(initialized.sessionId);
+    const closed = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'DELETE',
+      headers: {
+        Accept: 'application/json, text/event-stream',
+        'Mcp-Session-Id': initialized.sessionId!,
+        'Mcp-Protocol-Version': '2025-03-26',
+      },
+    });
+    assert.equal(closed.status, 200);
+
+    const health = await fetch(`http://127.0.0.1:${port}/health`);
+    assert.equal(health.status, 503);
+    assert.match(await health.text(), /restart_required/);
+    const reconnect = await postMcp(port, headers);
+    assert.equal(reconnect.statusCode, 410);
+    assert.match(reconnect.body, /restart/i);
+  } finally {
+    serverProcess.kill('SIGTERM');
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+});
+
+test('HTTP transport rejects oversized pre-read bodies before JSON parsing', async () => {
+  const port = await getFreePort();
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const serverProcess = spawn('node', [indexPath, '--transport', 'http', '--port', String(port), '--log_level', 'silent'], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  try {
+    assert.ok(await waitForServer(port));
+    const response = await postMcpRequest(port, {
+      jsonrpc: '2.0', id: 1, method: 'initialize',
+      params: {
+        protocolVersion: '2025-03-26', capabilities: {},
+        clientInfo: { name: 'x'.repeat(4 * 1024 * 1024), version: '1' },
+      },
+    }, { Host: `127.0.0.1:${port}` });
+    assert.equal(response.statusCode, 413);
+    assert.match(response.body, /exceeds/);
+    const health = await fetch(`http://127.0.0.1:${port}/health`);
+    assert.equal(health.status, 200);
+  } finally {
+    serverProcess.kill('SIGTERM');
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+});
+
 test('HTTP transport gracefully handles shutdown', async () => {
   const port = await getFreePort();
   const indexPath = path.resolve(__dirname, '../../dist/index.js');
@@ -381,8 +492,11 @@ test('HTTP transport gracefully handles shutdown', async () => {
   try {
     const ready = await waitForServer(port);
     assert.ok(ready, 'Server should start');
+    const initialized = await postMcp(port, { Host: `127.0.0.1:${port}` });
+    assert.equal(initialized.statusCode, 200);
+    assert.ok(initialized.sessionId);
 
-    // Send SIGTERM
+    // Send SIGTERM while an active MCP session exists.
     serverProcess.kill('SIGTERM');
 
     // Wait for graceful shutdown

@@ -2,6 +2,13 @@
  * CLI argument parsing utilities.
  */
 
+import { homedir } from "node:os";
+
+/** Expand only a leading current-user ~ segment; ~otheruser is unsupported. */
+export function expandCurrentUserHome(path: string): string {
+  return path.replace(/^~(?=$|[\\/])/, homedir());
+}
+
 export interface ParseArgsOptions {
   /** When true, don't coerce values - keep everything as strings */
   rawStrings?: boolean;

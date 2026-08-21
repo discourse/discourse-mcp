@@ -43,6 +43,7 @@ import { administrationTools } from "./administration/index.js";
 import { siteSettingTools } from "./site_settings/index.js";
 import { webhookTools } from "./webhooks/index.js";
 import { themeTools } from "./themes/index.js";
+import { tagGroupTools } from "./tag_groups/index.js";
 
 /** Built-in tools in their stable MCP registration order. */
 export const builtinTools = [
@@ -77,6 +78,7 @@ export const builtinTools = [
   ...dataExplorerTools,
   ...privateMessageTools,
   ...groupTools,
+  ...tagGroupTools,
   ...moderationTools,
   ...workflowTools,
   ...aiAgentTools,

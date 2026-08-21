@@ -32,7 +32,10 @@ function body(result: Awaited<ReturnType<typeof invoke>>): any {
   return JSON.parse(content?.type === "text" ? content.text : "{}");
 }
 
-function recordFetch(responder: (request: RequestRecord, index: number) => Response = () => Response.json({ success: "OK" })) {
+function recordFetch(responder: (request: RequestRecord, index: number) => Response = (request) =>
+  request.method === "GET" && request.url.includes("/groups.json")
+    ? Response.json({ groups: [], total_rows_groups: 0, load_more_groups: null })
+    : Response.json({ success: "OK" })) {
   const original = globalThis.fetch;
   const requests: RequestRecord[] = [];
   globalThis.fetch = async (input, init) => {
@@ -89,6 +92,19 @@ test("blank optional group query strings are treated as omitted", async () => {
   } finally {
     mock.restore();
   }
+});
+
+test("filtered group metadata does not trust the always-present upstream continuation URL", async () => {
+  const mock = recordFetch(() => Response.json({
+    groups: Array.from({ length: 14 }, (_, index) => ({ id: index + 37, name: `group-${index + 37}` })),
+    total_rows_groups: 50,
+    load_more_groups: "/groups?page=2",
+  }));
+  try {
+    const result = body(await invoke("discourse_list_groups", { page: 1 }, false, false));
+    assert.equal(result.meta.complete, false);
+    assert.equal(result.meta.has_more, false);
+  } finally { mock.restore(); }
 });
 
 test("group create, update, and delete serialize authoritative API contracts", async () => {

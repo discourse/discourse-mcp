@@ -5,7 +5,7 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 - **Entry point**: `src/index.ts` → compiled to `dist/index.js` (binary name: `discourse-mcp`)
 - **SDK**: `@modelcontextprotocol/sdk`
 - **Node**: >= 24
-- **Version**: 0.2.9 (0.2.x has breaking changes from 0.1.x - JSON-only output, resources replace list tools)
+- **Version**: 0.2.9 (0.2.x has breaking changes from 0.1.x, including JSON-only tool output; category/group resources remain deprecated compatibility surfaces alongside canonical list tools)
 
 ### Quick start (release)
 
@@ -84,6 +84,9 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
 
 - **Flags & defaults**
 
+  - `--help`, `-h`, or positional `help`: print current CLI help and exit successfully before loading profiles or starting a transport.
+  - `--version`, `-v`, or positional `version`: print one package-version line and exit successfully. `-v` means version; logging verbosity uses `--log_level`.
+
   - `--read_only` (default: true)
   - `--allow_writes` (default: false)
   - `--timeout_ms <number>` (default: 15000)
@@ -95,12 +98,12 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
     - `silent`: No logging output
   - `--show_emails` (default: false). includes emails in user tools. Requires admin access
   - `--tools_mode <auto|discourse_api_only|tool_exec_api>` (default: auto)
-  - `--toolsets <name[,name...]>`: Expose selected built-in domains. Omit for the default catalog (all non-opt-in domains); use `--toolsets all` to include opt-in moderation, workflows, and AI administration domains. See [Built-in toolsets](#built-in-toolsets).
+  - `--toolsets <name[,name...]>`: Expose selected built-in domains. Omit for the compact default catalog (all non-opt-in domains); use `--toolsets all` to include opt-in category/group/tag-group, moderation, workflow, and AI administration domains. See [Built-in toolsets](#built-in-toolsets).
   - `--site <url>`: Tether MCP to a single site and hide `discourse_select_site`.
   - `--default-search <prefix>`: Unconditionally prefix every search query (e.g., `tag:ai order:latest`).
   - `--max-read-length <number>`: Maximum characters returned for post content (default 50000). Applies to `discourse_read_post` and per-post content in `discourse_read_topic` and `discourse_read_private_message`. The tools prefer `raw` content by requesting `include_raw=true`.
-  - `--allowed_upload_paths <paths>`: Comma-separated list or JSON array of directories allowed for local file uploads. Required to enable local file uploads in `discourse_upload_file`. Example: `--allowed_upload_paths "/home/user/images,/tmp/uploads"` or `--allowed_upload_paths '["/home/user/images"]'`
-  - `--transport <stdio|http>` (default: stdio): Transport type. Use `stdio` for standard input/output (default), or `http` for Streamable HTTP transport (stateless mode with JSON responses).
+  - `--allowed_upload_paths <paths>`: Comma-separated list or JSON array of directories allowed for local file uploads. Required to enable local file uploads in `discourse_upload_file`. Example: `--allowed_upload_paths "/home/user/images,/tmp/uploads"` or `--allowed_upload_paths '["/home/user/images"]'`. These security-sensitive paths do **not** receive `~` expansion.
+  - `--transport <stdio|http>` (default: stdio): Use standard input/output by default, or loopback-only Streamable HTTP with JSON responses. HTTP explicitly supports one stateful MCP client/session per process. Every post-initialize request must carry the returned `Mcp-Session-Id`; a second initialize is rejected. After session DELETE/close, restart the process before connecting another client. `/health` returns `503 restart_required` in that closed state. Request bodies are bounded to 4 MiB.
   - `--port <number>` (default: 3000): Port to listen on when using HTTP transport.
   - `--cache_dir <path>` (reserved)
   - `--profile <path.json>` (see below)
@@ -146,9 +149,11 @@ Run with:
 
 ```bash
 node dist/index.js --profile /absolute/path/to/profile.json
+# Current-user home expansion is also supported:
+node dist/index.js --profile ~/discourse-mcp-profile.json
 ```
 
-Flags still override values from the profile.
+Flags still override values from the profile. A leading current-user `~`, `~/`, or `~\` in the **profile path** expands to the current home directory; `~otheruser`, shell-style expansion elsewhere, and upload-allowlist expansion are intentionally unsupported.
 
 ### Built-in toolsets
 
@@ -207,7 +212,8 @@ Available toolsets are:
 | `site_settings` *(opt-in, admin-sensitive)* | Masked site-setting inspection plus write-gated, preflighted updates of ordinary non-secret settings |
 | `webhooks` *(opt-in, admin-sensitive)* | Safe webhook and delivery-history inspection plus write-gated lifecycle, ping, and single-event redelivery operations |
 | `themes` *(opt-in, admin-sensitive)* | Theme/component inspection plus write-gated local creation, editing, installation, remote synchronization, asset upload, and guarded deletion |
-| `groups` *(opt-in)* | Complete group CRUD and membership operations plus fixed-page, cursor-based group-authored post evidence |
+| `groups` *(opt-in)* | Exhaustive empty-input group directory listing, explicit page/filter compatibility mode, complete group CRUD and membership operations, and fixed-page group-authored post evidence |
+| `tag_groups` *(opt-in, staff-sensitive)* | Public visibility-filtered search plus staff inventory/detail and write-gated, preflighted create/update/delete lifecycle |
 | `moderation` *(opt-in)* | Authenticated review queue triage, user behavioral counters, bounded post revisions, and one freshly preflighted reviewable action |
 | `workflows` *(opt-in)* | Admin-only workflow discovery, graph authoring, expression evaluation, pin-data, draft runs, step runs, executions, and version management |
 | `ai_agents` *(opt-in)* | Admin-only AI agent discovery, typed lifecycle, bot-user creation, and portable import/export |
@@ -227,6 +233,24 @@ Toolset membership is intentionally separate from safety and authorization:
 - Toolsets filter **built-in tools only; they are not an authorization or complete capability boundary**. MCP resources and prompts remain available, and all existing call-time access checks remain authoritative. Remote Tool Execution API discovery is controlled independently by `--tools_mode`; use `--tools_mode discourse_api_only` when the MCP tool list must contain only the selected built-in domains. The server logs an informational notice when selected toolsets are combined with remote discovery.
 - A selected domain can contribute no tools under the current safety configuration—for example, `uploads` in read-only mode. The server logs an informational notice when this occurs.
 - Unknown or empty toolset selections are configuration errors. Values are de-duplicated after trimming whitespace.
+
+#### Category, group, and tag-group directories
+
+Directory capabilities are deliberately opt-in, so omitting `--toolsets` adds **zero** category/group/tag-group tools:
+
+- Select `administration` for `discourse_list_categories`. Empty input performs bounded exhaustive traversal through the 1-based category-search endpoint when the deployment permits it. If anonymous POST is rejected, bounded paginated nested category-index GETs (and only on their rejection, legacy `/site.json`) are returned with explicit `anonymous_fallback`/`legacy_site_json` incomplete metadata—never as exhaustive. Optional `term`, `max_pages`, `max_requests`, `max_results`, and `deadline_ms` bound focused discovery; fallback term matching is applied locally because category index does not implement search terms. Category records retain URL/hierarchy fields; `parent_category_id` is canonical and nullable, while `pid` is a legacy alias retained for compatibility. The existing rich no-input projection is intentional: the reproducible 300-record fixture in `src/test/directory_tools.test.ts` measures about 45 KB, so this release preserves its useful counts/access fields rather than adding a second `fields` contract.
+- Select `groups` for `discourse_list_groups`. `{}` is the canonical exhaustive, deduplicating operation. Supplying any explicit existing key—including `{ "page": 0 }` or `{ "asc": false }`—preserves the historical one-page/filter query behavior. Both modes return `{ groups, meta, extras?, total_rows_groups?, load_more_groups? }`; filtered mode is intentionally `complete: false`.
+- Directory and tag-group successes advertise MCP `outputSchema` and return `structuredContent`. The JSON text content is the same normalized value for clients that do not consume structured output. Malformed upstream records return ordinary `isError: true` tool results rather than protocol output-validation failures.
+
+Select the dedicated `tag_groups` domain for six tools:
+
+1. `discourse_search_tag_groups` is public, Guardian-filtered discovery. It always sends an explicit limit and reports possible truncation. Search omits tag-group IDs, parents, and permissions, so it is not authoritative inventory; case-insensitive exact group names are the correlation key. `q` and `names` combine with AND semantics, and upstream treats `%`/`_` as SQL LIKE wildcards.
+2. `discourse_list_tag_groups` and `discourse_get_tag_group` require configured API credential shape plus upstream **staff** authority. The local helper cannot prove a staff role; Discourse is authoritative and privacy-preservingly returns 404 to non-staff. Reads can work when tagging is disabled.
+3. `discourse_create_tag_group`, `discourse_update_tag_group`, and `discourse_delete_tag_group` additionally require effective write mode and upstream `tagging_enabled`. Permissions are complete numeric maps: `1` = full, `3` = readonly, and group ID `0` = everyone. New selector names require `allow_tag_creation=true` because persistent tags are created and normal indexing/plugin hooks run.
+4. Updates require a fresh `expected_state_hash`, merge omitted fields locally, and send complete tags/parent/one-per-topic/permissions because partial upstream bodies clear state. Tag/parent removals, permission replacement, and possible materialization of serializer-synthesized everyone/full legacy permissions require explicit confirmations (including `acknowledge_possible_synthetic_permission_materialization`). The hash is an MCP optimistic precondition, not an upstream atomic lock; races can still occur after preflight.
+5. Deletes require exact ID/name/hash plus explicit cascade and unresolved-plugin acknowledgements. Deletion cascades memberships, permissions, and category allowed/required relationships, but does not delete tags or topic-tag rows. Plugin dependency discovery is not exhaustive. Discourse's scoped API-key action map may not authorize delete. A 200 acknowledgement is not success until a post-delete GET proves absence; uncertain post-dispatch outcomes are non-retryable `outcome_unknown` errors.
+
+These toolsets control discovery only. Staff role, Guardian visibility, scoped-key authority, write mode, and site settings remain call-time/upstream decisions.
 
 #### Webhooks and site settings
 
@@ -375,24 +399,24 @@ Agent create/update schemas accept `subagent_ids`, an ordered allowlist of up to
 
 ## MCP Resources
 
-Resources provide static/semi-static read-only data via URI addressing. Use these instead of tools for listing operations.
+Resources provide application-addressable static/semi-static read-only data. Category and group resources are retained as **deprecated compatibility surfaces**; their canonical model-callable replacements are the opt-in directory tools above. Other resources remain appropriate when an MCP host attaches them.
 
-- **discourse://site/categories**
+- **discourse://site/categories** *(deprecated; use `discourse_list_categories` with `--toolsets administration`)*
 
-  - List all categories with hierarchy and permissions
-  - Output: `{ categories: [{id, name, slug, pid, read_restricted, topic_count, post_count, perms}], meta: {total} }`
-  - `perms` is array of `{gid, perm}` where perm: 1=full, 2=create_post, 3=readonly
-  - **Note**: `perms` is only populated with admin/moderator auth. Without admin auth, only `read_restricted` boolean is available.
+  - Uses the same complete bounded/cached category fetcher, then enriches permissions in bounded ID chunks.
+  - Output: `{ categories: [{id, name, slug, parent_category_id, pid, read_restricted, topic_count, post_count, perms?}], meta: {total, reported_total, pages_fetched, complete, has_more, truncated_reason?} }`
+  - `parent_category_id` is canonical; `pid` is a legacy compatibility alias. `perms` is an array of `{gid, perm}` where perm: 1=full, 2=create_post, 3=readonly.
+  - `perms` is populated only when the selected identity can retrieve permission enrichment; otherwise it is omitted rather than fabricated.
 
 - **discourse://site/tags**
 
   - List all tags with usage counts
   - Output: `{ tags: [{id, name, count}], meta: {total} }`
 
-- **discourse://site/groups**
+- **discourse://site/groups** *(deprecated; use `discourse_list_groups` with `--toolsets groups`)*
 
-  - List all groups with visibility, interaction levels, and access settings
-  - Output: `{ groups: [{id, name, automatic, user_count, vis, members_vis, mention, msg, public_admission, public_exit, allow_membership_requests}], meta: {total} }`
+  - Uses the same complete bounded/cached exhaustive group fetcher and reports upstream failures explicitly rather than as a truthful empty site.
+  - Output: `{ groups: [{id, name, automatic, user_count, vis, members_vis, mention, msg, public_admission, public_exit, allow_membership_requests}], meta: {total, reported_total, pages_fetched, complete, has_more, truncated_reason?} }`
   - **Levels** (0-4): 0=public, 1=logged_on_users, 2=members, 3=staff, 4=owners
   - **Use case**: Resolve `gid` values from category permissions to group names, replicate group settings during migrations
 
@@ -422,7 +446,7 @@ Resources provide static/semi-static read-only data via URI addressing. Use thes
 
 The expanded read catalog exposes upstream evidence rather than MCP-authored judgments:
 
-- `discourse_search` returns matching **topics**; the default `discourse_search_posts` preserves matched **posts**, highlighted blurbs, authors, likes, and bounded search continuation. `discourse_ai_semantic_search` is a separate opt-in Discourse AI embedding search. The opt-in `activity` tool `discourse_list_latest_posts` is a fixed 50-row chronological feed with a post-ID cursor, not search.
+- `discourse_search` remains topic-focused. Use `discourse_search_posts` when matched posts are required: it preserves bounded post IDs **with** highlighted blurbs, authors, topics/categories, and truthful continuation. This supersedes the older proposal to add an unbounded list of bare post IDs to topic-search results. `discourse_ai_semantic_search` is a separate opt-in Discourse AI embedding search. The opt-in `activity` tool `discourse_list_latest_posts` is a fixed 50-row chronological feed with a post-ID cursor, not search.
 - The default `discourse_read_topic_posts` selects exact IDs, earliest/latest posts, an around-post window, or username-filtered posts. Latest/earliest selections use at most two upstream requests and cap the selected set at 50. The opt-in `activity` tool `discourse_get_post_replies` distinguishes recursive descendant IDs, 20-row direct replies, and the site-bounded ancestor history.
 - Topic and post reads preserve Discourse Solved fields when the plugin supplies them. An accepted answer is a resolution proxy, not proof that the original poster is satisfied.
 - The opt-in `activity` domain contains `discourse_get_user_summary` for profile-visible aggregates, `discourse_list_user_actions` for a paginated named event timeline, and `discourse_list_directory_items` for visible directory/cohort metrics. The existing default `discourse_list_user_posts` remains the compatible post/reply view.
@@ -545,10 +569,11 @@ Built‑in tools (always present unless noted). All tools return **strict JSON**
 - **Install / Build / Typecheck / Test**
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm typecheck
 pnpm build
 pnpm test
+pnpm lint
 ```
 
 - **Run locally (with source maps)**
@@ -567,6 +592,11 @@ pnpm build && pnpm dev
   - Remote tools: `src/tools/remote/tool_exec_api.ts`
   - JSON helpers: `src/util/json_response.ts`
   - Logging/redaction: `src/util/logger.ts`, `src/util/redact.ts`
+
+- **Dependency and lockfile policy**
+
+  - pnpm (`packageManager: pnpm@10.14.0`) is the authoritative development workflow, but both `pnpm-lock.yaml` and `package-lock.json` are tracked for downstream/npm compatibility. Regenerate and commit **both** whenever dependencies change; CI runs frozen pnpm and clean `npm ci` builds so neither can silently drift.
+  - `@modelcontextprotocol/sdk` is intentionally pinned exactly to the reviewed `1.30.0` release. SDK updates are deliberate security/compatibility changes and must pass typecheck, real transport/output-schema tests, production high-severity audits for both lockfiles, and packaging smoke tests. Dev-only audit exceptions require a dated owner and remediation plan.
 
 - **Testing notes**
 

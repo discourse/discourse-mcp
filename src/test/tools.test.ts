@@ -480,6 +480,11 @@ test('resources always includes Data Explorer resources regardless of auth', asy
   const registeredResources = Object.keys(resources).sort();
   const expectedResources = [...BASE_RESOURCES, ...ADMIN_RESOURCES].sort();
   assert.deepEqual(registeredResources, expectedResources);
+
+  const categoryRegistration = resources.site_categories as unknown[];
+  const groupRegistration = resources.site_groups as unknown[];
+  assert.match((categoryRegistration[1] as any).description, /DEPRECATED.*discourse_list_categories/);
+  assert.match((groupRegistration[1] as any).description, /DEPRECATED.*discourse_list_groups/);
 });
 
 // ========================
