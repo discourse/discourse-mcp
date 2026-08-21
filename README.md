@@ -5,7 +5,7 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 - **Entry point**: `src/index.ts` → compiled to `dist/index.js` (binary name: `discourse-mcp`)
 - **SDK**: `@modelcontextprotocol/sdk`
 - **Node**: >= 24
-- **Version**: 0.2.9 (0.2.x has breaking changes from 0.1.x, including JSON-only tool output; category/group resources remain deprecated compatibility surfaces alongside canonical list tools)
+- **Version**: 0.3.0 (adds operator-selectable toolsets, structured directory output, and expanded opt-in administration capabilities; 0.2.x introduced breaking changes from 0.1.x, including JSON-only tool output; category/group resources remain deprecated compatibility surfaces alongside canonical list tools)
 
 ### Quick start (release)
 
