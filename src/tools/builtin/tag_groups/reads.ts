@@ -57,7 +57,7 @@ export const searchTagGroupsTool = defineTool({
 export const listTagGroupsTool = defineTool({
   name: "discourse_list_tag_groups",
   title: "List Tag Groups",
-  description: "Authoritative unpaginated tag-group inventory ordered by name. Requires a locally configured API credential and upstream staff authority; Discourse returns a privacy-preserving 404 to non-staff. Staff reads can work when tagging is disabled. Returns canonical tags, parent, one-per-topic, numeric permissions (1=full, 3=readonly; group 0=everyone), and optimistic state hashes.",
+  description: "Authoritative unpaginated tag-group inventory ordered by name. Requires a locally configured API credential and upstream staff authority; Discourse returns a privacy-preserving 404 to non-staff. Staff reads can work when tagging is disabled. Returns canonical tags, parent, one-per-topic, explicit permissions entries ({group_id, access}; group_id 0 is everyone), and optimistic state hashes.",
   schema: z.object({}).strict(),
   outputSchema: listTagGroupsOutputSchema,
   availability: "always",

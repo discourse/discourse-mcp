@@ -37,13 +37,19 @@ function folded(value: string): string {
   return value.toLocaleLowerCase("en-US");
 }
 
+function parentTagUpdateRequested(input: Record<string, unknown>): boolean {
+  return Object.prototype.hasOwnProperty.call(input, "parent_tag") && input.parent_tag !== undefined;
+}
+
 function mutableUpdateRequested(input: Record<string, unknown>): boolean {
-  return ["name", "tags", "parent_tag", "one_per_topic", "permissions"].some((key) => Object.prototype.hasOwnProperty.call(input, key));
+  return ["name", "tags", "one_per_topic", "permissions"].some((key) => Object.prototype.hasOwnProperty.call(input, key)) ||
+    parentTagUpdateRequested(input);
 }
 
 function syntheticPermissionWarning(group: TagGroupRecord): string | undefined {
-  const entries = Object.entries(group.permissions);
-  return entries.length === 1 && entries[0][0] === "0" && entries[0][1] === 1
+  return group.permissions.length === 1 &&
+    group.permissions[0].group_id === 0 &&
+    group.permissions[0].access === "full"
     ? "Current everyone/full permissions may be serializer-synthesized from a legacy empty permission-row set; this complete-state update materializes that policy upstream."
     : undefined;
 }
@@ -51,7 +57,7 @@ function syntheticPermissionWarning(group: TagGroupRecord): string | undefined {
 export const createTagGroupTool = defineTool({
   name: "discourse_create_tag_group",
   title: "Create Tag Group",
-  description: "Create a tag group with explicit complete numeric permissions (1=full, 3=readonly), nonempty members, optional parent, and one-per-topic policy. New tag names require allow_tag_creation=true because they create persistent tags and trigger normal indexing/plugin hooks. Duplicate-name and ID checks are advisory; upstream staff authority, tagging_enabled, and constraints remain authoritative.",
+  description: "Create a tag group with an explicit complete permission list such as permissions: [{group_id: 0, access: \"full\"}] for everyone, nonempty members, an optional parent selector, and one-per-topic policy. Omit parent_tag or use null when there is no parent; blank placeholders are safely treated as omitted. New tag names require allow_tag_creation=true because they create persistent tags and trigger normal indexing/plugin hooks. Duplicate-name and ID checks are advisory; upstream staff authority, tagging_enabled, and constraints remain authoritative.",
   schema: createTagGroupInputSchema,
   outputSchema: tagGroupOutputSchema,
   availability: "writes_enabled",
@@ -121,7 +127,7 @@ export const createTagGroupTool = defineTool({
 export const updateTagGroupTool = defineTool({
   name: "discourse_update_tag_group",
   title: "Update Tag Group",
-  description: "Safely replace complete tag-group state after a fresh expected_state_hash preflight. Omitted mutable fields are preserved locally, but Discourse receives full tags, parent, one-per-topic, and numeric permissions because partial upstream bodies clear state. Tag/parent removals, permission replacement, and possible materialization of serializer-synthesized everyone/full permissions require explicit acknowledgements. The hash is advisory rather than an upstream atomic lock; uncertain post-dispatch outcomes must not be retried blindly.",
+  description: "Safely replace complete tag-group state after a fresh expected_state_hash preflight. Omitted mutable fields are preserved locally, but Discourse receives full tags, parent, one-per-topic, and permissions because partial upstream bodies clear state. For parent_tag, omit or pass a blank placeholder to preserve the current parent; pass null to clear it. Permissions use explicit {group_id, access} entries; group_id 0 means everyone. Tag/parent removals, permission replacement, and possible materialization of serializer-synthesized everyone/full permissions require explicit acknowledgements. The hash is advisory rather than an upstream atomic lock; uncertain post-dispatch outcomes must not be retried blindly.",
   schema: updateTagGroupInputSchema,
   outputSchema: tagGroupOutputSchema,
   availability: "writes_enabled",
@@ -129,9 +135,9 @@ export const updateTagGroupTool = defineTool({
   annotations: replacementAnnotations,
   handler: async (input, extra, ctx, opts) => {
     try {
-      const rawInput = input as Record<string, unknown>;
       const values = updateTagGroupInputSchema.parse(input);
-      if (!mutableUpdateRequested(rawInput)) return jsonError("Provide at least one mutable field to update", { code: "no_op" });
+      const normalizedInput = values as unknown as Record<string, unknown>;
+      if (!mutableUpdateRequested(normalizedInput)) return jsonError("Provide at least one mutable field to update", { code: "no_op" });
       const denied = requireTagGroupWrite(ctx.siteState, opts);
       if (denied) return denied;
       const { base, client } = ctx.siteState.ensureSelectedSite();
@@ -148,7 +154,7 @@ export const updateTagGroupTool = defineTool({
 
       const currentState = currentSelectors(current);
       const memberSelectors: TagSelector[] = values.tags ?? currentState.tags;
-      const parentSelector: TagSelector | null = Object.prototype.hasOwnProperty.call(rawInput, "parent_tag")
+      const parentSelector: TagSelector | null = parentTagUpdateRequested(normalizedInput)
         ? values.parent_tag ?? null
         : currentState.parent;
       const combined = await resolveTagSelectors(

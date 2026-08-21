@@ -17,6 +17,10 @@ const tags = [
   { id: 3, name: "parent", slug: "parent" },
 ];
 
+function everyoneFullPermissions() {
+  return [{ group_id: 0, access: "full" as const }];
+}
+
 function rawGroup(overrides: Record<string, unknown> = {}) {
   return {
     id: 7,
@@ -141,7 +145,10 @@ test("staff list/get normalize exact wrappers, permissions and parent shape with
     assert.deepEqual(body(listed).tag_groups.map((group: any) => group.name), ["Editorial", "Zed"]);
     const normalized = body(listed).tag_groups[0];
     assert.deepEqual(normalized.parent_tag, tags[2]);
-    assert.deepEqual(normalized.permissions, { "0": 1, "9": 3 });
+    assert.deepEqual(normalized.permissions, [
+      { group_id: 0, access: "full" },
+      { group_id: 9, access: "readonly" },
+    ]);
     assert.equal(normalized.state_hash, tagGroupStateHash(normalized));
 
     const detail = await api.invoke("discourse_get_tag_group", { id: 7 });
@@ -157,7 +164,7 @@ test("staff reads and writes reject missing local credentials/write mode before 
     assert.equal((await anonymous.invoke("discourse_list_tag_groups", {})).isError, true);
     const readOnly = harness(true, false);
     assert.equal((await readOnly.invoke("discourse_create_tag_group", {
-      name: "New", tags: [{ id: 1 }], permissions: { "0": 1 }, allow_tag_creation: false,
+      name: "New", tags: [{ id: 1 }], permissions: everyoneFullPermissions(), allow_tag_creation: false,
     })).isError, true);
     assert.equal(mock.requests.length, 0);
   } finally { mock.restore(); }
@@ -188,7 +195,7 @@ test("create preflights duplicates and IDs, requires tag-creation confirmation, 
       tags: [{ id: 1 }, { name: "brand-new" }],
       parent_tag: { id: 3 },
       one_per_topic: true,
-      permissions: { "0": 1 },
+      permissions: everyoneFullPermissions(),
       allow_tag_creation: true,
     });
     assertStructured(result);
@@ -201,7 +208,7 @@ test("create preflights duplicates and IDs, requires tag-creation confirmation, 
     : Response.json({ tags }));
   try {
     const result = await harness().invoke("discourse_create_tag_group", {
-      name: "Blocked", tags: [{ name: "unknown" }], permissions: { "0": 1 }, allow_tag_creation: false,
+      name: "Blocked", tags: [{ name: "unknown" }], permissions: everyoneFullPermissions(), allow_tag_creation: false,
     });
     assert.equal(result.isError, true);
     assert.match(body(result).error, /allow_tag_creation/);
@@ -223,7 +230,7 @@ test("writes authoritatively resolve valid tag IDs omitted from the general tag 
   });
   try {
     const result = await harness().invoke("discourse_create_tag_group", {
-      name: "Unused", tags: [{ id: 42 }], permissions: { "0": 1 }, allow_tag_creation: false,
+      name: "Unused", tags: [{ id: 42 }], permissions: everyoneFullPermissions(), allow_tag_creation: false,
     });
     assertStructured(result);
     assert.ok(mock.requests.some((request) => request.url.endsWith("/tag/42/info.json")));
@@ -236,7 +243,7 @@ test("create rejects case-insensitive duplicate names, unknown IDs, parent/membe
     : Response.json({ tags }));
   try {
     const result = await harness().invoke("discourse_create_tag_group", {
-      name: "editorial", tags: [{ id: 1 }], permissions: { "0": 1 }, allow_tag_creation: false,
+      name: "editorial", tags: [{ id: 1 }], permissions: everyoneFullPermissions(), allow_tag_creation: false,
     });
     assert.equal(body(result).code, "duplicate_name");
   } finally { duplicate.restore(); }
@@ -247,11 +254,11 @@ test("create rejects case-insensitive duplicate names, unknown IDs, parent/membe
   try {
     const api = harness();
     const unknown = await api.invoke("discourse_create_tag_group", {
-      name: "Unknown", tags: [{ id: 999 }], permissions: { "0": 1 }, allow_tag_creation: false,
+      name: "Unknown", tags: [{ id: 999 }], permissions: everyoneFullPermissions(), allow_tag_creation: false,
     });
     assert.equal(unknown.isError, true);
     const conflict = await api.invoke("discourse_create_tag_group", {
-      name: "Conflict", tags: [{ id: 1 }], parent_tag: { id: 1 }, permissions: { "0": 1 }, allow_tag_creation: false,
+      name: "Conflict", tags: [{ id: 1 }], parent_tag: { id: 1 }, permissions: everyoneFullPermissions(), allow_tag_creation: false,
     });
     assert.equal(conflict.isError, true);
     assert.equal(ids.requests.some((request) => request.method === "POST"), false);
@@ -265,7 +272,7 @@ test("create rejects case-insensitive duplicate names, unknown IDs, parent/membe
   });
   try {
     const unknownGroup = await harness().invoke("discourse_create_tag_group", {
-      name: "Unknown group", tags: [{ id: 1 }], permissions: { "99": 1 }, allow_tag_creation: false,
+      name: "Unknown group", tags: [{ id: 1 }], permissions: [{ group_id: 99, access: "full" }], allow_tag_creation: false,
     });
     assert.equal(unknownGroup.isError, true);
     assert.match(body(unknownGroup).error, /permission group IDs: 99/);
@@ -273,11 +280,29 @@ test("create rejects case-insensitive duplicate names, unknown IDs, parent/membe
   } finally { groups.restore(); }
 
   const createSchema = tagGroupTools.find((tool) => tool.name === "discourse_create_tag_group")!.schema;
-  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1, name: "both" }], permissions: { "0": 1 } }).success, false);
-  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: { "0": 2 } }).success, false);
-  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: {} }).success, false);
-  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: { "01": 1 } }).success, false);
-  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: { "0": 1 }, id: 9 }).success, false);
+  const blankParent = createSchema.safeParse({
+    name: "No parent", tags: [{ id: 1 }], parent_tag: "   ", permissions: everyoneFullPermissions(),
+  });
+  assert.equal(blankParent.success, true);
+  if (blankParent.success) assert.equal(blankParent.data.parent_tag, undefined);
+  const nullParent = createSchema.safeParse({
+    name: "No parent", tags: [{ id: 1 }], parent_tag: null, permissions: everyoneFullPermissions(),
+  });
+  assert.equal(nullParent.success, true);
+  assert.equal(createSchema.safeParse({
+    name: "Bad parent", tags: [{ id: 1 }], parent_tag: "not-a-selector", permissions: everyoneFullPermissions(),
+  }).success, false);
+  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1, name: "both" }], permissions: everyoneFullPermissions() }).success, false);
+  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: { "0": 1 } }).success, false);
+  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: [] }).success, false);
+  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: [{ group_id: -1, access: "full" }] }).success, false);
+  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: [{ group_id: 0, access: "owner" }] }).success, false);
+  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: [
+    { group_id: 0, access: "full" },
+    { group_id: 0, access: "readonly" },
+  ] }).success, false);
+  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: [{ group_id: 0, access: "full", group_name: "everyone" }] }).success, false);
+  assert.equal(createSchema.safeParse({ name: "Bad", tags: [{ id: 1 }], permissions: everyoneFullPermissions(), id: 9 }).success, false);
 });
 
 test("update performs fresh hash preflight, preserves omitted values, sends complete state, and verifies authoritative normalization", async () => {
@@ -329,6 +354,13 @@ test("update rejects hash conflicts, no-ops, removals and permission replacement
   });
   try {
     const api = harness();
+    const updateSchema = tagGroupTools.find((tool) => tool.name === "discourse_update_tag_group")!.schema;
+    const normalizedBlankParent = updateSchema.parse({
+      id: 7, expected_state_hash: normalizeTagGroup(current).state_hash, parent_tag: "   ",
+    });
+    const blankParent = await api.invoke("discourse_update_tag_group", normalizedBlankParent as Record<string, unknown>);
+    assert.equal(body(blankParent).code, "no_op");
+    assert.equal(mock.requests.length, 0);
     const conflict = await api.invoke("discourse_update_tag_group", { id: 7, expected_state_hash: "0".repeat(64), name: "X" });
     assert.equal(body(conflict).code, "state_conflict");
     const noOp = await api.invoke("discourse_update_tag_group", { id: 7, expected_state_hash: normalizeTagGroup(current).state_hash });
@@ -344,7 +376,8 @@ test("update rejects hash conflicts, no-ops, removals and permission replacement
     });
     assert.equal(body(removal).code, "confirmation_required");
     const permissions = await api.invoke("discourse_update_tag_group", {
-      id: 7, expected_state_hash: normalizeTagGroup(current).state_hash, permissions: { "0": 3 },
+      id: 7, expected_state_hash: normalizeTagGroup(current).state_hash,
+      permissions: [{ group_id: 0, access: "readonly" }],
     });
     assert.equal(body(permissions).code, "confirmation_required");
     const synthetic = await api.invoke("discourse_update_tag_group", {
@@ -481,7 +514,7 @@ test("tag-group mutations do not retry and diagnostics never leak arbitrary upst
   });
   try {
     const result = await harness().invoke("discourse_create_tag_group", {
-      name: "Failure", tags: [{ id: 1 }], permissions: { "0": 1 }, allow_tag_creation: false,
+      name: "Failure", tags: [{ id: 1 }], permissions: everyoneFullPermissions(), allow_tag_creation: false,
     });
     assert.equal(result.isError, true);
     assert.doesNotMatch(JSON.stringify(body(result)), /sensitive upstream detail/);
@@ -522,7 +555,7 @@ test("handlers surface upstream non-staff 404 and tagging-disabled 403 without l
   });
   try {
     const result = await harness().invoke("discourse_create_tag_group", {
-      name: "Disabled", tags: [{ id: 1 }], permissions: { "0": 1 }, allow_tag_creation: false,
+      name: "Disabled", tags: [{ id: 1 }], permissions: everyoneFullPermissions(), allow_tag_creation: false,
     });
     assert.equal(body(result).code, "insufficient_permission_or_tagging_disabled");
     assert.doesNotMatch(JSON.stringify(body(result)), /tagging disabled/);
@@ -588,12 +621,28 @@ test("real MCP output validation covers all six tag-group success paths", async 
     const advertised = await client.listTools();
     assert.deepEqual(advertised.tools.map((tool) => tool.name), tagGroupTools.map((tool) => tool.name));
     assert.ok(advertised.tools.every((tool) => tool.outputSchema));
+    const createTool = advertised.tools.find((tool) => tool.name === "discourse_create_tag_group");
+    assert.ok(createTool);
+    const advertisedPermissions = (createTool.inputSchema as any).properties.permissions;
+    assert.equal(advertisedPermissions.type, "array");
+    assert.equal(advertisedPermissions.minItems, 1);
+    assert.equal(advertisedPermissions.items.type, "object");
+    assert.deepEqual(advertisedPermissions.items.required, ["group_id", "access"]);
+    assert.equal(advertisedPermissions.items.additionalProperties, false);
+    assert.equal(advertisedPermissions.items.properties.group_id.type, "integer");
+    assert.equal(advertisedPermissions.items.properties.group_id.minimum, 0);
+    assert.match(advertisedPermissions.items.properties.group_id.description, /0.*everyone/);
+    assert.deepEqual(advertisedPermissions.items.properties.access.enum, ["full", "readonly"]);
+    const advertisedParent = (createTool.inputSchema as any).properties.parent_tag;
+    assert.match(advertisedParent.description, /Omit or use null.*blank string placeholders.*omitted/i);
 
     for (const call of [
       { name: "discourse_search_tag_groups", arguments: {} },
       { name: "discourse_list_tag_groups", arguments: {} },
       { name: "discourse_get_tag_group", arguments: { id: 7 } },
-      { name: "discourse_create_tag_group", arguments: { name: "Created", tags: [{ id: 1 }], permissions: { "0": 1 }, allow_tag_creation: false } },
+      { name: "discourse_create_tag_group", arguments: {
+        name: "Created", tags: [{ id: 1 }], parent_tag: "", permissions: everyoneFullPermissions(), allow_tag_creation: false,
+      } },
       { name: "discourse_update_tag_group", arguments: {
         id: 7,
         expected_state_hash: normalizeTagGroup(state).state_hash,

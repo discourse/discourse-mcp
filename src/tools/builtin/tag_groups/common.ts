@@ -51,9 +51,9 @@ function canonicalMutable(group: MutableTagGroupState) {
     tag_ids: group.tags.map((tag) => tag.id),
     parent_tag_id: group.parent_tag?.id ?? null,
     one_per_topic: group.one_per_topic,
-    permissions: Object.entries(group.permissions)
-      .map(([groupId, permission]) => [Number(groupId), permission] as const)
-      .sort(([left], [right]) => left - right),
+    permissions: [...group.permissions]
+      .sort((left, right) => left.group_id - right.group_id)
+      .map((permission) => [permission.group_id, permission.access === "full" ? 1 : 3] as const),
   };
 }
 
@@ -66,6 +66,28 @@ export function tagGroupStateHash(group: MutableTagGroupState): string {
 export function normalizeTag(raw: unknown) {
   const parsed = tagRecordSchema.parse(raw);
   return { id: parsed.id, name: parsed.name, slug: parsed.slug };
+}
+
+export function normalizePermissions(raw: unknown): Permissions {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("Malformed tag-group permissions: expected a numeric-keyed upstream map");
+  }
+  const entries = Object.entries(raw as Record<string, unknown>).map(([groupId, permission]) => {
+    if (!/^(0|[1-9]\d*)$/.test(groupId) || (permission !== 1 && permission !== 3)) {
+      throw new Error("Malformed tag-group permissions: expected group IDs with values 1 or 3");
+    }
+    return {
+      group_id: Number(groupId),
+      access: permission === 1 ? "full" as const : "readonly" as const,
+    };
+  });
+  return permissionsSchema.parse(entries.sort((left, right) => left.group_id - right.group_id));
+}
+
+export function permissionsToWire(permissions: Permissions): Record<string, 1 | 3> {
+  return Object.fromEntries(
+    permissions.map(({ group_id, access }) => [String(group_id), access === "full" ? 1 : 3]),
+  );
 }
 
 export function normalizeTagGroup(raw: unknown): TagGroupRecord {
@@ -81,7 +103,7 @@ export function normalizeTagGroup(raw: unknown): TagGroupRecord {
     tags,
     parent_tag: parentTag,
     one_per_topic: source?.one_per_topic,
-    permissions: permissionsSchema.parse(source?.permissions),
+    permissions: normalizePermissions(source?.permissions),
   };
   return tagGroupRecordSchema.parse({
     ...withoutHash,
@@ -238,7 +260,7 @@ export async function validatePermissionGroups(
   permissions: Permissions,
   signal?: AbortSignal,
 ): Promise<void> {
-  const ids = Object.keys(permissions).map(Number).filter((id) => id !== 0);
+  const ids = permissions.map((permission) => permission.group_id).filter((id) => id !== 0);
   if (ids.length === 0) return;
   const directory = await fetchAllGroups(client, { signal });
   if (!directory.meta.complete) {
@@ -267,7 +289,7 @@ export function completeTagGroupBody(
     tags: state.tags.map((selector) => selector.payload),
     parent_tag: state.parent ? [state.parent.payload] : [],
     one_per_topic: state.onePerTopic,
-    permissions: state.permissions,
+    permissions: permissionsToWire(state.permissions),
   };
 }
 
@@ -279,7 +301,10 @@ export function currentSelectors(group: TagGroupRecord): { tags: TagSelector[]; 
 }
 
 export function samePermissions(left: Permissions, right: Permissions): boolean {
-  return JSON.stringify(Object.entries(left).sort()) === JSON.stringify(Object.entries(right).sort());
+  const canonical = (permissions: Permissions) => [...permissions]
+    .sort((a, b) => a.group_id - b.group_id)
+    .map(({ group_id, access }) => [group_id, access]);
+  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
 }
 
 export function isNotFound(error: unknown): boolean {

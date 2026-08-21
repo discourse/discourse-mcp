@@ -11,8 +11,8 @@
   - Advertise output schemas and identical JSON-text fallbacks; malformed upstream records now produce normal tool errors
 
 * Add the dedicated opt-in `tag_groups` lifecycle toolset
-  - Add public Guardian-filtered search, authoritative staff list/detail, deterministic optimistic state hashes, and exact numeric permission contracts
-  - Add guarded create, complete-state update, and hard delete with local ID/name/hash preflights, tag-creation/replacement/cascade confirmations, non-retried writes, and authoritative post-state/absence verification
+  - Add public Guardian-filtered search, authoritative staff list/detail, deterministic optimistic state hashes, and explicit `{group_id, access}` permission entries that are machine-readable in MCP JSON Schema and converted to Discourse's numeric map only at the HTTP boundary
+  - Add guarded create, complete-state update, and hard delete with local ID/name/hash preflights, tag-creation/replacement/cascade confirmations, non-retried writes, and authoritative post-state/absence verification; tolerate blank optional `parent_tag` placeholders as omission while reserving explicit `null` for update-time clearing
   - Report uncertain post-dispatch outcomes without structured success or blind-retry advice; document scoped-key, plugin-dependency, tagging-setting, and deletion-cascade limits
 
 * Add top-level CLI metadata and cross-platform profile home expansion

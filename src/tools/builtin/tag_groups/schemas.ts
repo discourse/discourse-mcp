@@ -8,18 +8,36 @@ export const tagSelectorSchema = z.union([
   z.object({ name: z.string().trim().min(1).max(100) }).strict(),
 ]);
 
-const permissionValueSchema = z.union([z.literal(1), z.literal(3)]);
-export const permissionsSchema = z.record(permissionValueSchema).superRefine((permissions, ctx) => {
-  const keys = Object.keys(permissions);
-  if (keys.length === 0) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "permissions must contain at least one complete group policy" });
-  }
-  for (const key of keys) {
-    if (!/^(0|[1-9]\d*)$/.test(key)) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `permission key '${key}' must be a canonical nonnegative integer group ID` });
-    }
-  }
-});
+/** Tolerate blank placeholders from MCP clients while keeping selectors strongly typed. */
+const optionalParentTagSchema = z.preprocess(
+  (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+  tagSelectorSchema.nullable().optional(),
+).describe("Optional parent tag selector. Omit or use null when there is no parent; blank string placeholders are treated as omitted.");
+
+export const permissionEntrySchema = z.object({
+  group_id: z.number().int().nonnegative()
+    .describe("Numeric Discourse group ID. Use 0 for the built-in everyone group."),
+  access: z.enum(["full", "readonly"])
+    .describe("Tag permission for this group: full allows use; readonly allows visibility without use."),
+}).strict();
+
+export const permissionsSchema = z.array(permissionEntrySchema)
+  .min(1, "permissions must contain at least one complete group policy")
+  .max(1000)
+  .superRefine((permissions, ctx) => {
+    const seen = new Set<number>();
+    permissions.forEach((permission, index) => {
+      if (seen.has(permission.group_id)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [index, "group_id"],
+          message: `group_id ${permission.group_id} appears more than once`,
+        });
+      }
+      seen.add(permission.group_id);
+    });
+  })
+  .describe('Complete tag-group permission list. Use [{"group_id":0,"access":"full"}] for everyone with full access.');
 
 export const tagRecordSchema = z.object({
   id: z.number().int().positive(),
@@ -74,7 +92,7 @@ export const tagGroupOutputSchema = z.object({
 export const createTagGroupInputSchema = z.object({
   name: tagGroupNameSchema,
   tags: z.array(tagSelectorSchema).min(1).max(1000),
-  parent_tag: tagSelectorSchema.optional(),
+  parent_tag: optionalParentTagSchema,
   one_per_topic: z.boolean().default(false),
   permissions: permissionsSchema,
   allow_tag_creation: z.boolean().default(false),
@@ -85,7 +103,7 @@ export const updateTagGroupInputSchema = z.object({
   expected_state_hash: z.string().regex(/^[a-f0-9]{64}$/),
   name: tagGroupNameSchema.optional(),
   tags: z.array(tagSelectorSchema).min(1).max(1000).optional(),
-  parent_tag: tagSelectorSchema.nullable().optional(),
+  parent_tag: optionalParentTagSchema,
   one_per_topic: z.boolean().optional(),
   permissions: permissionsSchema.optional(),
   allow_tag_creation: z.boolean().default(false),
