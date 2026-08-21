@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Logger } from '../util/logger.js';
 import { HttpClient } from '../http/client.js';
 import { SiteState } from '../site/state.js';
-import { registerAllTools, type RegistryOptions } from '../tools/registry.js';
+import { registerAllTools, type ToolRegistrationOptions } from '../tools/registry.js';
 import type { ToolRegistrar } from '../tools/types.js';
 
 interface ToolResult {
@@ -107,7 +107,7 @@ test('select-site then search flow preserves subfolder base path', async () => {
   const restoreFetch = mockJsonFetch(calls);
 
   try {
-    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
+    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies ToolRegistrationOptions);
 
     const selectRes = await tools['discourse_select_site'].handler({ site: 'https://example.com/forum' }, {});
     assert.equal(selectRes?.isError, undefined);
@@ -134,7 +134,7 @@ test('tethered validation then search preserves subfolder base path', async () =
     await client.get('/about.json');
     siteState.selectSite(base);
 
-    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } satisfies RegistryOptions);
+    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } satisfies ToolRegistrationOptions);
     assert.ok(!('discourse_select_site' in tools));
 
     const searchRes = await tools['discourse_search'].handler({ query: 'hello' }, {});

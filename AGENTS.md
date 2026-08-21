@@ -19,28 +19,41 @@ pnpm clean       # Remove dist/
 |------|-------|
 | Entry/CLI | `src/index.ts` |
 | HTTP client | `src/http/client.ts` |
+| Bounded directories | `src/site/directories.ts` |
 | Tool registry | `src/tools/registry.ts` |
+| Tool definitions/catalog | `src/tools/definition.ts`, `src/tools/builtin/catalog.ts` |
+| Built-in toolsets | `src/tools/toolsets.ts` |
 | Resource registry | `src/resources/registry.ts` |
 | Built-in tools | `src/tools/builtin/*` |
+| Tag-group lifecycle | `src/tools/builtin/tag_groups/*` |
+| Workflow tools/adapters | `src/tools/builtin/workflows/*` |
 | Remote tools | `src/tools/remote/tool_exec_api.ts` |
 | Utilities | `src/util/*.ts` (logger, redact, json_response) |
 
 ## Key Patterns
 
 **Tool Implementation**
-- Tools live in `src/tools/builtin/` as individual files
-- Each tool exports a registration function called by `src/tools/registry.ts`
+- Tools live in `src/tools/builtin/` as typed `defineTool({...})` definitions
+- `src/tools/builtin/catalog.ts` is the ordered built-in collection; `src/tools/registry.ts` registers it through the shared registrar
+- Every definition declares two independent registration dimensions:
+  - `availability` is one mutually exclusive configuration gate: `always`, `writes_enabled`, or `site_selection`
+  - `toolsets` is a non-empty list of operator-facing domains; selected domains form a union while preserving catalog order
+- `OPT_IN_TOOLSETS` domains are hidden when selection is omitted; `--toolsets all` expands to every real domain. Definitions must not mix opt-in and default memberships.
+- Availability is not domain metadata, and toolsets do not replace write, authentication, or admin checks
 - All tools return strict JSON (no Markdown) with `isError: true` on failure
-- Write tools require `--allow_writes` flag and matching `auth_pairs` entry
+- Tools with `outputSchema` must validate normalized upstream data in the handler and use `structuredJsonResponse()` so `structuredContent` equals the JSON text fallback. Keep malformed/error results unstructured and `isError: true`.
+- Write tools use `writes_enabled` and retain a call-time access check; they require `--allow_writes` and matching `auth_pairs`
 
 **Resources**
 - URI-addressable read-only data (categories, tags, groups, channels, drafts)
 - Registered in `src/resources/registry.ts`
+- Category/group resources are deprecated compatibility surfaces backed by shared exhaustive fetchers; canonical model-callable discovery uses `discourse_list_categories` and `discourse_list_groups`. Do not claim resources universally replace list tools.
 
 **HTTP Layer**
 - Client in `src/http/client.ts` handles auth, retries (429/5xx), caching
 - User-Agent: `Discourse-MCP/0.x`
 - Write tools enforce ~1 req/sec rate limit
+- Streamable HTTP is loopback-only and supports exactly one stateful client/session per process. A closed session requires process restart; request bodies are capped at 4 MiB. Stdio remains the default.
 
 **Configuration**
 - CLI flags validated via Zod in `src/index.ts`
@@ -51,43 +64,91 @@ pnpm clean       # Remove dist/
 - Tests in `src/test/` use Node's built-in test runner
 - Build before running tests: `pnpm build && pnpm test`
 
+**Dependencies and packaging**
+- pnpm is authoritative, but both `pnpm-lock.yaml` and `package-lock.json` are tracked. Regenerate both whenever dependencies change; use `pnpm install --frozen-lockfile` and `npm ci --ignore-scripts` to verify them.
+- `@modelcontextprotocol/sdk` is intentionally exact-pinned to reviewed version `1.30.0`. Upgrade deliberately only after typecheck, real MCP transport/output-schema tests, both production audits, and package smoke tests.
+
 ## Adding a New Tool
 
-1. Create `src/tools/builtin/<name>.ts`
-2. Export a `RegisterFn` function
-3. Import and call it in `src/tools/registry.ts`
+A definition has two separate exposure concepts:
 
-**Minimal template:**
+| Field | Cardinality | Meaning |
+|---|---|---|
+| `availability` | Exactly one | Registration-time configuration gate. `always` is ungated, `writes_enabled` requires effective write mode, and `site_selection` is the untethered bootstrap tool class hidden by `--site`. |
+| `toolsets` | One or more | Operator-selectable domain membership. Multiple memberships are ORed; they do not grant write or admin access. |
+
+Call-time authorization remains in the handler because it can depend on the currently selected site.
+
+1. Create `src/tools/builtin/<name>.ts` and export a definition using `defineTool()`.
+2. Choose an explicit availability: `always`, `writes_enabled`, or `site_selection`.
+3. Assign one or more typed operator domains in `toolsets` (see `src/tools/toolsets.ts`).
+4. Retain the appropriate call-time access check (`requireWriteAccess()` or `requireAdminAccess()`).
+5. Add the definition to `builtinTools` in `src/tools/builtin/catalog.ts`, or to an ordered domain sub-collection included there.
+6. Add handler behavior tests in `src/test/` and update toolset contract tests when membership changes.
+7. Run `pnpm typecheck`, `pnpm build`, `pnpm test`, and `pnpm lint`.
+
+A normal built-in does not call `server.registerTool()` and does not require an edit to `src/tools/registry.ts`.
+
+**Read tool example:**
 ```typescript
 import { z } from "zod";
-import type { RegisterFn } from "../types.js";
+import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError } from "../../util/json_response.js";
 
-export const registerMyTool: RegisterFn = (server, ctx, opts) => {
-  if (!opts.allowWrites) return; // omit for read-only tools
+const schema = z.object({ id: z.number().int().positive() });
 
-  server.registerTool(
-    "discourse_my_tool",
-    {
-      title: "My Tool",
-      description: "Does X. Returns JSON with Y.",
-      inputSchema: z.object({ id: z.number() }).shape,
-    },
-    async (args) => {
-      const { client } = ctx.siteState.ensureSelectedSite();
-      try {
-        const data = await client.get(`/endpoint.json`);
-        return jsonResponse(data);
-      } catch (e: any) {
-        return jsonError(`Failed: ${e?.message}`);
-      }
+export const getThingTool = defineTool({
+  name: "discourse_get_thing",
+  title: "Get Thing",
+  description: "Get a thing. Returns JSON with its details.",
+  schema,
+  availability: "always",
+  toolsets: ["topics"],
+  handler: async ({ id }, _extra, ctx, _opts) => {
+    const { client } = ctx.siteState.ensureSelectedSite();
+    try {
+      return jsonResponse(await client.get(`/things/${id}.json`));
+    } catch (e: any) {
+      return jsonError(`Failed to get thing: ${e?.message || String(e)}`);
     }
-  );
-};
+  },
+});
+```
+
+**Write tool example:**
+```typescript
+import { z } from "zod";
+import { defineTool } from "../definition.js";
+import { requireWriteAccess } from "../../util/access.js";
+import { jsonResponse, jsonError, rateLimit } from "../../util/json_response.js";
+
+const schema = z.object({ name: z.string().min(1) });
+
+export const createThingTool = defineTool({
+  name: "discourse_create_thing",
+  title: "Create Thing",
+  description: "Create a thing. Returns JSON with its id and name.",
+  schema,
+  availability: "writes_enabled",
+  toolsets: ["topics"],
+  handler: async (input, _extra, ctx, opts) => {
+    try {
+      const { name } = schema.parse(input);
+      const accessError = requireWriteAccess(ctx.siteState, opts.allowWrites);
+      if (accessError) return accessError;
+      await rateLimit("thing");
+      const { client } = ctx.siteState.ensureSelectedSite();
+      return jsonResponse(await client.post("/things.json", { name }));
+    } catch (e: any) {
+      return jsonError(`Failed to create thing: ${e?.message || String(e)}`);
+    }
+  },
+});
 ```
 
 **Key helpers:**
-- `jsonResponse(data)` — success response
+- `jsonResponse(data)` — unstructured JSON-text success response
+- `structuredJsonResponse(data)` — identical normalized `structuredContent` and JSON text for tools with `outputSchema`
 - `jsonError(msg)` — error with `isError: true`
 - `paginatedResponse(name, items, meta)` — for lists
 - `rateLimit(key)` — throttle writes (call before mutations)

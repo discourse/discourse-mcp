@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -20,9 +21,13 @@ async function getPackageVersion(): Promise<string> {
 }
 import { Logger, type LogLevel } from "./util/logger.js";
 import { redactObject } from "./util/redact.js";
-import { parseArgs } from "./util/cli.js";
+import { parseArgs, expandCurrentUserHome } from "./util/cli.js";
 import { type AuthMode } from "./http/client.js";
 import { registerAllTools, type ToolsMode } from "./tools/registry.js";
+import {
+  BuiltinToolsetsSchema,
+  parseBuiltinToolsets,
+} from "./tools/toolsets.js";
 import { tryRegisterRemoteTools } from "./tools/remote/tool_exec_api.js";
 import { registerAllResources } from "./resources/registry.js";
 import { registerAllPrompts } from "./prompts/registry.js";
@@ -30,6 +35,49 @@ import { SiteState, type AuthOverride } from "./site/state.js";
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const LOOPBACK_HOST = "127.0.0.1";
+const MAX_HTTP_BODY_BYTES = 4 * 1024 * 1024;
+
+function topLevelMetadataRequest(args: string[]): "help" | "version" | undefined {
+  for (const arg of args) {
+    if (arg === "--") break;
+    if (arg === "--help" || arg === "-h" || arg === "help") return "help";
+    if (arg === "--version" || arg === "-v" || arg === "version") return "version";
+  }
+}
+
+function helpText(): string {
+  return `Discourse MCP server
+
+Usage:
+  discourse-mcp [options]
+  discourse-mcp generate-user-api-key [options]
+
+Information:
+  -h, --help, help                 Show this help and exit
+  -v, --version, version           Show the package version and exit
+
+Configuration:
+  --profile <path>                 JSON profile (~, ~/ and ~\\ expand for the current user)
+  --site <url>                     Tether and preselect one Discourse site
+  --auth_pairs <json>              Site-specific API/User API credentials
+  --read_only <boolean>            Keep mutation tools disabled (default: true)
+  --allow_writes <boolean>         Allow writes when read_only=false
+  --tools_mode <mode>              auto, discourse_api_only, or tool_exec_api
+  --toolsets <domains>             Comma-separated built-in domains or all
+                                   Includes opt-in administration, groups, tag_groups,
+                                   moderation, workflows, and AI administration domains
+  --default-search <prefix>        Prefix applied to every search query
+  --max-read-length <number>       Maximum returned post-content characters
+  --allowed_upload_paths <paths>   Comma-separated/JSON upload allowlist (no ~ expansion)
+  --show_emails <boolean>          Include email fields when authorized
+  --transport <stdio|http>         MCP transport (default: stdio)
+  --port <number>                  Loopback HTTP port (default: 3000)
+  --log_level <level>              silent, error, info, or debug
+  --cache_dir <path>               Reserved compatibility option
+
+See README.md for profile, authentication, toolset, and HTTP-session examples.
+`;
+}
 
 function allowedHttpHosts(port: number): string[] {
   return [`localhost:${port}`, `127.0.0.1:${port}`, `[::1]:${port}`];
@@ -58,13 +106,18 @@ function httpOriginError(req: IncomingMessage, port: number): string | undefined
   }
 }
 
-function rejectMcpRequest(res: ServerResponse, message: string): void {
-  res.writeHead(403, { "Content-Type": "application/json" });
+function rejectMcpRequest(
+  res: ServerResponse,
+  message: string,
+  status = 403,
+  code = -32000,
+): void {
+  res.writeHead(status, { "Content-Type": "application/json" });
   res.end(
     JSON.stringify({
       jsonrpc: "2.0",
       error: {
-        code: -32000,
+        code,
         message,
       },
       id: null,
@@ -98,6 +151,7 @@ const ProfileSchema = z
     log_level: z.enum(["silent", "error", "info", "debug"]).optional().default("info"),
     show_emails: z.boolean().optional().default(false),
     tools_mode: z.enum(["auto", "discourse_api_only", "tool_exec_api"]).optional().default("auto"),
+    toolsets: BuiltinToolsetsSchema.optional().describe("Built-in tool domains to expose (array or comma-separated string). Omit for the default catalog; use all to include opt-in workflows and AI administration domains."),
     site: z.string().url().optional().describe("Tether MCP to a single Discourse site; hides select_site and preselects this site"),
     default_search: z.string().optional().describe("Optional search prefix added to every search query (set via --default-search)"),
     max_read_length: z
@@ -126,7 +180,7 @@ type Profile = z.infer<typeof ProfileSchema>;
 
 async function loadProfile(path?: string): Promise<Partial<Profile>> {
   if (!path) return {};
-  const txt = await readFile(path, "utf8");
+  const txt = await readFile(expandCurrentUserHome(path), "utf8");
   const raw = JSON.parse(txt);
   const parsed = ProfileSchema.partial().safeParse(raw);
   if (!parsed.success) throw new Error(`Invalid profile JSON: ${parsed.error.message}`);
@@ -184,6 +238,7 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
     log_level: (((flags.log_level ?? flags["log-level"]) as LogLevel | undefined) ?? (profile.log_level as LogLevel | undefined) ?? "info") as LogLevel,
     show_emails: (((flags.show_emails ?? flags["show-emails"]) as boolean | undefined) ?? (profile.show_emails as boolean | undefined) ?? false) as boolean,
     tools_mode: (((flags.tools_mode ?? flags["tools-mode"]) as ToolsMode | undefined) ?? (profile.tools_mode as ToolsMode | undefined) ?? "auto") as ToolsMode,
+    toolsets: parseBuiltinToolsets(flags.toolsets, "from CLI") ?? profile.toolsets,
     site: (flags.site as string | undefined) ?? profile.site,
     default_search: (((flags.default_search ?? flags["default-search"]) as string | undefined) ?? profile.default_search) as string | undefined,
     max_read_length: (((flags.max_read_length ?? flags["max-read-length"]) as number | undefined) ?? profile.max_read_length ?? 50000) as number,
@@ -230,7 +285,17 @@ async function main() {
     return;
   }
 
-  const argv = parseArgs(process.argv.slice(2));
+  const metadata = topLevelMetadataRequest(args);
+  if (metadata === "help") {
+    process.stdout.write(helpText());
+    return;
+  }
+  if (metadata === "version") {
+    process.stdout.write(`${await getPackageVersion()}\n`);
+    return;
+  }
+
+  const argv = parseArgs(args);
   const profilePath = (argv.profile as string | undefined) ?? undefined;
   const profile = await loadProfile(profilePath).catch((e) => {
     throw new Error(`Failed to load profile: ${e?.message || String(e)}`);
@@ -292,6 +357,7 @@ async function main() {
   await registerAllTools(server, siteState, logger, {
     allowWrites,
     toolsMode: config.tools_mode,
+    toolsets: config.toolsets,
     hideSelectSite,
     defaultSearchPrefix: config.default_search,
     maxReadLength: config.max_read_length,
@@ -300,7 +366,7 @@ async function main() {
   });
 
   // Register MCP resources (URI-addressable read-only data)
-  registerAllResources(server, { siteState, logger });
+  registerAllResources(server, { siteState, logger }, { toolsets: config.toolsets });
 
   // Register MCP prompts (guided workflows)
   registerAllPrompts(server, { siteState, logger });
@@ -312,12 +378,19 @@ async function main() {
 
   // Create transport based on configuration
   if (config.transport === "http") {
-    // HTTP transport using Streamable HTTP (stateless mode)
+    // Keep one stateful transport so MCP lifecycle and dynamic tool registrations
+    // persist for exactly one connected local client. After DELETE the process
+    // remains up only to return an explicit restart-required response.
+    let sessionClosed = false;
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // Stateless mode
+      sessionIdGenerator: randomUUID,
       enableJsonResponse: true,
       enableDnsRebindingProtection: true,
       allowedHosts: allowedHttpHosts(config.port),
+      allowedOrigins: allowedHttpOrigins(config.port),
+      onsessionclosed: () => {
+        sessionClosed = true;
+      },
     });
 
     await server.connect(transport);
@@ -325,8 +398,10 @@ async function main() {
     const httpServer = createServer(async (req, res) => {
       // Health check endpoint
       if (req.method === "GET" && req.url === "/health") {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ status: "ok" }));
+        res.writeHead(sessionClosed ? 503 : 200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(sessionClosed
+          ? { status: "restart_required", message: "The single supported MCP session has closed; restart the process for a new client." }
+          : { status: "ok", session_model: "single_client" }));
         return;
       }
 
@@ -338,22 +413,43 @@ async function main() {
           return;
         }
 
-        let body = "";
-        req.on("data", (chunk) => {
-          body += chunk;
-        });
-        req.on("end", async () => {
-          try {
-            const parsedBody = body ? JSON.parse(body) : undefined;
-            await transport.handleRequest(req, res, parsedBody);
-          } catch (error) {
-            logger.error(`Request handling error: ${error}`);
-            if (!res.headersSent) {
-              res.writeHead(500, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "Internal server error" }));
+        if (sessionClosed) {
+          rejectMcpRequest(
+            res,
+            "The single supported MCP session is closed; restart the Discourse MCP process before connecting a new client.",
+            410,
+            -32001,
+          );
+          return;
+        }
+
+        try {
+          const chunks: Buffer[] = [];
+          let bodyBytes = 0;
+          for await (const chunk of req) {
+            const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            bodyBytes += buffer.byteLength;
+            if (bodyBytes > MAX_HTTP_BODY_BYTES) {
+              rejectMcpRequest(res, `MCP request body exceeds ${MAX_HTTP_BODY_BYTES} bytes`, 413, -32000);
+              return;
             }
+            chunks.push(buffer);
           }
-        });
+          const body = chunks.length ? Buffer.concat(chunks).toString("utf8") : "";
+          const parsedBody = body ? JSON.parse(body) : undefined;
+          await transport.handleRequest(req, res, parsedBody);
+        } catch (error) {
+          const syntaxError = error instanceof SyntaxError;
+          logger.error(`Request handling error: ${syntaxError ? "invalid JSON" : error}`);
+          if (!res.headersSent) {
+            rejectMcpRequest(
+              res,
+              syntaxError ? "Parse error: invalid JSON" : "Internal request handling error",
+              syntaxError ? 400 : 500,
+              syntaxError ? -32700 : -32603,
+            );
+          }
+        }
         return;
       }
 
@@ -368,13 +464,16 @@ async function main() {
       logger.info(`MCP endpoint available at http://localhost:${config.port}/mcp`);
     });
 
-    // Exit cleanly on SIGTERM/SIGINT
-    const onExit = () => {
+    // Exit cleanly on SIGTERM/SIGINT and close transport streams before the
+    // HTTP listener so an active MCP request cannot keep shutdown wedged.
+    let shuttingDown = false;
+    const onExit = async () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      await transport.close().catch((error) => logger.error(`Transport close error: ${error}`));
       httpServer.close(() => {
-        transport.close().then(() => {
-          logger.info("HTTP server closed");
-          process.exit(0);
-        });
+        logger.info("HTTP server closed");
+        process.exit(0);
       });
     };
     process.on("SIGTERM", onExit);
@@ -383,8 +482,14 @@ async function main() {
     // Default stdio transport
     const transport = new StdioServerTransport();
 
-    // Exit cleanly on stdin close or SIGTERM
-    const onExit = () => process.exit(0);
+    // Exit cleanly on stdin close or signals.
+    let shuttingDown = false;
+    const onExit = async () => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      await transport.close().catch(() => undefined);
+      process.exit(0);
+    };
     process.on("SIGTERM", onExit);
     process.on("SIGINT", onExit);
     process.stdin.on("close", onExit);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { Logger } from '../util/logger.js';
-import { registerAllTools, type RegistryOptions } from '../tools/registry.js';
+import { registerAllTools, type ToolRegistrationOptions } from '../tools/registry.js';
 import { registerAllResources, type ResourceRegistrar } from '../resources/registry.js';
 import { registerAllPrompts, type PromptRegistrar } from '../prompts/registry.js';
 import { SiteState } from '../site/state.js';
@@ -15,63 +15,69 @@ interface ToolResult {
 
 type ToolHandler = (args: Record<string, unknown>, extra: unknown) => Promise<ToolResult>;
 
+/** A captured registration, including the explicit registration order. */
+interface ToolRegistration {
+  name: string;
+  metadata: Record<string, unknown>;
+  handler: ToolHandler;
+}
+
 /** Creates a minimal mock server that captures tool registrations for testing */
-function createMockServer(): { server: ToolRegistrar; tools: Record<string, { handler: ToolHandler }> } {
+function createMockServer(): {
+  server: ToolRegistrar;
+  tools: Record<string, { handler: ToolHandler }>;
+  calls: ToolRegistration[];
+} {
   const tools: Record<string, { handler: ToolHandler }> = {};
-  // Cast needed because mock doesn't implement full SDK callback signature
+  const calls: ToolRegistration[] = [];
+  // Cast needed because mock doesn't implement the SDK's generic signature.
   const server = {
-    registerTool(name: string, _meta: Record<string, unknown>, handler: ToolHandler) {
+    registerTool(name: string, metadata: Record<string, unknown>, handler: ToolHandler) {
+      calls.push({ name, metadata, handler });
       tools[name] = { handler };
     },
   } as ToolRegistrar;
-  return { server, tools };
+  return { server, tools, calls };
 }
 
-test('registers built-in tools', async () => {
+test('registers built-in tools with the real MCP server', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
-
-  test('registers write-enabled tools when allowWrites=true', async () => {
-    const logger = new Logger('silent');
-    const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
-
-    const { server, tools } = createMockServer();
-
-    await registerAllTools(server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
-
-    // When writes are enabled, create and update tools should be registered
-    assert.ok('discourse_create_post' in tools);
-    assert.ok('discourse_create_category' in tools);
-    assert.ok('discourse_create_topic' in tools);
-    assert.ok('discourse_update_topic' in tools);
-    assert.ok('discourse_update_user' in tools);
-  });
-
-  test('does not register write tools when allowWrites=false', async () => {
-    const logger = new Logger('silent');
-    const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
-
-    const { server, tools } = createMockServer();
-
-    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
-
-    // Write tools should NOT be registered
-    assert.ok(!('discourse_create_post' in tools));
-    assert.ok(!('discourse_create_topic' in tools));
-    assert.ok(!('discourse_update_topic' in tools));
-    assert.ok(!('discourse_update_user' in tools));
-
-    // Read tools should still be registered
-    assert.ok('discourse_search' in tools);
-    assert.ok('discourse_read_topic' in tools);
-  });
-
   const server = new McpServer({ name: 'test', version: '0.0.0' }, { capabilities: { tools: { listChanged: false } } });
 
-  await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies RegistryOptions);
+  await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies ToolRegistrationOptions);
 
   // If no error is thrown we consider registration successful.
   assert.ok(true);
+});
+
+test('registers write-enabled tools when allowWrites=true', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, tools } = createMockServer();
+
+  await registerAllTools(server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only' } satisfies ToolRegistrationOptions);
+
+  assert.ok('discourse_create_post' in tools);
+  assert.ok('discourse_create_category' in tools);
+  assert.ok('discourse_create_topic' in tools);
+  assert.ok('discourse_update_topic' in tools);
+  assert.ok('discourse_update_user' in tools);
+});
+
+test('does not register write tools when allowWrites=false', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, tools } = createMockServer();
+
+  await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only' } satisfies ToolRegistrationOptions);
+
+  assert.ok(!('discourse_create_post' in tools));
+  assert.ok(!('discourse_create_topic' in tools));
+  assert.ok(!('discourse_update_topic' in tools));
+  assert.ok(!('discourse_update_user' in tools));
+  assert.ok('discourse_search' in tools);
+  assert.ok('discourse_read_topic' in tools);
 });
 
 // Simple HTTP integration using fixtures when present
@@ -161,7 +167,7 @@ test('tethered mode hides select_site and allows search without selection', asyn
     siteState.selectSite(base);
 
     // Register tools with select_site hidden
-    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } satisfies RegistryOptions);
+    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', hideSelectSite: true } satisfies ToolRegistrationOptions);
 
     // Ensure select tool is not exposed
     assert.ok(!('discourse_select_site' in tools));
@@ -203,7 +209,7 @@ test('default-search prefix is applied to queries', async () => {
     await client.get('/about.json');
     siteState.selectSite(base);
 
-    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest' } satisfies RegistryOptions);
+    await registerAllTools(server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', defaultSearchPrefix: 'tag:ai order:latest' } satisfies ToolRegistrationOptions);
 
     await tools['discourse_search'].handler({ query: 'hello world' }, {});
     assert.ok(lastUrl && lastUrl.includes('/search.json?'));
@@ -220,27 +226,44 @@ test('default-search prefix is applied to queries', async () => {
 // Tool registration tests - verify tools are exposed based on auth context
 // ========================
 
-// Define expected tool sets for each context
-const READ_ONLY_TOOLS = [
+// Exact legacy registration order. Keep this independent of builtinTools so it
+// characterizes the externally visible contract rather than mirroring it.
+const ALL_TOOLS_IN_ORDER = [
   'discourse_select_site',
   'discourse_search',
   'discourse_filter_topics',
   'discourse_read_topic',
   'discourse_read_post',
+  'discourse_read_topic_posts',
+  'discourse_search_posts',
   'discourse_get_user',
   'discourse_list_user_posts',
+  'discourse_list_users',
   'discourse_get_chat_messages',
   'discourse_get_draft',
-];
-
-// Admin-only tools are now always registered; access is checked at call time
-const ADMIN_READ_TOOLS = [
-  'discourse_list_users',
+  'discourse_create_post',
+  'discourse_create_user',
+  'discourse_create_category',
+  'discourse_create_topic',
+  'discourse_update_topic',
+  'discourse_update_post',
+  'discourse_update_user',
+  'discourse_upload_file',
+  'discourse_save_draft',
+  'discourse_delete_draft',
   'discourse_get_query',
   'discourse_run_query',
-];
+  'discourse_create_query',
+  'discourse_update_query',
+  'discourse_delete_query',
+  'discourse_list_private_messages',
+  'discourse_read_private_message',
+  'discourse_create_private_message',
+  'discourse_reply_private_message',
+  'discourse_invite_to_private_message',
+] as const;
 
-const WRITE_TOOLS = [
+const WRITE_TOOL_NAMES = new Set([
   'discourse_create_post',
   'discourse_create_user',
   'discourse_create_category',
@@ -254,42 +277,45 @@ const WRITE_TOOLS = [
   'discourse_create_query',
   'discourse_update_query',
   'discourse_delete_query',
-];
+  'discourse_create_private_message',
+  'discourse_reply_private_message',
+  'discourse_invite_to_private_message',
+]);
+
+const READ_ONLY_TOOLS_IN_ORDER = ALL_TOOLS_IN_ORDER.filter(
+  (name) => !WRITE_TOOL_NAMES.has(name)
+);
 
 test('read-only mode registers read + admin-read tools (access checked at call time)', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
-  const { server, tools } = createMockServer();
+  const { server, calls } = createMockServer();
 
   await registerAllTools(server, siteState, logger, {
     allowWrites: false,
     toolsMode: 'discourse_api_only'
   });
 
-  const registeredTools = Object.keys(tools).sort();
-  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_READ_TOOLS].sort();
-  assert.deepEqual(registeredTools, expectedTools);
+  assert.deepEqual(calls.map((call) => call.name), READ_ONLY_TOOLS_IN_ORDER);
 });
 
 test('write mode registers all tools', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
-  const { server, tools } = createMockServer();
+  const { server, calls } = createMockServer();
 
   await registerAllTools(server, siteState, logger, {
     allowWrites: true,
     toolsMode: 'discourse_api_only'
   });
 
-  const registeredTools = Object.keys(tools).sort();
-  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_READ_TOOLS, ...WRITE_TOOLS].sort();
-  assert.deepEqual(registeredTools, expectedTools);
+  assert.deepEqual(calls.map((call) => call.name), ALL_TOOLS_IN_ORDER);
 });
 
 test('tethered mode hides select_site from tool list', async () => {
   const logger = new Logger('silent');
   const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
-  const { server, tools } = createMockServer();
+  const { server, calls } = createMockServer();
 
   await registerAllTools(server, siteState, logger, {
     allowWrites: false,
@@ -297,9 +323,119 @@ test('tethered mode hides select_site from tool list', async () => {
     hideSelectSite: true
   });
 
-  const registeredTools = Object.keys(tools).sort();
-  const expectedTools = [...READ_ONLY_TOOLS, ...ADMIN_READ_TOOLS].filter(t => t !== 'discourse_select_site').sort();
-  assert.deepEqual(registeredTools, expectedTools);
+  assert.deepEqual(
+    calls.map((call) => call.name),
+    READ_ONLY_TOOLS_IN_ORDER.filter((name) => name !== 'discourse_select_site')
+  );
+});
+
+test('data_explorer toolset registers only its domain plus untethered site selection', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, calls } = createMockServer();
+
+  await registerAllTools(server, siteState, logger, {
+    allowWrites: false,
+    toolsMode: 'discourse_api_only',
+    toolsets: ['data_explorer']
+  });
+
+  assert.deepEqual(calls.map((call) => call.name), [
+    'discourse_select_site',
+    'discourse_get_query',
+    'discourse_run_query'
+  ]);
+});
+
+test('data_explorer toolset composes with write and tethered registration gates', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, calls } = createMockServer();
+
+  await registerAllTools(server, siteState, logger, {
+    allowWrites: true,
+    toolsMode: 'discourse_api_only',
+    toolsets: ['data_explorer'],
+    hideSelectSite: true
+  });
+
+  assert.deepEqual(calls.map((call) => call.name), [
+    'discourse_get_query',
+    'discourse_run_query',
+    'discourse_create_query',
+    'discourse_update_query',
+    'discourse_delete_query'
+  ]);
+});
+
+test('private_messages toolset is isolated and composes with write and tether gates', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const readOnly = createMockServer();
+  await registerAllTools(readOnly.server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', toolsets: ['private_messages'] });
+  assert.deepEqual(readOnly.calls.map((call) => call.name), [
+    'discourse_select_site',
+    'discourse_list_private_messages',
+    'discourse_read_private_message'
+  ]);
+
+  const writes = createMockServer();
+  await registerAllTools(writes.server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only', toolsets: ['private_messages'], hideSelectSite: true });
+  assert.deepEqual(writes.calls.map((call) => call.name), [
+    'discourse_list_private_messages',
+    'discourse_read_private_message',
+    'discourse_create_private_message',
+    'discourse_reply_private_message',
+    'discourse_invite_to_private_message'
+  ]);
+  assert.equal(writes.calls.some((call) => call.name === 'discourse_create_post'), false);
+});
+
+test('workflows is opt-in and composes with write and tether gates', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const readOnly = createMockServer();
+  await registerAllTools(readOnly.server, siteState, logger, { allowWrites: false, toolsMode: 'discourse_api_only', toolsets: ['workflows'] });
+  assert.deepEqual(readOnly.calls.map((call) => call.name), [
+    'discourse_select_site', 'discourse_list_workflows', 'discourse_get_workflow',
+    'discourse_list_workflow_node_types', 'discourse_resolve_workflow_entity',
+    'discourse_list_workflow_templates', 'discourse_list_workflow_executions',
+    'discourse_get_workflow_execution', 'discourse_list_workflow_versions',
+    'discourse_list_workflow_credentials', 'discourse_evaluate_workflow_expression'
+  ]);
+
+  const writes = createMockServer();
+  await registerAllTools(writes.server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only', toolsets: ['workflows'], hideSelectSite: true });
+  assert.equal(writes.calls.length, 18);
+  assert.ok(writes.calls.some((call) => call.name === 'discourse_create_workflow'));
+  assert.ok(writes.calls.some((call) => call.name === 'discourse_update_workflow_pin_data'));
+  assert.equal(writes.calls.some((call) => call.name.includes('preview')), false);
+});
+
+test('expanded all selection includes opt-in workflow tools', async () => {
+  const logger = new Logger('silent');
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server, calls } = createMockServer();
+  await registerAllTools(server, siteState, logger, { allowWrites: true, toolsMode: 'discourse_api_only', toolsets: ['site', 'search', 'topics', 'users', 'chat', 'drafts', 'uploads', 'data_explorer', 'private_messages', 'workflows'] });
+  assert.deepEqual(calls.slice(0, ALL_TOOLS_IN_ORDER.length).map((call) => call.name), [...ALL_TOOLS_IN_ORDER]);
+  assert.equal(calls.filter((call) => call.name.includes('workflow')).length, 18);
+});
+
+test('toolset selection reports empty domains and independent remote discovery', async () => {
+  const logger = new Logger('silent');
+  const messages: string[] = [];
+  logger.info = (message: string) => { messages.push(message); };
+  const siteState = new SiteState({ logger, timeoutMs: 5000, defaultAuth: { type: 'none' } });
+  const { server } = createMockServer();
+
+  await registerAllTools(server, siteState, logger, {
+    allowWrites: false,
+    toolsMode: 'auto',
+    toolsets: ['uploads']
+  });
+
+  assert.ok(messages.some((message) => message.includes("Toolset 'uploads' registered no tools")));
+  assert.ok(messages.some((message) => message.includes('toolsets do not filter remote tools')));
 });
 
 
@@ -344,6 +480,11 @@ test('resources always includes Data Explorer resources regardless of auth', asy
   const registeredResources = Object.keys(resources).sort();
   const expectedResources = [...BASE_RESOURCES, ...ADMIN_RESOURCES].sort();
   assert.deepEqual(registeredResources, expectedResources);
+
+  const categoryRegistration = resources.site_categories as unknown[];
+  const groupRegistration = resources.site_groups as unknown[];
+  assert.match((categoryRegistration[1] as any).description, /DEPRECATED.*discourse_list_categories/);
+  assert.match((groupRegistration[1] as any).description, /DEPRECATED.*discourse_list_groups/);
 });
 
 // ========================

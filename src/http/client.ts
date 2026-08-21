@@ -79,19 +79,34 @@ export class HttpClient {
     return this.request("POST", path, body, { signal, extraHeaders: headers});
   }
 
+  /** Send a non-idempotent JSON POST exactly once. */
+  async postNoRetry(path: string, body: unknown, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
+    return this.request("POST", path, body, { signal, extraHeaders: headers, allowRetries: false });
+  }
+
   async delete(path: string, body?: unknown, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
     return this.request("DELETE", path, body, { signal, extraHeaders: headers });
+  }
+
+  /** Send a destructive JSON DELETE exactly once. */
+  async deleteNoRetry(path: string, body?: unknown, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
+    return this.request("DELETE", path, body, { signal, extraHeaders: headers, allowRetries: false });
   }
 
   async put(path: string, body: unknown, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
     return this.request("PUT", path, body, { signal, extraHeaders: headers });
   }
 
-  async postMultipart(path: string, formData: FormData, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
-    return this.requestMultipart("POST", path, formData, { signal, extraHeaders: headers });
+  /** Send a non-idempotent JSON PUT exactly once. */
+  async putNoRetry(path: string, body: unknown, { signal, headers }: { signal?: AbortSignal, headers?: Record<string, string>} = {}) {
+    return this.request("PUT", path, body, { signal, extraHeaders: headers, allowRetries: false });
   }
 
-  private async request(method: string, path: string, body?: unknown, { signal, extraHeaders }: { signal?: AbortSignal, extraHeaders?: Record<string, string>} = {}) {
+  async postMultipart(path: string, formData: FormData, { signal, headers, expectedStatus }: { signal?: AbortSignal, headers?: Record<string, string>, expectedStatus?: number } = {}) {
+    return this.requestMultipart("POST", path, formData, { signal, extraHeaders: headers, expectedStatus });
+  }
+
+  private async request(method: string, path: string, body?: unknown, { signal, extraHeaders, allowRetries = true }: { signal?: AbortSignal, extraHeaders?: Record<string, string>, allowRetries?: boolean } = {}) {
     const headers = this.headers();
     if (body !== undefined) {
       headers["Content-Type"] = "application/json";
@@ -99,10 +114,10 @@ export class HttpClient {
     if (extraHeaders) {
       Object.assign(headers, extraHeaders);
     }
-    return this.executeRequest(method, path, body !== undefined ? JSON.stringify(body) : undefined, headers, signal);
+    return this.executeRequest(method, path, body !== undefined ? JSON.stringify(body) : undefined, headers, signal, allowRetries);
   }
 
-  private async requestMultipart(method: string, path: string, formData: FormData, { signal, extraHeaders }: { signal?: AbortSignal, extraHeaders?: Record<string, string>} = {}) {
+  private async requestMultipart(method: string, path: string, formData: FormData, { signal, extraHeaders, expectedStatus }: { signal?: AbortSignal, extraHeaders?: Record<string, string>, expectedStatus?: number } = {}) {
     const headers = this.headers();
     if (extraHeaders) {
       Object.assign(headers, extraHeaders);
@@ -111,10 +126,10 @@ export class HttpClient {
     // Delete after merging extraHeaders to prevent overrides breaking the boundary
     delete headers["Content-Type"];
     // Disable retries for multipart - FormData body is consumed after first attempt
-    return this.executeRequest(method, path, formData, headers, signal, /* allowRetries */ false);
+    return this.executeRequest(method, path, formData, headers, signal, /* allowRetries */ false, expectedStatus);
   }
 
-  private async executeRequest(method: string, path: string, body: BodyInit | undefined, headers: Record<string, string>, signal?: AbortSignal, allowRetries = true) {
+  private async executeRequest(method: string, path: string, body: BodyInit | undefined, headers: Record<string, string>, signal?: AbortSignal, allowRetries = true, expectedStatus?: number) {
     const url = this.urlFor(path);
     this.opts.logger.debug(`HTTP ${method} ${url}`);
 
@@ -133,12 +148,20 @@ export class HttpClient {
 
         this.opts.logger.debug(`HTTP ${method} ${url} -> ${res.status} ${res.statusText}`);
 
+        if (expectedStatus !== undefined && res.status !== expectedStatus) {
+          const text = await safeText(res);
+          throw new HttpError(res.status, `Expected HTTP ${expectedStatus}, received ${res.status} ${res.statusText}`, safeJson(text));
+        }
         if (!res.ok) {
           const text = await safeText(res);
           const errorBody = safeJson(text);
-          this.opts.logger.error(`HTTP ${res.status} ${res.statusText} for ${method} ${url}: ${text}`);
+          // Keep response bodies available on HttpError for structured client
+          // errors, but never write them to logs: admin endpoints can echo
+          // prompts, scripts, bindings, import bundles, or test parameters.
+          this.opts.logger.error(`HTTP ${res.status} ${res.statusText} for ${method} ${url}`);
           throw new HttpError(res.status, `HTTP ${res.status} ${res.statusText}`, errorBody);
         }
+        if (res.status === 204) return {};
         const ct = res.headers.get("content-type") || "";
         if (ct.includes("application/json")) {
           return res.json();

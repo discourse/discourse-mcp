@@ -5,28 +5,62 @@
 
 import { ZodError } from "zod";
 
-// Shared rate limiter for write operations
+// Shared per-key operation queues. Unlike a timestamp-only throttle, this also
+// spaces callers that arrive concurrently (common when a model emits a tool batch).
 const rateLimiters = new Map<string, number>();
+const rateLimitTails = new Map<string, Promise<void>>();
 
 /**
- * Rate limits operations by key. Ensures minimum interval between calls.
+ * Runs an operation exclusively for a key and spaces operation starts.
+ * The queue is released in a finally block so failures cannot wedge later calls.
+ */
+export async function withRateLimit<T>(
+  key: string,
+  operation: () => Promise<T>,
+  intervalMs: number = 1000,
+): Promise<T> {
+  const previous = rateLimitTails.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
+  const tail = previous.catch(() => undefined).then(() => current);
+  rateLimitTails.set(key, tail);
+
+  await previous.catch(() => undefined);
+  try {
+    const now = Date.now();
+    const lastOp = rateLimiters.get(key) || 0;
+    const waitMs = intervalMs - (now - lastOp);
+    if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+    rateLimiters.set(key, Date.now());
+    return await operation();
+  } finally {
+    release();
+    if (rateLimitTails.get(key) === tail) rateLimitTails.delete(key);
+  }
+}
+
+/**
+ * Rate limits operations by key. Ensures minimum interval between calls,
+ * including calls that begin concurrently.
  * @param key - Unique identifier for the rate limit bucket (e.g., "post", "topic")
  * @param intervalMs - Minimum interval between operations in milliseconds (default: 1000)
  */
 export async function rateLimit(key: string, intervalMs: number = 1000): Promise<void> {
-  const now = Date.now();
-  const lastOp = rateLimiters.get(key) || 0;
-  if (now - lastOp < intervalMs) {
-    await new Promise((r) => setTimeout(r, intervalMs - (now - lastOp)));
-  }
-  rateLimiters.set(key, Date.now());
+  await withRateLimit(key, async () => undefined, intervalMs);
 }
 
 export interface PaginationMeta {
   total?: number;
+  reported_total?: number | null;
+  pages_fetched?: number;
   page?: number;
+  per_page?: number;
   limit?: number;
+  returned?: number;
   has_more?: boolean;
+  complete?: boolean;
+  truncated?: boolean;
+  truncated_reason?: string;
   next_cursor?: string | null;
 }
 
@@ -45,14 +79,21 @@ export function paginatedResponse<T>(
 }
 
 /**
- * Removes undefined/null values from meta object for compact JSON.
+ * Removes undefined values from meta objects while preserving meaningful nulls.
  */
 function cleanMeta(meta: PaginationMeta): PaginationMeta {
   const clean: PaginationMeta = {};
   if (meta.total !== undefined) clean.total = meta.total;
+  if (meta.reported_total !== undefined) clean.reported_total = meta.reported_total;
+  if (meta.pages_fetched !== undefined) clean.pages_fetched = meta.pages_fetched;
   if (meta.page !== undefined) clean.page = meta.page;
+  if (meta.per_page !== undefined) clean.per_page = meta.per_page;
   if (meta.limit !== undefined) clean.limit = meta.limit;
+  if (meta.returned !== undefined) clean.returned = meta.returned;
   if (meta.has_more !== undefined) clean.has_more = meta.has_more;
+  if (meta.complete !== undefined) clean.complete = meta.complete;
+  if (meta.truncated !== undefined) clean.truncated = meta.truncated;
+  if (meta.truncated_reason !== undefined) clean.truncated_reason = meta.truncated_reason;
   if (meta.next_cursor !== undefined) clean.next_cursor = meta.next_cursor;
   return clean;
 }
@@ -63,6 +104,26 @@ function cleanMeta(meta: PaginationMeta): PaginationMeta {
 export function jsonResponse(data: unknown): { content: Array<{ type: "text"; text: string }> } {
   return {
     content: [{ type: "text", text: JSON.stringify(data) }],
+  };
+}
+
+/**
+ * Creates a structured MCP success while retaining the same value as JSON text
+ * for clients that do not consume structuredContent.
+ */
+export function structuredJsonResponse<T extends Record<string, unknown>>(
+  data: T,
+): {
+  content: Array<{ type: "text"; text: string }>;
+  structuredContent: T;
+} {
+  const text = JSON.stringify(data);
+  // Round-trip once so properties JSON text cannot represent (notably
+  // `undefined`) are absent from structuredContent as well.
+  const structuredContent = JSON.parse(text) as T;
+  return {
+    content: [{ type: "text", text }],
+    structuredContent,
   };
 }
 
@@ -111,7 +172,9 @@ export interface LeanCategory {
   id: number;
   name: string;
   slug: string;
+  /** Legacy alias retained for compatibility; prefer parent_category_id. */
   pid: number | null;
+  parent_category_id: number | null;
   read_restricted: boolean;
   topic_count: number;
   post_count: number;
@@ -119,6 +182,21 @@ export interface LeanCategory {
 }
 
 export function transformCategory(raw: any): LeanCategory {
+  if (
+    !raw ||
+    !Number.isInteger(raw.id) ||
+    raw.id <= 0 ||
+    typeof raw.name !== "string" ||
+    raw.name.length === 0 ||
+    typeof raw.slug !== "string" ||
+    raw.slug.length === 0
+  ) {
+    throw new Error("Malformed category: expected positive integer id and nonempty name/slug");
+  }
+
+  const parentCategoryId = Number.isInteger(raw.parent_category_id)
+    ? raw.parent_category_id
+    : null;
   let perms: Array<{ gid: number; perm: number }> | undefined = undefined;
   
   if (Array.isArray(raw.group_permissions) && raw.group_permissions.length > 0) {
@@ -134,7 +212,8 @@ export function transformCategory(raw: any): LeanCategory {
     id: raw.id,
     name: raw.name,
     slug: raw.slug,
-    pid: raw.parent_category_id ?? null,
+    pid: parentCategoryId,
+    parent_category_id: parentCategoryId,
     read_restricted: raw.read_restricted ?? false,
     topic_count: raw.topic_count ?? 0,
     post_count: raw.post_count ?? 0,

@@ -1,5 +1,122 @@
 # Changelog
 
+## [0.3.0](https://github.com/discourse/discourse-mcp/compare/v0.2.9...v0.3.0) (2026-08-21)
+
+### Features
+
+* Complete bounded category and group directories with structured MCP output
+  - Paginate lazy-loaded category/group endpoints with stable ID deduplication, cancellation/deadline/page budgets, short-lived site/auth/option-isolated caching, and truthful completeness/truncation metadata
+  - Keep `discourse_list_categories` isolated to opt-in `administration`; make empty-input `discourse_list_groups` exhaustive under opt-in `groups` while preserving explicit page/filter one-request behavior
+  - Add `parent_category_id` while retaining legacy `pid`, and keep deprecated category/group resources correct through shared fetchers and bounded permission enrichment
+  - Advertise output schemas and identical JSON-text fallbacks; malformed upstream records now produce normal tool errors
+
+* Add the dedicated opt-in `tag_groups` lifecycle toolset
+  - Add public Guardian-filtered search, authoritative staff list/detail, deterministic optimistic state hashes, and explicit `{group_id, access}` permission entries that are machine-readable in MCP JSON Schema and converted to Discourse's numeric map only at the HTTP boundary
+  - Add guarded create, complete-state update, and hard delete with local ID/name/hash preflights, tag-creation/replacement/cascade confirmations, non-retried writes, and authoritative post-state/absence verification; tolerate blank optional `parent_tag` placeholders as omission while reserving explicit `null` for update-time clearing
+  - Report uncertain post-dispatch outcomes without structured success or blind-retry advice; document scoped-key, plugin-dependency, tagging-setting, and deletion-cascade limits
+
+* Add top-level CLI metadata and cross-platform profile home expansion
+  - `--help`/`-h`/`help` and `--version`/`-v`/`version` exit successfully before profile/site/transport startup
+  - Expand only a leading current-user `~`, `~/`, or `~\` in profile paths; do not expand `~otheruser` or upload allowlists
+
+* Make the loopback HTTP transport contract explicitly one stateful client per process
+  - Retain random session IDs, reject missing/unknown sessions and second initialization, bound pre-read request bodies to 4 MiB, and close active transports during shutdown
+  - After DELETE, expose a clear restart-required MCP/health response instead of leaving a closed transport behind a healthy endpoint
+
+* Add opt-in, admin-sensitive `webhooks` and `site_settings` toolsets
+  - Add secret-safe webhook inspection, bounded/redacted delivery diagnostics, guarded lifecycle operations, ping, and exact single-event redelivery with fresh destination preconditions and no automatic mutation retries
+  - Harden site-setting reads against upstream-secret and credential-like values, support directly listing only currently overridden settings, and add one-setting-at-a-time updates with live metadata validation, expected-value conflict checks, no-retry writes, and exact verification reads
+  - Keep external delivery, bulk operations, secret/structured setting mutation, user backfills, and generic admin-route passthrough outside the supported surface
+
+* Add the opt-in, admin-sensitive `themes` toolset
+  - Add bounded list/detail reads and write-gated local creation, metadata/composition changes, field/setting/translation editing, Git/archive installation, remote synchronization, asset upload, and guarded single deletion
+  - Require explicit confirmations for executable code, migrations, default and component-graph changes, source replacement, archive replacement, forced placeholders, reverts, uploads, and deletion
+  - Keep local files beneath symlink-resolved `allowed_upload_paths`, bound source/archive/asset responses, redact credentials and private-key-like data, and avoid retries for multipart and non-idempotent create/delete requests
+  - Advertise mutually exclusive text/upload/delete field variants and nested repository/base64-archive/path-archive variants so clients do not invent placeholder `upload_id` or archive values
+  - Intentionally exclude private-repository keys, source repointing, export, bulk deletion, arbitrary themeable site-setting mutation, and generic controller pass-through
+
+* Add a cohesive Discourse evidence and analytics layer
+  - Add bounded topic-stream selection, reply relationships, latest-post feeds, post-level search, and daily topic view statistics with truthful upstream cursor and limit semantics
+  - Keep only topic-stream selection and post-level search default-on; expose deeper reply, feed, view, user-summary, action-timeline, and directory reads through the opt-in `activity` toolset
+  - Add opt-in `administration` discovery for categories and site settings plus explicitly confirmed user activation/approval actions
+  - Make acting-user writes require a global API key and report actual attribution; treat signup anti-enumeration responses as unconfirmed instead of inventing created users
+  - Preserve conditional Discourse Solved topic/post fields and keep accepted answers explicitly framed as a resolution proxy
+  - Add profile-visible user summaries, named action timelines, directory/cohort metrics, group-authored post evidence, staff moderation counters, and bounded post revisions
+  - Add opt-in `analytics` report discovery/execution and the Discourse Solved support dashboard without arbitrary SQL or customer-specific rules
+  - Add opt-in `ai_insights` cached summaries, semantic search, and staff sentiment reads while labeling AI output as upstream classification rather than objective judgment
+  - Share bounded, privacy-conscious post/topic/user projections; pace fan-out reads per selected site; and return structured status/plugin diagnostics without leaking upstream bodies
+  - Keep existing tool names and response contracts compatible, retain write gates, and update catalog/toolset contract coverage
+
+* Enrich topic discovery and add authoritative top/hot views to `discourse_filter_topics`
+  - Preserve existing filtered calls while adding top periods and defining hot exactly as Discourse's daily top score
+  - Return uniform rich topic metadata with null-safe fields and pagination totals/continuation only when authoritative
+  - Keep `search` default-on and both search tools available in read-only mode
+
+* Add the opt-in `moderation` toolset for Discourse's review queue
+  - Inspect queue count, reviewables, high-priority reviewable-topic aggregation, full bounded context, score explanations, and dynamic available actions
+  - Distinguish pending reviewable totals from individual score/flag records and mark the topic aggregation as non-exhaustive
+  - Support staff and category moderators through authenticated reads while leaving Guardian permissions authoritative
+  - Add one write-gated action tool with fresh-action preflight, optimistic-version checks, explicit confirmation, contracted fields, and structured moderation errors
+  - Mark reads and destructive actions accurately in MCP metadata, make strict-schema numeric placeholders safe, and normalize statuses/count units
+  - Serialize concurrent moderation mutations, pace high-volume reads, route prefixed UI action IDs through their authoritative `server_action`, and report ambiguous post-PUT failures without encouraging blind retries
+
+* Use Discourse's device authorization flow when generating User API Keys
+  - Show a short browser activation code and poll for approval automatically
+  - Use RSA-OAEP encryption and validate the response nonce
+  - Fall back to the legacy copy-and-paste flow on older Discourse sites
+
+* Add typed built-in toolsets and `--toolsets <name[,name...]>` selection
+  - Filter built-in tools by operator-facing domains while preserving canonical registration order
+  - Keep site selection, write enablement, and call-time authorization as independent safety controls
+  - Support comma-separated CLI values and string or array profile configuration
+  - Treat omitted selection as the non-opt-in default catalog and add `--toolsets all` for every domain
+
+* Add the opt-in `groups` toolset for complete group lifecycle management
+  - List and inspect groups, members, owners, and pending membership requests with upstream visibility and pagination semantics
+  - Create, fully configure, update, and delete custom groups, including notification defaults, associations, email settings, custom fields, and plugin extensions
+  - Use separate, unambiguous mutation tools for usernames, numeric user IDs, existing-account emails, and unknown-address invitations instead of mirroring Discourse's selector precedence
+  - Bulk-add and remove members, promote and demote owners, approve or deny requests, and support request/join/leave self-service flows
+  - Preserve write gating and Discourse's staff, owner, Guardian, automatic-group, invitation, and membership-setting restrictions
+
+* Add the opt-in `workflows` toolset for the experimental `discourse-workflows` plugin
+  - Discover workflows, node types, templates, credentials, executions, versions, and related forum entities
+  - Create and replace complete graphs with paired graph safety and a flat connection adapter
+  - Apply mechanical MCP-side graph operations after a fresh GET, then publish, unpublish, discard, delete, or restore drafts
+  - Evaluate expressions, manage pin-data, step-run or manually run the current draft, and poll asynchronous executions
+
+* Add opt-in Discourse AI administration toolsets
+  - Add typed AI-agent discovery, lifecycle management, bot-user creation, and portable import/export through `ai_agents`
+  - Add scripted custom-tool discovery, lifecycle, focused authoring guidance, execution testing, and import/export through `ai_custom_tools`
+  - Add exact-area, non-secret AI feature discovery and updates through `ai_features`
+  - Keep all three domains default-off, require admin authority, and retain write gating for mutations and custom-tool execution
+  - Accept ordered `subagent_ids` allowlists on agent creation and partial updates, including negative system-agent IDs
+  - Match Discourse's limit of 20 unique subagents and expose `subagent_count` in slim agent listings
+
+* Add the default `private_messages` toolset for authenticated PM lifecycle operations
+  - List personal and group inbox/archive/unread/new mailboxes, plus personal sent messages, with uncached identity-safe reads
+  - Read PM-specific metadata, direct allowed-user/group records, reply relationships, and bounded post bodies while rejecting public topics
+  - Create PMs for typed user, group, and email recipients and safely reply only after a PM-archetype preflight
+  - Invite users, groups, or email addresses with correct group notification serialization and intentionally conservative email outcome reporting
+  - Preserve Discourse authorization, write gating, API-key identity rules, recipient limits, and Guardian checks
+
+### Security
+
+* Stop logging HTTP response bodies, including at debug level, because administration APIs may return secrets or other sensitive content
+
+### Bug Fixes
+
+* Treat successful empty `204 No Content` responses as valid results for delete operations
+
+### Maintenance
+
+* Pin `@modelcontextprotocol/sdk` exactly to reviewed version 1.30.0 and harden dual-lockfile packaging
+  - Keep pnpm authoritative while regenerating/tracking `package-lock.json`; CI now verifies frozen pnpm and clean npm installs, typecheck/build/tests, production audits, package contents, and CLI metadata smoke tests
+  - Upgrade Zod, TypeScript, ESLint, and supporting type packages while preserving the modern remote-tool callback/content compatibility fixes and rejecting the vulnerable SDK 1.17.x downgrade
+
+* Simplify built-in tool registration with typed `defineTool()` definitions and one ordered catalog
+  - Preserve existing MCP names, metadata, schemas, handlers, registration order, and availability
+  - Add compile-time inference fixtures and catalog/registration contract tests
+
 ## [0.2.9](https://github.com/discourse/discourse-mcp/compare/v0.2.8...v0.2.9) (2026-07-03)
 
 ### Security
@@ -227,7 +344,7 @@
 #### Features
 
 * add optional HTTP transport support via --transport flag
-* implement Streamable HTTP transport (stateless mode) as alternative to stdio
+* implement Streamable HTTP transport (initially stateless; superseded in 0.3.0 by the one-stateful-session security contract) as alternative to stdio
 * add --port flag for configuring HTTP server port (default: 3000)
 * include health check endpoint at /health for HTTP mode
 
