@@ -8,6 +8,12 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 - **Version**: 0.3.1 (simplifies write opt-in so `--allow_writes` is sufficient and deprecates `read_only=false`; 0.3.0 added operator-selectable toolsets, structured directory output, and expanded opt-in administration capabilities; 0.2.x introduced breaking changes from 0.1.x, including JSON-only tool output; category/group resources remain deprecated compatibility surfaces alongside canonical list tools)
 
 ### Quick start (release)
+- install with agent（such as codex)
+```
+In your AI agent tool (such as Codex Desktop or Claude), install the official @discourse/mcp from https://github.com/discourse/discourse-mcp/ for <forum URL> and <username> (ask me to confirm both first), name it discourse-forum, enable only search, topics, and users, and keep --read_only=true.
+Securely save authorization to the absolute path ~/.config/discourse-forum/profile.json, wait for browser authorization, never request, display, or expose the API key, validate the file with permission 600, and only add or replace discourse-forum in the agent tool’s MCP configuration; use absolute paths throughout.
+Verify the discourse-forum MCP configuration using the agent tool’s native MCP inspection command and a read-only /session/current.json request, report status, username, and errors without exposing credentials, then remind me to fully quit and restart the agent tool and check its MCP settings.
+```
 
 - **Run (read‑only, recommended to start)**
 
