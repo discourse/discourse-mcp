@@ -29,7 +29,7 @@ export function requireAuthenticatedAccess(siteState: SiteState) {
 
 export function requireWriteAccess(siteState: SiteState, allowWrites: boolean) {
   if (!allowWrites) {
-    return jsonError("Writes are disabled. Run with --allow_writes --read_only=false to enable.");
+    return jsonError("Writes are disabled. Run with --allow_writes to enable.");
   }
   return requireSiteAuth(siteState, "any");
 }

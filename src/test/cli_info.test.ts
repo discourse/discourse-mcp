@@ -40,6 +40,9 @@ test("all top-level help spellings describe current options and never start a tr
       "--max-read-length", "--allowed_upload_paths", "--show_emails", "--transport",
       "--port", "--log_level", "--cache_dir", "generate-user-api-key",
     ]) assert.match(result.stdout, new RegExp(option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(result.stdout, /--allow_writes <boolean>\s+Enable mutation tools/);
+    assert.match(result.stdout, /--read_only <boolean>\s+Deprecated: true vetoes writes/);
+    assert.doesNotMatch(result.stdout, /allow_writes when read_only=false/);
     assert.doesNotMatch(result.stdout, /listening on/);
   }
 });
@@ -52,6 +55,19 @@ test("top-level metadata scanning stops at -- and does not steal subcommand help
   const stopped = run(["--", "--version"]);
   assert.equal(stopped.stdout, "");
   assert.match(stopped.stderr, /Starting Discourse MCP/);
+});
+
+test("profile-sourced contradictory write settings fail startup", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "discourse-mcp-write-mode-"));
+  const profilePath = path.join(directory, "profile.json");
+  try {
+    await writeFile(profilePath, JSON.stringify({ allow_writes: true, read_only: true }));
+    const result = run(["--profile", profilePath]);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /allow_writes=true conflicts with read_only=true \(from CLI or profile\)/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("profile loading expands current-user ~/ paths while preserving validation wrapping", async () => {

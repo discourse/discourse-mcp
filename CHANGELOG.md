@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.1](https://github.com/discourse/discourse-mcp/compare/v0.3.0...v0.3.1) (2026-08-25)
+
+### Changed
+
+* Simplify write-mode opt-in and deprecate `read_only=false`
+  - `--allow_writes` now enables mutation tools by itself; the redundant `--read_only=false` CLI/profile setting is deprecated, has no effect, and emits an informational migration notice
+  - Migration note: an existing command or profile with `allow_writes=true` and no `read_only` value previously remained read-only; it now enables mutation tools as its name indicates
+  - Keep writes disabled when `allow_writes` is omitted or false, and retain toolset selection, authentication, authorization, confirmation, and call-time access checks unchanged
+
+### Breaking Changes
+
+* Reject contradictory `allow_writes=true` and `read_only=true` configuration at startup instead of silently hiding mutation tools; remove `read_only=true` to enable writes, or remove `allow_writes=true` to remain read-only
+
 ## [0.3.0](https://github.com/discourse/discourse-mcp/compare/v0.2.9...v0.3.0) (2026-08-21)
 
 ### Features
