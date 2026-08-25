@@ -100,6 +100,50 @@ async function postMcp(
   }, headers);
 }
 
+async function listToolsFromServer(args: string[]): Promise<{ names: string[]; stderr: string }> {
+  const port = await getFreePort();
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const serverProcess = spawn('node', [
+    indexPath,
+    '--transport', 'http',
+    '--port', String(port),
+    '--tools_mode', 'discourse_api_only',
+    ...args,
+  ], {
+    stdio: ['ignore', 'pipe', 'pipe']
+  });
+  const headers = { Host: `127.0.0.1:${port}` };
+  let stderr = '';
+  serverProcess.stderr?.setEncoding('utf8');
+  serverProcess.stderr?.on('data', (chunk) => { stderr += chunk; });
+
+  try {
+    const ready = await waitForServer(port);
+    assert.ok(ready, 'Server should start');
+    const initialization = await postMcp(port, headers);
+    assert.equal(initialization.statusCode, 200);
+    assert.ok(initialization.sessionId);
+
+    const response = await postMcpRequest(port, {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list',
+      params: {},
+    }, { ...headers, 'Mcp-Session-Id': initialization.sessionId });
+    assert.equal(response.statusCode, 200);
+    const body = JSON.parse(response.body) as {
+      result?: { tools?: Array<{ name: string }> };
+    };
+    return {
+      names: body.result?.tools?.map((tool) => tool.name) ?? [],
+      stderr,
+    };
+  } finally {
+    serverProcess.kill('SIGTERM');
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+}
+
 test('HTTP transport starts on specified port', async () => {
   const port = await getFreePort();
   const indexPath = path.resolve(__dirname, '../../dist/index.js');
@@ -188,6 +232,44 @@ test('invalid CLI toolsets fail startup with actionable output', () => {
   assert.equal(result.status, 1);
   assert.match(result.stderr, /expected a comma-separated string or string array/);
   assert.match(result.stderr, /data_explorer/);
+});
+
+test('conflicting write-mode flags fail startup with actionable output', () => {
+  const indexPath = path.resolve(__dirname, '../../dist/index.js');
+  const result = spawnSync('node', [indexPath, '--allow_writes', '--read_only=true'], {
+    encoding: 'utf8',
+  });
+
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /allow_writes=true conflicts with read_only=true/);
+});
+
+test('--allow_writes alone registers mutation tools', async () => {
+  const { names } = await listToolsFromServer([
+    '--log_level', 'silent',
+    '--toolsets', 'themes',
+    '--allow_writes',
+  ]);
+  assert.ok(names.includes('discourse_install_theme'));
+  assert.ok(names.includes('discourse_update_theme'));
+});
+
+test('legacy read_only values remain safe while false emits a deprecation notice', async () => {
+  const veto = await listToolsFromServer([
+    '--log_level', 'silent',
+    '--toolsets', 'themes',
+    '--read_only=true',
+  ]);
+  assert.ok(!veto.names.includes('discourse_install_theme'));
+  assert.ok(veto.names.includes('discourse_get_theme'));
+
+  const deprecated = await listToolsFromServer([
+    '--log_level', 'info',
+    '--toolsets', 'themes',
+    '--read_only=false',
+  ]);
+  assert.ok(!deprecated.names.includes('discourse_install_theme'));
+  assert.match(deprecated.stderr, /read_only=false is no longer required and has no effect/);
 });
 
 test('CLI toolsets override profile toolsets and are reflected by MCP tools/list', async () => {

@@ -5,7 +5,7 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 - **Entry point**: `src/index.ts` → compiled to `dist/index.js` (binary name: `discourse-mcp`)
 - **SDK**: `@modelcontextprotocol/sdk`
 - **Node**: >= 24
-- **Version**: 0.3.0 (adds operator-selectable toolsets, structured directory output, and expanded opt-in administration capabilities; 0.2.x introduced breaking changes from 0.1.x, including JSON-only tool output; category/group resources remain deprecated compatibility surfaces alongside canonical list tools)
+- **Version**: 0.3.1 (simplifies write opt-in so `--allow_writes` is sufficient and deprecates `read_only=false`; 0.3.0 added operator-selectable toolsets, structured directory output, and expanded opt-in administration capabilities; 0.2.x introduced breaking changes from 0.1.x, including JSON-only tool output; category/group resources remain deprecated compatibility surfaces alongside canonical list tools)
 
 ### Quick start (release)
 
@@ -23,7 +23,7 @@ Then, in your MCP client, either:
 - **Enable writes (opt‑in, safe‑guarded)**
 
 ```bash
-npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
+npx -y @discourse/mcp@latest --allow_writes --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 ```
 
 - **Run with only Data Explorer built-in tools**
@@ -76,7 +76,7 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
 - **Write safety**
 
   - Writes are disabled by default.
-  - Built-in write tools are only registered when `--allow_writes` is enabled **and** `--read_only=false`. This includes post, topic, private-message, category, user, upload, draft, and saved Data Explorer query mutations.
+  - Built-in write tools are only registered when `--allow_writes` is enabled. This includes post, topic, private-message, category, user, upload, draft, and saved Data Explorer query mutations.
   - Private-message listing and reading also require a matching authenticated site because PM data is never public.
   - Toolset selection does not bypass write safety. A selected write tool remains absent unless writes are enabled.
   - Write tools require a matching `auth_pairs` entry for the selected site; otherwise they return an error.
@@ -87,8 +87,8 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
   - `--help`, `-h`, or positional `help`: print current CLI help and exit successfully before loading profiles or starting a transport.
   - `--version`, `-v`, or positional `version`: print one package-version line and exit successfully. `-v` means version; logging verbosity uses `--log_level`.
 
-  - `--read_only` (default: true)
-  - `--allow_writes` (default: false)
+  - `--allow_writes` (default: false): enable mutation tools. This single explicit opt-in is sufficient.
+  - `--read_only <boolean>`: deprecated compatibility setting. `true` is an explicit read-only override and conflicts with `--allow_writes`; `false` has no effect and should be removed from commands and profiles.
   - `--timeout_ms <number>` (default: 15000)
   - `--concurrency <number>` (default: 4)
   - `--log_level <silent|error|info|debug>` (default: info)
@@ -131,7 +131,6 @@ The server registers tools under the MCP server name `@discourse/mcp`. Choose a 
       "http_basic_pass": "password"
     }
   ],
-  "read_only": false,
   "allow_writes": true,
   "show_emails": true,
   "log_level": "info",
@@ -182,7 +181,7 @@ npx -y @discourse/mcp@latest \
   --toolsets workflows \
   --site https://forum.example.com \
   --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
-  --allow_writes --read_only=false \
+  --allow_writes \
   --tools_mode discourse_api_only
 ```
 
@@ -228,7 +227,7 @@ Toolset membership is intentionally separate from safety and authorization:
 - Selected toolsets form a union. A tool in multiple selected sets is registered once, in the canonical built-in order. `all` expands to every real domain and is never tool metadata.
 - Omitted selection excludes opt-in-only tools. Tool definitions may not mix opt-in and default memberships, which prevents accidental default exposure.
 - `discourse_select_site` is automatically retained as a bootstrap capability for every untethered subset. With `--site`, it remains hidden as usual.
-- Read-only mode still removes tools that require write enablement. For example, `--toolsets data_explorer` exposes query retrieval and execution by default; add both `--allow_writes` and `--read_only=false` to expose saved-query mutations.
+- Read-only mode still removes tools that require write enablement. For example, `--toolsets data_explorer` exposes query retrieval and execution by default; add `--allow_writes` to expose saved-query mutations.
 - Existing call-time authentication and admin checks are unchanged. Data Explorer tools still require admin access when called; group operations retain Discourse's own staff, owner, visibility, and self-service authorization rules.
 - Toolsets filter **built-in tools only; they are not an authorization or complete capability boundary**. MCP resources and prompts remain available, and all existing call-time access checks remain authoritative. Remote Tool Execution API discovery is controlled independently by `--tools_mode`; use `--tools_mode discourse_api_only` when the MCP tool list must contain only the selected built-in domains. The server logs an informational notice when selected toolsets are combined with remote discovery.
 - A selected domain can contribute no tools under the current safety configuration—for example, `uploads` in read-only mode. The server logs an informational notice when this occurs.
@@ -254,7 +253,7 @@ These toolsets control discovery only. Staff role, Guardian visibility, scoped-k
 
 #### Webhooks and site settings
 
-The `webhooks` and `site_settings` toolsets are opt-in and admin-sensitive. Selecting either toolset controls discovery only—it is **not authorization**. Every call requires matching selected-site admin-style authentication, Discourse remains the final authorization and validation authority, and mutations additionally require `--allow_writes --read_only=false`. The existing site-setting read remains available through `administration`, but site-setting mutation is discoverable only through an explicit `site_settings` selection.
+The `webhooks` and `site_settings` toolsets are opt-in and admin-sensitive. Selecting either toolset controls discovery only—it is **not authorization**. Every call requires matching selected-site admin-style authentication, Discourse remains the final authorization and validation authority, and mutations additionally require `--allow_writes`. The existing site-setting read remains available through `administration`, but site-setting mutation is discoverable only through an explicit `site_settings` selection.
 
 ```bash
 # Inspect safe webhook summaries and bounded delivery diagnostics
@@ -266,7 +265,7 @@ npx -y @discourse/mcp@latest --site https://forum.example.com \
 npx -y @discourse/mcp@latest --site https://forum.example.com \
   --toolsets site_settings --tools_mode discourse_api_only \
   --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
-  --allow_writes --read_only=false
+  --allow_writes
 ```
 
 Webhook delivery, ping, and redelivery make requests to external systems; enqueue or HTTP success does not prove that the destination processed an event correctly. Webhook secrets are never returned, URL userinfo is removed, query values are masked, and raw event headers are never passed through. Event payload/body previews require explicit sensitive-content confirmation and are bounded and credential-redacted. Bulk redelivery is intentionally unsupported.
@@ -275,7 +274,7 @@ Site settings affect the entire forum. Reads mask both upstream-secret and crede
 
 #### Theme administration
 
-The opt-in `themes` toolset is admin-sensitive and is never included in the default catalog. Read-only selection registers only `discourse_list_themes` and `discourse_get_theme`; every mutation additionally requires `--allow_writes --read_only=false`. Toolset selection does not grant admin access: configure matching site authentication and Discourse remains authoritative for admin, repository-allowlist, dependency, compiler, import, and migration checks.
+The opt-in `themes` toolset is admin-sensitive and is never included in the default catalog. Read-only selection registers only `discourse_list_themes` and `discourse_get_theme`; every mutation additionally requires `--allow_writes`. Toolset selection does not grant admin access: configure matching site authentication and Discourse remains authoritative for admin, repository-allowlist, dependency, compiler, import, and migration checks.
 
 Theme HTML, JavaScript, SCSS, settings migrations, assets, and third-party repositories can execute or deploy code for every visitor. The tools require operation-specific confirmations, but they do not sandbox, validate, or declare third-party code safe. Local archives and assets are accepted only from bounded base64 input or regular files beneath symlink-resolved `--allowed_upload_paths` roots.
 
@@ -287,7 +286,6 @@ discourse-mcp \
   --site https://forum.example.com \
   --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
   --allow_writes \
-  --read_only=false \
   --allowed_upload_paths /srv/discourse-theme-inputs
 ```
 
@@ -324,7 +322,7 @@ This release intentionally excludes private-repository key management, repositor
 
 The opt-in `groups` toolset covers the complete custom-group lifecycle: directory listing and full detail reads; create, update, and permanent delete; paginated member and owner reads; explicit selector-specific tools for adding/removing members and promoting/demoting owners by username, numeric user ID, or existing-account email; pending-request listing and approve/deny decisions; and authenticated request, public-join, and public-leave flows. A separate invitation tool handles addresses that may not have accounts yet, avoiding confusion between account lookup and forum invitations.
 
-All mutations require both `--allow_writes` and `--read_only=false`. Creation and deletion additionally require staff/admin-style API credentials at the MCP access gate. Discourse remains authoritative for Guardian checks, group visibility, staff versus owner capabilities, automatic-group restrictions, membership settings, invitation limits, and the fields a caller may update. Core automatic groups cannot be created, deleted, or have membership/ownership changed; their permitted presentation and interaction settings can still be updated by authorized staff. Selecting the toolset does not grant any of these permissions.
+All mutations require `--allow_writes`. Creation and deletion additionally require staff/admin-style API credentials at the MCP access gate. Discourse remains authoritative for Guardian checks, group visibility, staff versus owner capabilities, automatic-group restrictions, membership settings, invitation limits, and the fields a caller may update. Core automatic groups cannot be created, deleted, or have membership/ownership changed; their permitted presentation and interaction settings can still be updated by authorized staff. Selecting the toolset does not grant any of these permissions.
 
 #### Moderation queue
 
@@ -332,11 +330,11 @@ The opt-in `moderation` toolset exposes `discourse_get_review_queue_count`, `dis
 
 For queue totals, use `discourse_get_review_queue_count`; its `count` is the number of pending **reviewable records** visible to the caller, not the number of individual flags. Use `discourse_list_reviewables` with only `status: "pending"` and `offset: 0` for ordinary triage—do not invent topic, category, type, or user filters—and follow `next_offset` until `has_more` is false. Numeric topic/category placeholders of `0` and optional text placeholders of blank/`all`/`any` are treated as omitted, so strict-schema clients cannot accidentally filter to ID 1 or send invalid universal sentinels. List results already contain bounded evidence and dynamic actions; avoid fanning out `discourse_read_topic` or detail calls across the queue. `discourse_list_reviewable_topics` is only a convenience aggregation: upstream includes pending topics at or above its minimum review-priority threshold, omits queue items without topics, and reports `score_count` as the number of review score/flag records—not reviewable items. It must not be used to infer the complete queue size.
 
-When both `--allow_writes` and `--read_only=false` are set, `discourse_perform_reviewable_action` is also registered. Call list/detail first and submit one exact `available_actions[].id` with `confirm: true`; choose from the full action description, not a repeated label such as “Delete post.” Discourse UI action IDs can be prefixed (`post-…` or `user-…`), while the route requires the associated `server_action`; the MCP validates and maps this automatically. Moderation mutations are serialized and paced across the complete fresh-GET/PUT operation, so a concurrent model batch cannot bypass the write throttle. The tool checks an optional expected version, rejects unadvertised fields, and returns normalized success/count fields. A failure after the PUT is marked as an unknown outcome with identifiers and must be verified rather than blindly retried. Discourse still enforces claims, optimistic conflicts, action validity, and Guardian permissions. The tools expose evidence and explicit operations; they do not recommend moderation decisions.
+When `--allow_writes` is set, `discourse_perform_reviewable_action` is also registered. Call list/detail first and submit one exact `available_actions[].id` with `confirm: true`; choose from the full action description, not a repeated label such as “Delete post.” Discourse UI action IDs can be prefixed (`post-…` or `user-…`), while the route requires the associated `server_action`; the MCP validates and maps this automatically. Moderation mutations are serialized and paced across the complete fresh-GET/PUT operation, so a concurrent model batch cannot bypass the write throttle. The tool checks an optional expected version, rejects unadvertised fields, and returns normalized success/count fields. A failure after the PUT is marked as an unknown outcome with identifiers and must be verified rather than blindly retried. Discourse still enforces claims, optimistic conflicts, action validity, and Guardian permissions. The tools expose evidence and explicit operations; they do not recommend moderation decisions.
 
 #### Private messages
 
-The default `private_messages` toolset provides a PM-aware interface rather than reusing generic public-topic mutations. Listing and reading require configured authentication. Creation, replies, and invitations additionally require both `--allow_writes` and `--read_only=false`. Discourse remains authoritative for mailbox visibility, PM membership, recipient limits, group messageability, and all Guardian/API-key checks.
+The default `private_messages` toolset provides a PM-aware interface rather than reusing generic public-topic mutations. Listing and reading require configured authentication. Creation, replies, and invitations additionally require `--allow_writes`. Discourse remains authoritative for mailbox visibility, PM membership, recipient limits, group messageability, and all Guardian/API-key checks.
 
 Personal mailboxes support `inbox`, `sent`, `archive`, `unread`, and `new`. Group mailboxes support all except `sent`; a personal inbox does not include every group inbox. If `discourse_list_private_messages` omits `username`, it resolves the authenticated user through `/session/current.json`. A supplied username selects a mailbox path—it does not impersonate that user. Discourse permits another user's inbox/sent/archive only where its authorization rules allow it, while `unread` and `new` remain owner-only even for admins.
 
@@ -359,20 +357,20 @@ Flat connections such as `[{"from":"Start","to":"Check","type":"main"}]` are acc
 
 #### Discourse AI administration
 
-The three AI administration domains require a Discourse admin API key (or an admin user API key accepted by the selected endpoint). They are independently opt-in and default-off. Mutations—and custom-tool test execution—also require both `--allow_writes` and `--read_only=false`.
+The three AI administration domains require a Discourse admin API key (or an admin user API key accepted by the selected endpoint). They are independently opt-in and default-off. Mutations—and custom-tool test execution—also require `--allow_writes`.
 
 ```bash
 # Configure agents without exposing scripted source management
 npx -y @discourse/mcp@latest --site https://forum.example.com \
   --toolsets ai_agents --tools_mode discourse_api_only \
   --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
-  --allow_writes --read_only=false
+  --allow_writes
 
 # Assign agents and update safe feature settings, but do not expose custom-tool code editing
 npx -y @discourse/mcp@latest --site https://forum.example.com \
   --toolsets ai_agents,ai_features --tools_mode discourse_api_only \
   --auth_pairs '[{"site":"https://forum.example.com","api_key":"...","api_username":"system"}]' \
-  --allow_writes --read_only=false
+  --allow_writes
 ```
 
 The agent index is intentionally concise by default: `discourse_ai_list_agents` omits system prompts and per-agent configuration, returning summary counts—including `subagent_count`—plus slim tool/model catalogs. Use `discourse_ai_get_agent` with an ID to inspect one full configuration. `view: "full"` is available only for clients that explicitly need the complete upstream index.
@@ -625,7 +623,7 @@ npx @discourse/mcp@latest generate-user-api-key \
 # Step 2: Visit the authorization URL shown, approve the request, and paste the payload
 
 # Step 3: Run the MCP server with your new key
-npx @discourse/mcp@latest --profile profile.json --allow_writes --read_only=false
+npx @discourse/mcp@latest --profile profile.json --allow_writes
 ```
 
 ### Other Examples
@@ -646,19 +644,19 @@ npx -y @discourse/mcp@latest --site https://try.discourse.org
 - Create a post with Admin API Key (writes enabled):
 
 ```bash
-npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
+npx -y @discourse/mcp@latest --allow_writes --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 ```
 
 - Create a post with User API Key (writes enabled, no admin required):
 
 ```bash
-npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","user_api_key":"'$DISCOURSE_USER_API_KEY'"}]'
+npx -y @discourse/mcp@latest --allow_writes --auth_pairs '[{"site":"https://try.discourse.org","user_api_key":"'$DISCOURSE_USER_API_KEY'"}]'
 ```
 
 - Create a category (writes enabled):
 
 ```bash
-npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
+npx -y @discourse/mcp@latest --allow_writes --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 # In your MCP client, call discourse_create_category with for example:
 # { "name": "AI Research", "color": "0088CC", "text_color": "FFFFFF", "description": "Discussions about AI research" }
 ```
@@ -666,7 +664,7 @@ npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"s
 - Create a topic (writes enabled):
 
 ```bash
-npx -y @discourse/mcp@latest --allow_writes --read_only=false --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
+npx -y @discourse/mcp@latest --allow_writes --auth_pairs '[{"site":"https://try.discourse.org","api_key":"'$DISCOURSE_API_KEY'","api_username":"system"}]'
 # In your MCP client, call discourse_create_topic, for example:
 # { "title": "Agentic workflows", "raw": "Let's discuss agent workflows.", "category_id": 1, "tags": ["ai","agents"] }
 ```
@@ -679,7 +677,7 @@ npx -y @discourse/mcp@latest \
   --toolsets private_messages \
   --tools_mode discourse_api_only \
   --auth_pairs '[{"site":"https://try.discourse.org","user_api_key":"'$DISCOURSE_USER_API_KEY'"}]' \
-  --allow_writes --read_only=false
+  --allow_writes
 
 # In your MCP client:
 # discourse_list_private_messages: { "mailbox": "inbox", "page": 0 }

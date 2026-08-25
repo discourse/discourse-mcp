@@ -60,8 +60,8 @@ Configuration:
   --profile <path>                 JSON profile (~, ~/ and ~\\ expand for the current user)
   --site <url>                     Tether and preselect one Discourse site
   --auth_pairs <json>              Site-specific API/User API credentials
-  --read_only <boolean>            Keep mutation tools disabled (default: true)
-  --allow_writes <boolean>         Allow writes when read_only=false
+  --allow_writes <boolean>         Enable mutation tools (default: false)
+  --read_only <boolean>            Deprecated: true vetoes writes; false has no effect
   --tools_mode <mode>              auto, discourse_api_only, or tool_exec_api
   --toolsets <domains>             Comma-separated built-in domains or all
                                    Includes opt-in administration, groups, tag_groups,
@@ -143,7 +143,7 @@ const ProfileSchema = z
           .strict()
       )
       .optional(),
-    read_only: z.boolean().optional().default(true),
+    read_only: z.boolean().optional(),
     allow_writes: z.boolean().optional().default(false),
     timeout_ms: z.number().int().positive().optional().default(DEFAULT_TIMEOUT_MS),
     concurrency: z.number().int().positive().optional().default(4),
@@ -230,7 +230,7 @@ function parseAllowedUploadPaths(value: unknown, source: string): string[] | und
 function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>): Profile {
   const merged = {
     auth_pairs: parseAuthPairs(flags.auth_pairs ?? flags["auth-pairs"], "from CLI") ?? parseAuthPairs(profile.auth_pairs, "from profile"),
-    read_only: ((flags.read_only ?? flags["read-only"]) as boolean | undefined) ?? profile.read_only ?? true,
+    read_only: ((flags.read_only ?? flags["read-only"]) as boolean | undefined) ?? profile.read_only,
     allow_writes: ((flags.allow_writes ?? flags["allow-writes"]) as boolean | undefined) ?? profile.allow_writes ?? false,
     timeout_ms: ((flags.timeout_ms ?? flags["timeout-ms"]) as number | undefined) ?? profile.timeout_ms ?? DEFAULT_TIMEOUT_MS,
     concurrency: (flags.concurrency as number | undefined) ?? profile.concurrency ?? 4,
@@ -248,6 +248,9 @@ function mergeConfig(profile: Partial<Profile>, flags: Record<string, unknown>):
   } satisfies Profile;
   const result = ProfileSchema.safeParse(merged);
   if (!result.success) throw new Error(`Invalid configuration: ${result.error.message}`);
+  if (result.data.allow_writes && result.data.read_only === true) {
+    throw new Error("Invalid configuration: allow_writes=true conflicts with read_only=true (from CLI or profile); remove read_only=true to enable writes, or remove allow_writes=true to remain read-only");
+  }
   return result.data;
 }
 
@@ -303,6 +306,9 @@ async function main() {
   const config = mergeConfig(profile, argv);
 
   const logger = new Logger(config.log_level);
+  if (config.read_only === false) {
+    logger.info("Deprecated configuration: read_only=false is no longer required and has no effect; use allow_writes=true to enable mutation tools.");
+  }
   const auth = buildAuth(config);
 
   // Meta log (stderr) without leaking secrets
@@ -335,7 +341,7 @@ async function main() {
     }
   );
 
-  const allowWrites = Boolean(config.allow_writes && !config.read_only);
+  const allowWrites = Boolean(config.allow_writes);
   const showEmails = Boolean(config.show_emails);
 
   // If tethered to a site, validate and preselect it before registering tools,
