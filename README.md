@@ -10,9 +10,9 @@ A Model Context Protocol (MCP) stdio server that exposes Discourse forum capabil
 ### Quick start (release)
 - install with agent（such as codex)
 ```
-In your AI agent tool (such as Codex Desktop or Claude), install the official @discourse/mcp from https://github.com/discourse/discourse-mcp/ for <forum URL> and <username> (ask me to confirm both first), name it discourse-forum, enable only search, topics, and users, and keep --read_only=true.
-Securely save authorization to the absolute path ~/.config/discourse-forum/profile.json, wait for browser authorization, never request, display, or expose the API key, validate the file with permission 600, and only add or replace discourse-forum in the agent tool’s MCP configuration; use absolute paths throughout.
-Verify the discourse-forum MCP configuration using the agent tool’s native MCP inspection command and a read-only /session/current.json request, report status, username, and errors without exposing credentials, then remind me to fully quit and restart the agent tool and check its MCP settings.
+In your AI agent tool (e.g., Codex Desktop or Claude Desktop), add an MCP server named discourse-forum that runs `npx -y @discourse/mcp@latest --toolsets search,topics,users` for your forum URL and username (confirm both before authorizing). Read-only is the default; avoid the deprecated `--read_only` flag.
+Store authentication in a local profile file (e.g., $HOME/.config/discourse-forum/profile.json), ensure it is only readable by you (mode 600), and reference it from the MCP server command using `--profile` with an absolute path.
+Verify the configuration using your agent tool’s MCP inspection UI/command and a read-only `/session/current.json` request; report status/username and any errors without exposing credentials, then fully restart the agent tool to reload MCP settings.
 ```
 
 - **Run (read‑only, recommended to start)**
