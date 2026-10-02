@@ -6,7 +6,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { generateUserApiKey, type GenerateOptions } from "./user-api-key-generator.js";
+import { errorMessageWithNetworkHint, generateUserApiKey, type GenerateOptions } from "./user-api-key-generator.js";
 
 // Read package version at runtime to avoid import-attributes incompatibility
 async function getPackageVersion(): Promise<string> {
@@ -505,7 +505,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  const msg = err?.message || String(err);
+  const msg = errorMessageWithNetworkHint(err);
   process.stderr.write(`[${new Date().toISOString()}] ERROR ${msg}\n`);
   process.exit(1);
 });
