@@ -1,6 +1,6 @@
 import type { ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
-import { z, type AnyZodObject, type ZodRawShape } from "zod";
+import { z, type ZodObject, type ZodRawShape } from "zod";
 import {
   OPT_IN_TOOLSETS,
   type BuiltinToolset,
@@ -28,15 +28,15 @@ export type StructuredToolResult<Output extends Record<string, unknown>> = ToolR
   | { readonly isError: true; readonly structuredContent?: never }
 );
 
-type HandlerResult<OutputSchema extends AnyZodObject | undefined> =
-  OutputSchema extends AnyZodObject
+type HandlerResult<OutputSchema extends ZodObject | undefined> =
+  OutputSchema extends ZodObject
     ? StructuredToolResult<z.output<OutputSchema>>
     : ToolResult;
 
 /** Authoring-time type that infers a handler's input and structured output from Zod schemas. */
 export interface ToolSpec<
-  Schema extends AnyZodObject,
-  OutputSchema extends AnyZodObject | undefined = undefined,
+  Schema extends ZodObject,
+  OutputSchema extends ZodObject | undefined = undefined,
 > {
   readonly name: string;
   readonly title: string;
@@ -60,8 +60,8 @@ export interface ToolDefinition {
   readonly name: string;
   readonly title: string;
   readonly description: string;
-  readonly schema: AnyZodObject;
-  readonly outputSchema?: AnyZodObject;
+  readonly schema: ZodObject;
+  readonly outputSchema?: ZodObject;
   readonly availability: ToolAvailability;
   readonly toolsets: BuiltinToolsetMembership;
   readonly annotations?: ToolAnnotations;
@@ -78,8 +78,8 @@ export interface ToolDefinition {
  * schema/handler association only at the heterogeneous collection boundary.
  */
 export function defineTool<
-  Schema extends AnyZodObject,
-  OutputSchema extends AnyZodObject | undefined = undefined,
+  Schema extends ZodObject,
+  OutputSchema extends ZodObject | undefined = undefined,
 >(
   spec: ToolSpec<Schema, OutputSchema>
 ): ToolDefinition {
@@ -120,7 +120,7 @@ export function registerToolDefinitions(
       continue;
     }
 
-    ctx.server.registerTool<AnyZodObject, AnyZodObject>(
+    ctx.server.registerTool<ZodObject, ZodObject>(
       definition.name,
       {
         title: definition.title,

@@ -13,7 +13,7 @@ const schema = z.object({
   reviewable_id: z.number().int().positive().describe("Reviewable ID from list/detail"),
   action_id: z.string().trim().min(1).describe("Exact available_actions[].id from the current reviewable; the MCP maps its server_action to the route"),
   expected_version: z.number().int().min(0).optional().describe("Version observed during review; fail closed if it has changed"),
-  additional_fields: z.record(z.unknown()).optional().describe("Only fields advertised by the selected dynamic action contract"),
+  additional_fields: z.record(z.string(), z.unknown()).optional().describe("Only fields advertised by the selected dynamic action contract"),
   confirm: z.literal(true).describe("Explicit acknowledgement that the selected action may delete content, delete users, or block accounts"),
 }).strict();
 

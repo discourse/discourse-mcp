@@ -142,7 +142,7 @@ const groupSettingsShape = {
   membership_request_template: z.string().max(5000).nullable().optional(),
   publish_read_state: z.boolean().optional(),
   associated_group_ids: z.array(groupIdSchema).optional(),
-  custom_fields: z.record(z.unknown()).optional(),
+  custom_fields: z.record(z.string(), z.unknown()).optional(),
 };
 
 const createSchema = z.object({
@@ -150,7 +150,7 @@ const createSchema = z.object({
   ...groupSettingsShape,
   owner_usernames: z.array(usernameSchema).max(1000).optional(),
   usernames: z.array(usernameSchema).max(1000).optional(),
-  plugin_fields: z.record(z.unknown()).optional(),
+  plugin_fields: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const createGroupTool = defineTool({
@@ -202,7 +202,7 @@ const updateSchema = z.object({
   email_from_alias: z.string().nullable().optional(),
   allow_unknown_sender_topic_replies: z.boolean().optional(),
   update_existing_users: z.boolean().optional(),
-  plugin_fields: z.record(z.unknown()).optional(),
+  plugin_fields: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const updateGroupTool = defineTool({

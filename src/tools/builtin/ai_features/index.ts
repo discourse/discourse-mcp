@@ -26,7 +26,7 @@ export const getAiFeatureConfigTool = defineTool({
   handler: async (input, _extra, ctx) => { const access = requireAiAdmin(ctx.siteState); if (access) return access; try { const { module_id } = moduleSchema.parse(input); const config = await fetchFeatureConfig(ctx.siteState.ensureSelectedSite().client, module_id); const name = String((config.module as any)?.module_name ?? ""); return jsonResponse({ ...config, routing_guidance: routingGuidance(name) }); } catch (error) { return isZodError(error) ? zodError(error) : aiAdminError("get AI feature configuration", error); } },
 });
 
-const valuesRecord = z.record(settingValueSchema);
+const valuesRecord = z.record(z.string(), settingValueSchema);
 const updateSchema = z.object({ module_id: aiIdSchema, settings: valuesRecord.refine((value) => Object.keys(value).length > 0, "Provide at least one setting"), original_values: valuesRecord.optional() }).strict();
 export const updateAiFeatureConfigTool = defineTool({
   name: "discourse_ai_update_feature_config", title: "Update AI Feature Configuration",

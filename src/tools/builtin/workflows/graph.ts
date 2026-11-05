@@ -5,8 +5,8 @@ export const workflowNodeSchema = z.object({
   id: z.string().optional(),
   type: z.string().min(1),
   name: z.string().min(1),
-  parameters: z.record(z.unknown()).optional(),
-  credentials: z.record(z.unknown()).optional(),
+  parameters: z.record(z.string(), z.unknown()).optional(),
+  credentials: z.record(z.string(), z.unknown()).optional(),
   position: z.unknown().optional(),
 }).passthrough();
 
@@ -25,7 +25,7 @@ export type NestedConnections = Record<string, Record<string, Array<Array<{ node
 
 export const connectionsSchema = z.union([
   z.array(flatConnectionSchema),
-  z.record(z.record(z.array(z.array(z.object({
+  z.record(z.string(), z.record(z.string(), z.array(z.array(z.object({
     node: z.string(),
     type: z.string(),
     index: z.number().int().nonnegative(),
@@ -39,7 +39,7 @@ const nodeRefFields = {
 
 export const workflowOperationSchema = z.union([
   z.object({ op: z.literal("add_node"), id: z.string().optional(), node: workflowNodeSchema }),
-  z.object({ op: z.literal("update_node_parameters"), parameters: z.record(z.unknown()), ...nodeRefFields })
+  z.object({ op: z.literal("update_node_parameters"), parameters: z.record(z.string(), z.unknown()), ...nodeRefFields })
     .refine((value) => Boolean(value.id || value.name), "Provide id or name"),
   z.object({ op: z.literal("rename_node"), name: z.string().min(1), id: z.string().optional(), current_name: z.string().optional() })
     .refine((value) => Boolean(value.id || value.current_name), "Provide id or current_name"),

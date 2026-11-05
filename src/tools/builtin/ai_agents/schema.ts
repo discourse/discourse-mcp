@@ -7,7 +7,7 @@ export const aiAgentIdSchema = z.union([
 
 const nullablePositiveId = z.number().int().positive().nullable();
 const uploadSchema = z.object({ id: z.number().int().positive() }).strict();
-const toolOptionsSchema = z.record(z.unknown()).nullable();
+const toolOptionsSchema = z.record(z.string(), z.unknown()).nullable();
 export const agentToolSchema = z.union([
   z.string().min(1),
   z.tuple([z.string().min(1), toolOptionsSchema.optional(), z.boolean().optional()]),
@@ -36,13 +36,13 @@ export const agentPayloadShape = {
   allow_personal_messages: z.boolean(),
   tools: z.array(agentToolSchema),
   mcp_server_ids: z.array(z.number().int().positive()),
-  mcp_server_tool_names: z.record(z.array(z.string().min(1))),
+  mcp_server_tool_names: z.record(z.string(), z.array(z.string().min(1))),
   subagent_ids: z.array(aiAgentIdSchema)
     .refine((ids) => new Set(ids.map(String)).size <= 20, "At most 20 unique subagent IDs are allowed")
     .describe("Up to 20 existing AI agent IDs this agent may delegate to; IDs may include negative system-agent IDs"),
   forced_tool_count: z.number().int().min(-1).max(100_000),
   require_approval: z.boolean(),
-  response_format: z.array(z.record(z.unknown())).nullable(),
+  response_format: z.array(z.record(z.string(), z.unknown())).nullable(),
   examples: z.array(z.tuple([z.string(), z.string()])),
   show_thinking: z.boolean(),
   vision_enabled: z.boolean(),
@@ -65,7 +65,7 @@ export const createAgentPayloadSchema = z.object({
 
 export const updateAgentPayloadSchema = z.object(agentPayloadShape).partial().strict();
 
-export const agentImportBundleSchema = z.record(z.unknown()).refine(
+export const agentImportBundleSchema = z.record(z.string(), z.unknown()).refine(
   (value) => (value.agent !== null && typeof value.agent === "object" && !Array.isArray(value.agent)) || (value.persona !== null && typeof value.persona === "object" && !Array.isArray(value.persona)),
   "Agent import bundle must contain an agent or persona object",
 );
