@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Logger } from "../util/logger.js";
 import { SiteState } from "../site/state.js";
 import { filterTopicsTool, projectTopic } from "../tools/builtin/filter_topics.js";
+import { readTopicTool } from "../tools/builtin/read_topic.js";
 import type { ToolContext, ToolRegistrationOptions } from "../tools/types.js";
 
 function setup() {
@@ -110,5 +111,42 @@ test("topic discovery never treats a full page as proof of continuation", async 
     assert.equal("total" in output.meta, false);
   } finally {
     mock.restore();
+  }
+});
+
+test("topic discovery and reads preserve authorized user, group, and post assignments", async () => {
+  const assignments = [
+    { assigned_to_user: { id: 8, username: "alice", name: "Alice" } },
+    { assigned_to_group: { id: 4, name: "security", assignable_level: 1 } },
+    { indirectly_assigned_to: { "12": { assigned_to: { id: 9, username: "bob" }, post_number: 3 } } },
+    { assigned_to_user: null },
+    {},
+  ];
+
+  for (const assignment of assignments) {
+    const topic = {
+      id: 123,
+      posts_count: 1,
+      post_stream: { posts: [{ id: 12, post_number: 1, raw: "Report" }] },
+      ...assignment,
+    };
+    const mock = mockFetch({ ...topic, topic_list: { topics: [topic] } });
+    try {
+      const { ctx, opts } = setup();
+      const discovered = body(await invoke({ filter: "assigned:*" })).results[0];
+      const read = body(await readTopicTool.handler({ topic_id: 123, post_limit: 1 }, {} as any, ctx, opts));
+
+      for (const result of [discovered, read]) {
+        for (const field of ["assigned_to_user", "assigned_to_group", "indirectly_assigned_to"]) {
+          assert.equal(field in result, field in assignment);
+          if (field in assignment) {
+            assert.deepEqual(result[field], assignment[field as keyof typeof assignment]);
+          }
+        }
+      }
+      assert.equal(mock.requests.length, 2);
+    } finally {
+      mock.restore();
+    }
   }
 });

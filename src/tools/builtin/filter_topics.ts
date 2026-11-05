@@ -3,6 +3,7 @@ import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, zodError } from "../../util/json_response.js";
 
 import { readAnnotations } from "./common/helpers.js";
+import { projectTopicAssignments } from "./common/topic_assignments.js";
 
 const topPeriodSchema = z.enum(["daily", "weekly", "monthly", "quarterly", "yearly", "all"]);
 
@@ -56,6 +57,7 @@ export function projectTopic(topic: any) {
     visible: optional(topic?.visible),
     last_poster_username: optional(topic?.last_poster_username ?? lastPoster?.username),
     posters,
+    ...projectTopicAssignments(topic),
   };
 }
 
