@@ -2,6 +2,7 @@ import { z } from "zod";
 import { defineTool } from "../definition.js";
 import { jsonResponse, jsonError, withRateLimit } from "../../util/json_response.js";
 import { projectPost } from "./common/post_projection.js";
+import { projectTopicAssignments } from "./common/topic_assignments.js";
 
 import { readAnnotations } from "./common/helpers.js";
 
@@ -81,6 +82,7 @@ export const readTopicTool = defineTool({
         category_id: topicData?.category_id || null,
         tags: Array.isArray(topicData?.tags) ? topicData.tags : [],
         posts_count: topicData?.posts_count || fetchedPosts.length,
+        ...projectTopicAssignments(topicData),
         ...(topicData && "has_accepted_answer" in topicData ? { has_accepted_answer: topicData.has_accepted_answer } : {}),
         ...(topicData && "accepted_answers" in topicData ? { accepted_answers: Array.isArray(topicData.accepted_answers) ? topicData.accepted_answers.map((post: any) => projectPost(post, limit, { includeRaw: true })) : topicData.accepted_answers } : {}),
         posts: fetchedPosts,
