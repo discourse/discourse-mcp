@@ -11,7 +11,7 @@ export const workflowIdSchema = z.union([
   z.string().regex(/^\d+$/, "ID must be numeric"),
   z.number().int().positive(),
 ]);
-export const jsonRecordSchema = z.record(z.unknown());
+export const jsonRecordSchema = z.record(z.string(), z.unknown());
 export const authoringPlaybook = `Authoring loop: inspect the slim node catalog, request identifiers for schemas and output keys, resolve entity ids, create from a template or complete graph, GET before edits, test the draft, then publish. Interpolating strings start with =. Filter/if use leftValue/rightValue and output ports true/false. Connection type is the source output key, not always main. Prefer declarative nodes over action:code. Manual runs execute the current draft. Omitting a node on whole-graph update deletes it. nodes and connections must always be sent together.`;
 
 export function requireWorkflowAdmin(siteState: SiteState) {

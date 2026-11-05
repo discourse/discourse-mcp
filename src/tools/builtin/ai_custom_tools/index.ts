@@ -73,7 +73,7 @@ export const deleteCustomToolTool = defineTool({
   handler: async (input, _extra, ctx, opts) => { const access = requireAiAdminWrite(ctx.siteState, opts); if (access) return access; try { const { id } = idSchema.parse(input); await rateLimit("ai-tool-delete"); await ctx.siteState.ensureSelectedSite().client.delete(`${AI_TOOLS_BASE}/${id}.json`); return jsonResponse(deleteSuccess("custom_tool", id)); } catch (error) { return aiAdminError("delete custom tool", error); } },
 });
 
-const testSchema = z.object({ id: aiIdSchema, parameters: z.record(z.unknown()).default({}), script: z.string().min(1).max(100_000).optional(), secret_bindings: z.array(secretBindingSchema).optional() }).strict();
+const testSchema = z.object({ id: aiIdSchema, parameters: z.record(z.string(), z.unknown()).default({}), script: z.string().min(1).max(100_000).optional(), secret_bindings: z.array(secretBindingSchema).optional() }).strict();
 export const testCustomToolTool = defineTool({
   name: "discourse_ai_test_custom_tool", title: "Test AI Custom Tool",
   description: "Actually execute a persisted or unsaved custom-tool script. It can make external requests and cause side effects; this is not dry validation. Requires admin credentials and write mode.", schema: testSchema,

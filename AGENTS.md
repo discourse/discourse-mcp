@@ -66,7 +66,7 @@ pnpm clean       # Remove dist/
 
 **Dependencies and packaging**
 - pnpm is authoritative, but both `pnpm-lock.yaml` and `package-lock.json` are tracked. Regenerate both whenever dependencies change; use `pnpm install --frozen-lockfile` and `npm ci --ignore-scripts` to verify them.
-- `@modelcontextprotocol/sdk` is intentionally exact-pinned to reviewed version `1.30.0`. Upgrade deliberately only after typecheck, real MCP transport/output-schema tests, both production audits, and package smoke tests.
+- `@modelcontextprotocol/sdk` is intentionally exact-pinned to reviewed version `1.32.2`. Upgrade deliberately only after typecheck, real MCP transport/output-schema tests, both production audits, and package smoke tests.
 
 ## Adding a New Tool
 

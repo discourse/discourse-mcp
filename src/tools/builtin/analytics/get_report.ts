@@ -11,7 +11,7 @@ const schema = z.object({
   start_date: isoDate.optional(),
   end_date: isoDate.optional(),
   facets: z.array(z.string().min(1)).max(20).optional(),
-  filters: z.record(filterValue).optional(),
+  filters: z.record(z.string(), filterValue).optional(),
   limit: z.number().int().min(1).max(50).optional(),
   cache: z.boolean().optional(),
 });

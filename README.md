@@ -594,7 +594,7 @@ pnpm build && pnpm dev
 - **Dependency and lockfile policy**
 
   - pnpm (`packageManager: pnpm@10.14.0`) is the authoritative development workflow, but both `pnpm-lock.yaml` and `package-lock.json` are tracked for downstream/npm compatibility. Regenerate and commit **both** whenever dependencies change; CI runs frozen pnpm and clean `npm ci` builds so neither can silently drift.
-  - `@modelcontextprotocol/sdk` is intentionally pinned exactly to the reviewed `1.30.0` release. SDK updates are deliberate security/compatibility changes and must pass typecheck, real transport/output-schema tests, production high-severity audits for both lockfiles, and packaging smoke tests. Dev-only audit exceptions require a dated owner and remediation plan.
+  - `@modelcontextprotocol/sdk` is intentionally pinned exactly to the reviewed `1.32.2` release. SDK updates are deliberate security/compatibility changes and must pass typecheck, real transport/output-schema tests, production high-severity audits for both lockfiles, and packaging smoke tests. Dev-only audit exceptions require a dated owner and remediation plan.
 
 - **Testing notes**
 
