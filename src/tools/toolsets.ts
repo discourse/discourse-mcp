@@ -30,6 +30,7 @@ export const BUILTIN_TOOLSETS = [
   "ai_features",
   "analytics",
   "ai_insights",
+  "boards",
 ] as const;
 
 export type BuiltinToolset = (typeof BUILTIN_TOOLSETS)[number];
@@ -50,6 +51,7 @@ export const OPT_IN_TOOLSETS = [
   "ai_features",
   "analytics",
   "ai_insights",
+  "boards",
 ] as const satisfies readonly BuiltinToolset[];
 
 /** One or more domains assigned to a built-in tool definition or selection. */

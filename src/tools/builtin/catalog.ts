@@ -44,6 +44,7 @@ import { siteSettingTools } from "./site_settings/index.js";
 import { webhookTools } from "./webhooks/index.js";
 import { themeTools } from "./themes/index.js";
 import { tagGroupTools } from "./tag_groups/index.js";
+import { boardTools } from "./boards/index.js";
 
 /** Built-in tools in their stable MCP registration order. */
 export const builtinTools = [
@@ -90,4 +91,5 @@ export const builtinTools = [
   ...themeTools,
   ...analyticsTools,
   ...aiInsightTools,
+  ...boardTools,
 ] as const satisfies readonly ToolDefinition[];

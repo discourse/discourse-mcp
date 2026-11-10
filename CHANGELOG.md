@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* Add the opt-in `boards` toolset with 16 Discourse Boards (kanban) tools for discovery, card placement and editing, column rules, and ACL-aware board lifecycle
+  - Validate structured output, merge full-replacement column updates, guard tag creation and destructive/access changes, and honor board move confirmations
+  - Rate-limit non-retried mutations and report uncertain outcomes without blind-retry advice; verify board deletion with a fresh read
+
 ## [0.3.1](https://github.com/discourse/discourse-mcp/compare/v0.3.0...v0.3.1) (2026-08-25)
 
 ### Changed

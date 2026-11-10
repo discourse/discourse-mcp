@@ -26,6 +26,7 @@ pnpm clean       # Remove dist/
 | Resource registry | `src/resources/registry.ts` |
 | Built-in tools | `src/tools/builtin/*` |
 | Tag-group lifecycle | `src/tools/builtin/tag_groups/*` |
+| Boards toolset | `src/tools/builtin/boards/*` |
 | Workflow tools/adapters | `src/tools/builtin/workflows/*` |
 | Remote tools | `src/tools/remote/tool_exec_api.ts` |
 | Utilities | `src/util/*.ts` (logger, redact, json_response) |

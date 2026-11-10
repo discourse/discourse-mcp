@@ -6,6 +6,7 @@ import { SiteState } from "../site/state.js";
 import { builtinTools } from "../tools/builtin/catalog.js";
 import { groupTools } from "../tools/builtin/groups/index.js";
 import { tagGroupTools } from "../tools/builtin/tag_groups/index.js";
+import { boardTools } from "../tools/builtin/boards/index.js";
 import { themeTools } from "../tools/builtin/themes/index.js";
 import { moderationTools } from "../tools/builtin/moderation/index.js";
 import { registerToolDefinitions } from "../tools/definition.js";
@@ -521,6 +522,22 @@ const EXPECTED_TOOLSETS = {
   discourse_ai_get_topic_summary: ["ai_insights"],
   discourse_ai_semantic_search: ["ai_insights"],
   discourse_ai_list_sentiment_posts: ["ai_insights"],
+  discourse_list_boards: ["boards"],
+  discourse_get_board: ["boards"],
+  discourse_list_topic_boards: ["boards"],
+  discourse_create_board_card: ["boards"],
+  discourse_move_board_card: ["boards"],
+  discourse_update_board_card: ["boards"],
+  discourse_delete_board_card: ["boards"],
+  discourse_create_board_column: ["boards"],
+  discourse_update_board_column: ["boards"],
+  discourse_move_board_column: ["boards"],
+  discourse_clear_board_column: ["boards"],
+  discourse_delete_board_column: ["boards"],
+  discourse_create_board: ["boards"],
+  discourse_update_board: ["boards"],
+  discourse_set_board_archived: ["boards"],
+  discourse_delete_board: ["boards"],
 } as const;
 
 function registeredNames(opts: ToolRegistrationOptions): string[] {
@@ -605,9 +622,10 @@ test("builtinTools metadata and deterministic order match the compatibility snap
       (OPT_IN_TOOLSETS as readonly BuiltinToolset[]).includes(toolset)
     )
   );
-  assert.equal(optInMetadata.length, 111);
+  assert.equal(optInMetadata.length, 127);
   assert.equal(builtinTools.filter((tool) => tool.toolsets.includes("groups")).length, 25);
   assert.equal(builtinTools.filter((tool) => tool.toolsets.includes("tag_groups")).length, 6);
+  assert.equal(builtinTools.filter((tool) => tool.toolsets.includes("boards")).length, 16);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("review")).length, 5);
   assert.equal(optInMetadata.filter((tool) => tool.name.includes("workflow")).length, 18);
   assert.equal(optInMetadata.filter((tool) => tool.name.startsWith("discourse_ai_")).length, 23);
@@ -785,6 +803,15 @@ test("selected built-in toolsets preserve order and compose with availability", 
   assert.deepEqual(
     registeredNames({ ...baseOptions, toolsets: ["moderation"], hideSelectSite: true }),
     moderationTools.map((tool) => tool.name)
+  );
+
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, allowWrites: false, toolsets: ["boards"] }),
+    ["discourse_select_site", "discourse_list_boards", "discourse_get_board", "discourse_list_topic_boards"]
+  );
+  assert.deepEqual(
+    registeredNames({ ...baseOptions, toolsets: ["boards"], hideSelectSite: true }),
+    boardTools.map((tool) => tool.name)
   );
 
   const selectedToolsets = ["users", "topics"] as const;
