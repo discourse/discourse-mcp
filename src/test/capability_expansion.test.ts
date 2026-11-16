@@ -67,7 +67,7 @@ test("new capability reads carry accurate annotations and specialized domains re
 
 test("topic post selection performs bounded IDs-then-posts reads and preserves order", async () => {
   const { ctx, opts } = setup();
-  const mock = mockFetch((_url, index) => Response.json(index === 0 ? { post_ids: [1, 2, 3] } : { post_stream: { posts: [
+  const mock = mockFetch((_url, index) => Response.json(index === 0 ? { post_stream: { stream: [1, 2, 3], posts: [] } } : { post_stream: { posts: [
     { id: 3, topic_id: 9, post_number: 3, username: "c", raw: "third body" },
     { id: 2, topic_id: 9, post_number: 2, username: "b", raw: "second body", accepted_answer: true },
   ] } }));
@@ -78,8 +78,25 @@ test("topic post selection performs bounded IDs-then-posts reads and preserves o
     assert.equal(result.posts[0].accepted_answer, true);
     assert.equal(result.meta.visible_stream_size, 3);
     assert.equal(mock.urls.length, 2);
-    assert.equal(mock.urls[0], "https://example.com/t/9/post_ids.json");
+    assert.equal(mock.urls[0], "https://example.com/t/9.json");
     assert.match(mock.urls[1]!, /post_ids%5B%5D=2&post_ids%5B%5D=3&include_raw=true/);
+  } finally { mock.restore(); }
+});
+
+test("topic post selection reads the latest posts of a topic longer than one page", async () => {
+  const { ctx, opts } = setup();
+  const stream = Array.from({ length: 25 }, (_, index) => index + 1);
+  const mock = mockFetch((url) => {
+    const { pathname, searchParams } = new URL(url);
+    if (pathname === "/t/9/post_ids.json") return Response.json({ post_ids: stream.slice(0, 20) });
+    if (pathname === "/t/9.json") return Response.json({ post_stream: { stream, posts: [] } });
+    return Response.json({ post_stream: { posts: searchParams.getAll("post_ids[]").map((id) => ({ id: Number(id), topic_id: 9, post_number: Number(id), username: "a", raw: "body" })) } });
+  });
+  try {
+    const result = body(await invoke("discourse_read_topic_posts", { topic_id: 9, selection_mode: "latest", limit: 2 }, ctx, opts));
+    assert.deepEqual(result.posts.map((post: any) => post.id), [24, 25]);
+    assert.equal(result.meta.visible_stream_size, 25);
+    assert.equal(mock.urls.length, 2);
   } finally { mock.restore(); }
 });
 
