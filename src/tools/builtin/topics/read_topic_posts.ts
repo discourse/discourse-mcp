@@ -49,8 +49,9 @@ export const readTopicPostsTool = defineTool({
         postsUrl = `/t/${topic_id}/posts.json${queryString({ post_number: selection.post_number, include_raw: true })}`;
       } else {
         const usernames = selection.selection_mode === "usernames" ? selection.usernames.join(",") : undefined;
-        const idsData = await withRateLimit(`discourse-api:${base}`, () => client.get(`/t/${topic_id}/post_ids.json${queryString({ username_filters: usernames })}`), 200) as any;
-        streamIds = Array.isArray(idsData?.post_ids) ? idsData.post_ids.filter(Number.isInteger) : [];
+        const topicData = await withRateLimit(`discourse-api:${base}`, () => client.get(`/t/${topic_id}.json${queryString({ username_filters: usernames })}`), 200) as any;
+        const stream = topicData?.post_stream?.stream ?? topicData?.post_stream?.posts?.map((post: any) => post?.id);
+        streamIds = Array.isArray(stream) ? stream.filter(Number.isInteger) : [];
         let candidates: number[] = streamIds ?? [];
         if (selection.replies_only) candidates = candidates.slice(1);
         selectedIds = selection.selection_mode === "latest" ? candidates.slice(-limit) : candidates.slice(0, limit);
