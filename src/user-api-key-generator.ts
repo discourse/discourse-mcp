@@ -113,13 +113,39 @@ async function responseError(response: Response): Promise<Error> {
   return new Error(`Request failed with HTTP ${response.status}${detail}`);
 }
 
+const PROXY_ENVIRONMENT_VARIABLES = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"];
+
+export function networkErrorHint(): string {
+  const proxyConfigured = PROXY_ENVIRONMENT_VARIABLES.some((name) => process.env[name]);
+  const proxyForwardingEnabled = process.env.NODE_USE_ENV_PROXY === "1";
+  if (proxyConfigured && !proxyForwardingEnabled) {
+    return " (proxy environment variables are set, but Node's built-in fetch ignores them by default; retry with NODE_USE_ENV_PROXY=1 on Node >= 24 so fetch uses the proxy)";
+  }
+  return "";
+}
+
+export function errorMessageWithNetworkHint(error: unknown): string {
+  const message = (error as any)?.message || String(error);
+  if (error instanceof TypeError && message === "fetch failed") {
+    return message + networkErrorHint();
+  }
+  return message;
+}
+
 export async function supportsDeviceAuthorization(
   site: string,
   fetchImpl: Fetch = fetch
 ): Promise<boolean> {
   const response = await fetchImpl(siteUrl(site, "/user-api-key/new"), { method: "HEAD" });
   if (response.status === 404 || response.status === 405) return false;
-  if (!response.ok) throw await responseError(response);
+  if (!response.ok) {
+    const error = await responseError(response);
+    if (response.status === 403) {
+      error.message +=
+        " (the site may require login for API access, sit behind a bot challenge such as Cloudflare, or have user API keys disabled by the administrator; opening the site's /user-api-key/new page in a normal browser usually shows the definitive reason)";
+    }
+    throw error;
+  }
   return response.headers.get(DEVICE_AUTH_HEADER)?.toLowerCase() === "true";
 }
 
@@ -401,7 +427,7 @@ async function main() {
   try {
     await generateUserApiKey(options);
   } catch (error: any) {
-    console.error(`\n❌ Error: ${error?.message || String(error)}`);
+    console.error(`\n❌ Error: ${errorMessageWithNetworkHint(error)}`);
     process.exit(1);
   }
 }

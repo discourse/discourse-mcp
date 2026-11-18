@@ -5,6 +5,7 @@ import {
   buildAuthorizationUrl,
   createDeviceAuthorization,
   decryptPayload,
+  networkErrorHint,
   pollDeviceAuthorization,
   supportsDeviceAuthorization,
   type GenerateOptions,
@@ -188,4 +189,38 @@ test("buildAuthorizationUrl preserves the legacy fallback protocol and site subf
   assert.equal(url.searchParams.get("scopes"), "read,write");
   assert.equal(url.searchParams.get("public_key"), "PUBLIC KEY");
   assert.equal(url.searchParams.get("nonce"), "request-nonce");
+});
+
+test("supportsDeviceAuthorization explains likely causes on HTTP 403", async () => {
+  await assert.rejects(
+    supportsDeviceAuthorization(
+      options.site,
+      mockFetch(() => new Response(null, { status: 403 }))
+    ),
+    /disabled by the administrator/
+  );
+});
+
+test("networkErrorHint suggests NODE_USE_ENV_PROXY when a proxy is configured", () => {
+  const names = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"];
+  const saved = names.map((name) => [name, process.env[name]] as const);
+  const savedFlag = process.env.NODE_USE_ENV_PROXY;
+  try {
+    for (const name of names) delete process.env[name];
+    delete process.env.NODE_USE_ENV_PROXY;
+    assert.equal(networkErrorHint(), "");
+
+    process.env.HTTPS_PROXY = "http://127.0.0.1:7890";
+    assert.match(networkErrorHint(), /NODE_USE_ENV_PROXY=1/);
+
+    process.env.NODE_USE_ENV_PROXY = "1";
+    assert.equal(networkErrorHint(), "");
+  } finally {
+    for (const [name, value] of saved) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+    if (savedFlag === undefined) delete process.env.NODE_USE_ENV_PROXY;
+    else process.env.NODE_USE_ENV_PROXY = savedFlag;
+  }
 });
